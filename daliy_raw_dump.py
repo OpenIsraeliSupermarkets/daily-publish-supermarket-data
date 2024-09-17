@@ -1,5 +1,5 @@
 from il_supermarket_scarper import MainScrapperRunner
-from  il_supermarket_parsers import ParallelParser
+from il_supermarket_parsers import ParallelParser
 
 
 number_of_processes = 6
