@@ -5,6 +5,7 @@ ARG PY_VERSION="3.11.0"
 
 ENV HOME="/root"
 WORKDIR ${HOME}
+RUN apt-get update
 RUN apt-get install -y git libbz2-dev libncurses-dev  libreadline-dev libffi-dev libssl-dev build-essential python3-dev
 RUN git clone --depth=1 https://github.com/pyenv/pyenv.git .pyenv
 ENV PYENV_ROOT="${HOME}/.pyenv"
