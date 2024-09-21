@@ -1,5 +1,5 @@
 from il_supermarket_scarper import ScarpingTask,ScraperFactory
-from il_supermarket_parsers.main import ConvertingTask
+from il_supermarket_parsers import ConvertingTask
 from kaggle import KaggleDatasetManager
 
 
