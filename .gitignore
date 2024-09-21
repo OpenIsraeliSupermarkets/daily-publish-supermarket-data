@@ -3,3 +3,5 @@ venv/
 *.log
 dumps
 status
+now
+outputs
