@@ -23,15 +23,6 @@ if __name__ == "__main__":
         output_folder=outputs_folder
     ).start()
 
-database =  KaggleDatasetManager()
-database.upload_to_dataset("israeli-supermarkets-2024", data_folder)
-
-
-
-from il_supermarket_parsers import ConvertingTask
-from il_supermarket_scarper import ScarpingTask,ScraperFactory
-if __name__ == "__main__":
-
-
-    multiprocessing = None
+    database =  KaggleDatasetManager()
+    database.upload_to_dataset("israeli-supermarkets-2024", data_folder)
 
