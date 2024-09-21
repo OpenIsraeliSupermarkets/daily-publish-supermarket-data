@@ -1,14 +1,24 @@
-from il_supermarket_scarper import MainScrapperRunner
-from il_supermarket_parsers import ParallelParser
+from il_supermarket_scarper import ScarpingTask,ScraperFactory
+from il_supermarket_parsers.main import ConvertingTask
+from kaggle import KaggleDatasetManager
 
 
 number_of_processes = 6
 data_folder = "dumps"
+enabled_scrapers=[ScraperFactory.BAREKET.name]
 
-scraper = MainScrapperRunner()
-scraper.run()
+scraper = ScarpingTask(
+    enabled_scrapers=enabled_scrapers,
+    multiprocessing=number_of_processes,
+    dump_folder_name=data_folder
+)
+scraper.start()
 
-ParallelParser(
-      data_folder,
+converter = ConvertingTask(
+      data_folder=data_folder,
       number_of_processes=number_of_processes,
-).execute()
+)
+files = converter.start()
+
+database =  KaggleDatasetManager()
+database.upload_to_dataset("israeli-supermarkets-2024", data_folder)
