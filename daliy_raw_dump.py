@@ -1,12 +1,15 @@
 from il_supermarket_scarper import ScarpingTask,ScraperFactory
 from il_supermarket_parsers import ConvertingTask
 from kaggle import KaggleDatasetManager
+import os
+import shutil
 
 
 if __name__ == "__main__":
     number_of_processes = 6
     data_folder = "dumps"
     outputs_folder = "outputs"
+    status_folder = "status"
     enabled_scrapers=[ScraperFactory.BAREKET.name]
 
     ScarpingTask(
@@ -23,6 +26,11 @@ if __name__ == "__main__":
         output_folder=outputs_folder
     ).start()
 
+    
+    os.mkdir("now")
+    shutil.copytree(outputs_folder, f"now/{outputs_folder}")
+    shutil.copytree(status_folder, f"now/{status_folder}")
+
     database =  KaggleDatasetManager()
-    database.upload_to_dataset("israeli-supermarkets-2024", data_folder)
+    database.upload_to_dataset("israeli-supermarkets-2024", "now")
 
