@@ -27,7 +27,7 @@ if __name__ == "__main__":
     ).start()
 
     
-    os.mkdir("now")
+    os.makedirs("now",exist_ok=True)
     shutil.copytree(outputs_folder, f"now/{outputs_folder}")
     shutil.copytree(status_folder, f"now/{status_folder}")
 
