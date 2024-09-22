@@ -39,6 +39,6 @@ if __name__ == "__main__":
     shutil.copytree(status_folder, "israeli-supermarkets-2024",dirs_exist_ok=True)
     shutil.rmtree(status_folder)
 
-    database =  KaggleDatasetManager()
-    database.api.dataset_create_version("israeli-supermarkets-2024",version_notes="first try")
+    database = KaggleDatasetManager(dataset="israeli-supermarkets-2024")
+    database.upload_to_dataset(version_notes="first try")
 
