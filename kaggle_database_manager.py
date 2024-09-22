@@ -31,7 +31,7 @@ class KaggleDatasetManager:
         :param new_file_name: str, optional new name for the file in the dataset
         """
         try:
-            self.api.dataset_create_version(self.dataset, version_notes=version_notes)
+            self.api.dataset_create_version(self.dataset, version_notes=version_notes,delete_old_versions=False) # each day is a version
         except Exception as e:
             print(f"Error uploading file: {e}")
 

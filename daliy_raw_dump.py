@@ -17,7 +17,8 @@ if __name__ == "__main__":
         enabled_scrapers=enabled_scrapers, #download one from each 
         dump_folder_name=data_folder,
         multiprocessing=number_of_processes,
-        lookup_in_db=True
+        lookup_in_db=True,
+        only_latest=True
     ).start()
     scraper = ConvertingTask(
         enabled_parsers=enabled_scrapers,
