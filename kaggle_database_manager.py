@@ -1,26 +1,26 @@
 import os
 
 class KaggleDatasetManager:
-    def __init__(self, dataset, status_files):
+    def __init__(self, dataset):
         from kaggle import KaggleApi
         self.api = KaggleApi()
         self.api.authenticate()
         self.dataset = dataset
-        self.status_files = status_files
+        # self.status_files = status_files
 
-    def download_status_files(self):
-        """
-        Download a dataset from Kaggle.
+    # def download_status_files(self):
+    #     """
+    #     Download a dataset from Kaggle.
 
-        :param dataset: str, the dataset to download in the format 'owner/dataset-name'
-        :param path: str, the path where to save the dataset (default is current directory)
-        """
-        for status_file in self.status_files:
-            try:
-                self.api.dataset_download_cli(self.dataset, file_name=status_file)
-                print(f"Dataset '{self.dataset}' downloaded successfully")
-            except Exception as e:
-                print(f"Error downloading dataset: {e}")
+    #     :param dataset: str, the dataset to download in the format 'owner/dataset-name'
+    #     :param path: str, the path where to save the dataset (default is current directory)
+    #     """
+    #     for status_file in self.status_files:
+    #         try:
+    #             self.api.dataset_download_cli(self.dataset, file_name=status_file)
+    #             print(f"Dataset '{self.dataset}' downloaded successfully")
+    #         except Exception as e:
+    #             print(f"Error downloading dataset: {e}")
 
     def upload_to_dataset(self, version_notes=None):
         """

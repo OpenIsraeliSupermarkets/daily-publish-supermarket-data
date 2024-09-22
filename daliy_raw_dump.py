@@ -27,7 +27,7 @@ if __name__ == "__main__":
         output_folder=outputs_folder
     ).start()
 
-    shutil.rmtree("israeli-supermarkets-2024")
+    shutil.rmtree("israeli-supermarkets-2024",ignore_errors=True)
     os.makedirs("israeli-supermarkets-2024",exist_ok=True)
     with open("israeli-supermarkets-2024/dataset-metadata.json",'w') as file:
         json.dump({
