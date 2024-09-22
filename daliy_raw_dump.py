@@ -16,7 +16,6 @@ if __name__ == "__main__":
     ScarpingTask(
         enabled_scrapers=enabled_scrapers, #download one from each 
         dump_folder_name=data_folder,
-        limit=1,
         multiprocessing=number_of_processes,
         lookup_in_db=True
     ).start()
