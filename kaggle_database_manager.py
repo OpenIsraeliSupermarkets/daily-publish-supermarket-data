@@ -1,14 +1,9 @@
 import os
 
-
-
 class KaggleDatasetManager:
     def __init__(self, username=None, key=None):
-        from kaggle.api.kaggle_api_extended  import KaggleApi
+        from kaggle import KaggleApi
         self.api = KaggleApi()
-        if username and key:
-            os.environ["KAGGLE_USERNAME"] = username
-            os.environ["KAGGLE_KEY"] = key
         self.api.authenticate()
 
     def download_dataset(self, dataset, path="."):
@@ -48,10 +43,32 @@ class KaggleDatasetManager:
         except Exception as e:
             print(f"Error uploading file: {e}")
 
+    def upload_folder_to_dataset(self, dataset, folder_path):
+        """
+        Upload all files in a folder to an existing Kaggle dataset.
+
+        :param dataset: str, the dataset to upload to in the format 'owner/dataset-name'
+        :param folder_path: str, the path to the folder to upload
+        """
+        try:
+            # Check if folder exists
+            if not os.path.isdir(folder_path):
+                raise ValueError(f"The path {folder_path} is not a valid folder.")
+
+            # Loop through all files in the folder and upload them one by one
+            for root, _, files in os.walk(folder_path):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    new_file_name = os.path.relpath(file_path, folder_path)
+                    self.upload_to_dataset(dataset, file_path, new_file_name)
+
+            print(f"All files in folder '{folder_path}' uploaded successfully to dataset '{dataset}'")
+        except Exception as e:
+            print(f"Error uploading folder: {e}")
 
 # Example usage:
 if __name__ == "__main__":
     manager = KaggleDatasetManager()
 
-    # Upload a file to a dataset (make sure you have write permissions)
-    manager.upload_to_dataset("israeli-supermarkets-2024", "tmp/file.csv")
+    # Upload a folder to a dataset (make sure you have write permissions)
+    manager.upload_folder_to_dataset("israeli-supermarkets-2024",'now')
