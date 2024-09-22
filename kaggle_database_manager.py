@@ -37,7 +37,7 @@ class KaggleDatasetManager:
 
 # Example usage:
 if __name__ == "__main__":
-    manager = KaggleDatasetManager()
+    manager = KaggleDatasetManager("israeli-supermarkets-2024")
 
     # Upload a folder to a dataset (make sure you have write permissions)
-    manager.upload_folder_to_dataset("israeli-supermarkets-2024",'now')
+    manager.upload_to_dataset(version_notes='now')
