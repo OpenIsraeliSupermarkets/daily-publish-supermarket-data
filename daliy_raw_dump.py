@@ -11,7 +11,7 @@ if __name__ == "__main__":
     data_folder = "dumps"
     outputs_folder = "outputs"
     status_folder = "status"
-    enabled_scrapers=[ScraperFactory.BAREKET.name]
+    enabled_scrapers=None
 
     ScarpingTask(
         enabled_scrapers=enabled_scrapers, #download one from each 
