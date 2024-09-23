@@ -12,8 +12,9 @@ class KaggleDatasetManager:
         self.api = KaggleApi()
         self.api.authenticate()
         self.dataset = dataset
+        self.when = self._now()
 
-    def _now():
+    def _now(self):
         return datetime.datetime.now(pytz.timezone("Asia/Jerusalem")).strftime(
             "%d/%m/%Y, %H:%M:%S"
         )
@@ -30,10 +31,9 @@ class KaggleDatasetManager:
                 },
                 file,
             )
-        shutil.copytree(outputs_folder, self.dataset, dirs_exist_ok=True)
-        shutil.rmtree(outputs_folder)
+        shutil.copytree(outputs_folder, self.dataset, dirs_exist_ok=True)    
         shutil.copytree(status_folder, self.dataset, dirs_exist_ok=True)
-        shutil.rmtree(status_folder)
+
 
         self.increase_index()
 
@@ -49,9 +49,9 @@ class KaggleDatasetManager:
         print(f"Dataset '{self.dataset}' downloaded successfully")
 
         with open("index.json", "r") as file:
-            index = json.loads(file)
+            index = json.load(file)
 
-        index[max(map(int, index.keys())) + 1] = self._now()
+        index[max(map(int, index.keys())) + 1] = self.when
 
         with open(os.path.join(self.dataset, "index.json"), "w") as file:
             json.dump(index, file)
@@ -66,11 +66,16 @@ class KaggleDatasetManager:
         """
         try:
             self.api.dataset_create_version(
-                self.dataset, version_notes=version_notes, delete_old_versions=False
+                self.dataset, version_notes=f"{self.when} {version_notes}", delete_old_versions=False
             )  # each day is a version
         except Exception as e:
             print(f"Error uploading file: {e}")
 
+    def clean(self,*folders):
+        for folder in folders:
+            shutil.rmtree(folder)
+        shutil.rmtree(self.dataset)
+        os.remove("index.json")
 
 # Example usage:
 if __name__ == "__main__":

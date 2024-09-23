@@ -1,4 +1,4 @@
-from il_supermarket_scarper import ScarpingTask
+from il_supermarket_scarper import ScarpingTask,ScraperFactory
 from il_supermarket_parsers import ConvertingTask
 from kaggle_database_manager import KaggleDatasetManager
 import shutil
@@ -10,7 +10,7 @@ if __name__ == "__main__":
     data_folder = "dumps"
     outputs_folder = "outputs"
     status_folder = "status"
-    enabled_scrapers = None
+    enabled_scrapers = [ScraperFactory.BAREKET.name]
 
     ScarpingTask(
         enabled_scrapers=enabled_scrapers,  # download one from each
@@ -28,6 +28,5 @@ if __name__ == "__main__":
 
     database = KaggleDatasetManager(dataset="israeli-supermarkets-2024")
     database.compose(outputs_folder=outputs_folder, status_folder=status_folder)
-    database.upload_to_dataset(version_notes="first try")
-
-    shutil.rmtree(data_folder)
+    database.upload_to_dataset(version_notes=",".join(enabled_scrapers))
+    database.clean(data_folder,status_folder,outputs_folder)
