@@ -6,13 +6,16 @@ import pytz
 
 
 class KaggleDatasetManager:
-    def __init__(self, dataset):
+    def __init__(self, dataset, enabled_scrapers=None, enabled_file_types=None):
         from kaggle import KaggleApi
 
         self.api = KaggleApi()
         self.api.authenticate()
         self.dataset = dataset
         self.when = self._now()
+        self.enabled_scrapers = "ALL" if enabled_scrapers else ",".join(enabled_scrapers)
+        self.enabled_file_types = "ALL" if enabled_file_types else ",".join(enabled_file_types)
+
 
     def _now(self):
         return datetime.datetime.now(pytz.timezone("Asia/Jerusalem")).strftime(
@@ -56,7 +59,7 @@ class KaggleDatasetManager:
         with open(os.path.join(self.dataset, "index.json"), "w") as file:
             json.dump(index, file)
 
-    def upload_to_dataset(self, version_notes=None):
+    def upload_to_dataset(self):
         """
         Upload a new file to an existing Kaggle dataset.
 
@@ -66,8 +69,8 @@ class KaggleDatasetManager:
         """
         try:
             self.api.dataset_create_version(
-                self.dataset, version_notes=f"{self.when} {version_notes}", delete_old_versions=False
-            )  # each day is a version
+                self.dataset, version_notes=f"Update-Time: {self.when}, Scrapers:{self.enabled_scrapers}, Files:{self.enabled_file_types}", delete_old_versions=False
+            ) 
         except Exception as e:
             print(f"Error uploading file: {e}")
 

@@ -1,2 +1,3 @@
 git+https://github.com/OpenIsraeliSupermarkets/israeli-supermarket-parsers.git@dev
+git+https://github.com/erlichsefi/israeli-supermarket-scarpers.git@dev
 kaggle==1.6.17
