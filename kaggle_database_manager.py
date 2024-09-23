@@ -13,8 +13,8 @@ class KaggleDatasetManager:
         self.api.authenticate()
         self.dataset = dataset
         self.when = self._now()
-        self.enabled_scrapers = "ALL" if enabled_scrapers else ",".join(enabled_scrapers)
-        self.enabled_file_types = "ALL" if enabled_file_types else ",".join(enabled_file_types)
+        self.enabled_scrapers = "ALL" if not enabled_scrapers else ",".join(enabled_scrapers)
+        self.enabled_file_types = "ALL" if not enabled_file_types else ",".join(enabled_file_types)
 
 
     def _now(self):
