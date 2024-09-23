@@ -6,7 +6,7 @@ import datetime
 
 
 if __name__ == "__main__":
-    number_of_processes = 6
+    number_of_processes = 12
     data_folder = "dumps"
     outputs_folder = "outputs"
     status_folder = "status"
