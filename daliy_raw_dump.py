@@ -10,7 +10,7 @@ if __name__ == "__main__":
     data_folder = "dumps"
     outputs_folder = "outputs"
     status_folder = "status"
-    enabled_scrapers = [ScraperFactory.BAREKET.name]
+    enabled_scrapers = None
     enabled_file_types = None
 
     ScarpingTask(
