@@ -1,8 +1,6 @@
-from il_supermarket_scarper import ScarpingTask,ScraperFactory
+from il_supermarket_scarper import ScarpingTask
 from il_supermarket_parsers import ConvertingTask
 from kaggle_database_manager import KaggleDatasetManager
-import shutil
-import datetime
 
 
 if __name__ == "__main__":
@@ -31,5 +29,5 @@ if __name__ == "__main__":
 
     database = KaggleDatasetManager(dataset="israeli-supermarkets-2024",enabled_scrapers=enabled_scrapers,enabled_file_types=enabled_file_types)
     database.compose(outputs_folder=outputs_folder, status_folder=status_folder)
-    database.upload_to_dataset(version_notes=",".join(enabled_scrapers))
+    database.upload_to_dataset()
     database.clean(data_folder,status_folder,outputs_folder)
