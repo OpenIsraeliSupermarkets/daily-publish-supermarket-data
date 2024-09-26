@@ -21,6 +21,6 @@ RUN pip install -r requirements.txt
 FROM base as prod
 CMD python daliy_raw_dump.py
 
-FROM base as dev
+#
 
-RUN pip install -r requirements-dev.txt
+# RUN pip install -r requirements-dev.txt
