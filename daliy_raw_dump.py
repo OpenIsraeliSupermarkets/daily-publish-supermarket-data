@@ -19,7 +19,7 @@ if __name__ == "__main__":
         lookup_in_db=True,
         only_latest=True,
     ).start()
-    scraper = ConvertingTask(
+    ConvertingTask(
         enabled_parsers=enabled_scrapers,
         files_types=enabled_file_types,
         data_folder=data_folder,

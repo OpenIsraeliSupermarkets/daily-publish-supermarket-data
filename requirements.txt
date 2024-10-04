@@ -1,3 +1,3 @@
-git+https://github.com/OpenIsraeliSupermarkets/israeli-supermarket-parsers.git@dev
-git+https://github.com/erlichsefi/israeli-supermarket-scarpers.git@dev
+il-supermarket-scraper==0.4.6
+il-supermarket-parser==0.0.1 
 kaggle==1.6.17
