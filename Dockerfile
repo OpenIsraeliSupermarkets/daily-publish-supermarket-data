@@ -1,7 +1,5 @@
 FROM node:20-bookworm as base
-WORKDIR /usr/src/app
 ARG PY_VERSION="3.11.0"
-
 
 ENV HOME="/root"
 WORKDIR ${HOME}
@@ -14,6 +12,7 @@ ENV PATH="${PYENV_ROOT}/shims:${PYENV_ROOT}/bin:${PATH}"
 RUN pyenv install $PY_VERSION
 RUN pyenv global $PY_VERSION
 
+WORKDIR /usr/src/app
 COPY . .
 
 RUN pip install -r requirements.txt

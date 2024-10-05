@@ -74,9 +74,7 @@ class KaggleDatasetManager:
         except Exception as e:
             print(f"Error uploading file: {e}")
 
-    def clean(self,*folders):
-        for folder in folders:
-            shutil.rmtree(folder)
+    def clean(self):
         shutil.rmtree(self.dataset)
         os.remove("index.json")
 
