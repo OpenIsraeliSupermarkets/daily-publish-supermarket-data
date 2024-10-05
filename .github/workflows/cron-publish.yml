@@ -35,7 +35,7 @@ jobs:
         df --human-readable
     - name: Build with Docker
       run: docker build -t erlichsefi/israeli-supermarket-publisher:prod --target prod .
-    - name: Test with pytest
+    - name: Daily Dump
       run: |
            mkdir -p temp &&
            docker rm publisher-runner || true &&
