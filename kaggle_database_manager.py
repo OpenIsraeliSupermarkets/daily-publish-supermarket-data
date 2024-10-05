@@ -3,12 +3,10 @@ import shutil
 import json
 import datetime
 import pytz
-
+from kaggle import KaggleApi
 
 class KaggleDatasetManager:
     def __init__(self, dataset, enabled_scrapers=None, enabled_file_types=None):
-        from kaggle import KaggleApi
-
         self.api = KaggleApi()
         self.api.authenticate()
         self.dataset = dataset
