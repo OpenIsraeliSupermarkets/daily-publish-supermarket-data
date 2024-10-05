@@ -10,3 +10,5 @@ The cron:
 
 
 [Link to Kaggle](https://www.kaggle.com/datasets/erlichsefi/israeli-supermarkets-2024)
+
+[![Last Publish Data to Kaggle Status](https://github.com/OpenIsraeliSupermarkets/daily-publish-supermarket-data/actions/workflows/cron-publish.yml/badge.svg?event=schedule)](https://github.com/OpenIsraeliSupermarkets/daily-publish-supermarket-data/actions/workflows/cron-publish.yml)
