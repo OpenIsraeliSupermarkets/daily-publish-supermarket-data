@@ -9,7 +9,7 @@ if __name__ == "__main__":
     number_of_processes = 12
     data_folder = "app_data/dumps"
     outputs_folder = "app_data/outputs"
-    status_folder = "app_data/status"
+    status_folder = "app_data/dumps/status"
     enabled_scrapers = None
     enabled_file_types = None
 
