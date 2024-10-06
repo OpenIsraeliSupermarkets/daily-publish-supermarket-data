@@ -1,3 +1,3 @@
-il-supermarket-scraper==0.4.6
-il-supermarket-parser==0.0.1 
+il-supermarket-scraper==0.4.7
+il-supermarket-parser==0.0.2
 kaggle==1.6.17
