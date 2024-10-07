@@ -6,7 +6,7 @@ from kaggle_database_manager import KaggleDatasetManager
 
 
 if __name__ == "__main__":
-    number_of_processes = 12
+    number_of_processes = 6
     data_folder = "app_data/dumps"
     outputs_folder = "app_data/outputs"
     status_folder = "app_data/dumps/status"
