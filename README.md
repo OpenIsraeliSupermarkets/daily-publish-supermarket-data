@@ -6,7 +6,8 @@ This repository defines a cron job that runs every day at 11 PM israel time.
 The cron: 
   - Fetch the data from all supermarkets.
   - Converted to data frame.
-  - Push it to each version in Puggle defines a push.
+  - Compose kaggle dataset with a binding between the version number and the scrape date.
+  - Create new version in Kaggle.
 
 
 [Link to Kaggle](https://www.kaggle.com/datasets/erlichsefi/israeli-supermarkets-2024)
