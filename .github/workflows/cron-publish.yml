@@ -24,8 +24,10 @@ jobs:
         python-version: ["3.11.0"]
 
     steps:
-    - name: clean-old
-      run: sudo rm -rf "${{ github.workspace }}"
+    - name: Clean Old
+      run: |
+        sudo rm -rf "${{ github.workspace }}"
+        mkdir "${{ github.workspace }}"
       
     - name: Checkout
       uses: actions/checkout@v3
