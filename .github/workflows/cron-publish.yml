@@ -25,7 +25,7 @@ jobs:
     steps:
     - name: clean-old
       run: |
-      sudo rm -rf ${{ github.workspace }}
+      sudo rm -rf "${{ github.workspace }}"
       
     - name: Checkout
       uses: actions/checkout@v3
