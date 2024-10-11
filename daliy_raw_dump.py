@@ -36,7 +36,6 @@ if __name__ == "__main__":
         database.clean()
     
     finally:  
-
         # clean the folders in case of an error
         for folder in [data_folder,outputs_folder,status_folder]:
             

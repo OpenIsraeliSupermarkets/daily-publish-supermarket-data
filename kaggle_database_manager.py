@@ -46,7 +46,7 @@ class KaggleDatasetManager:
         :param path: str, the path where to save the dataset (default is current directory)
         """
 
-        self.api.dataset_download_cli(self.dataset, file_name="index.json")
+        self.api.dataset_download_cli(self.dataset, file_name="index.json",force=True)
         print(f"Dataset '{self.dataset}' downloaded successfully")
 
         with open("index.json", "r") as file:
@@ -81,4 +81,4 @@ if __name__ == "__main__":
     manager = KaggleDatasetManager("israeli-supermarkets-2024")
 
     # Upload a folder to a dataset (make sure you have write permissions)
-    manager.upload_to_dataset(version_notes="now")
+    manager.increase_index()
