@@ -1,6 +1,6 @@
 import shutil
 import os
-from il_supermarket_scarper import ScarpingTask, ScraperFactory
+from il_supermarket_scarper import ScarpingTask
 from il_supermarket_parsers import ConvertingTask
 from kaggle_database_manager import KaggleDatasetManager
 
