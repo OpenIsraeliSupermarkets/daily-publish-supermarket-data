@@ -35,7 +35,9 @@ if __name__ == "__main__":
         database.upload_to_dataset()
         database.clean(data_folder,status_folder,outputs_folder)
     
-    except Exception as e:    
+    except Exception as e:  
+        
+        print(e)
         # clean the folders in case of an error
         for folder in [data_folder,outputs_folder,status_folder]:
             
