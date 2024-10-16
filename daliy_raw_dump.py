@@ -4,7 +4,7 @@ import time
 import logging
 import datetime
 import os
-from il_supermarket_scarper import ScarpingTask, ScraperFactory
+from il_supermarket_scarper import ScarpingTask
 from il_supermarket_parsers import ConvertingTask
 from kaggle_database_manager import KaggleDatasetManager
 
@@ -30,11 +30,7 @@ class SupermarketDataPublisher:
         self.data_folder = data_folder
         self.outputs_folder = outputs_folder
         self.status_folder = status_folder
-        self.enabled_scrapers = (
-            enabled_scrapers
-            if enabled_scrapers is not None
-            else [ScraperFactory.BAREKET.name]
-        )
+        self.enabled_scrapers = enabled_scrapers
         self.enabled_file_types = enabled_file_types
         self.occasions = (
             occasions if occasions is not None else ["12:00", "17:30", "23:00"]
