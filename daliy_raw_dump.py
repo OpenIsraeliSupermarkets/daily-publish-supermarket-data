@@ -1,6 +1,7 @@
 import shutil
 import schedule
 import time
+import pytz
 import logging
 import datetime
 import os
@@ -19,31 +20,46 @@ class SupermarketDataPublisher:
     def __init__(
         self,
         number_of_processes=4,
-        data_folder="app_data/dumps",
-        outputs_folder="app_data/outputs",
-        status_folder="app_data/dumps/status",
+        data_folder="dumps",
+        outputs_folder="outputs",
+        status_folder="dumps/status",
         enabled_scrapers=None,
         enabled_file_types=None,
-        occasions=None,
+        completed_by=None,
+        num_of_occasions=3,
         limit=None,
     ):
         self.number_of_processes = number_of_processes
-        self.data_folder = data_folder
-        self.outputs_folder = outputs_folder
-        self.status_folder = status_folder
+        self.data_folder = os.path.join("app_data",data_folder)
+        self.outputs_folder = os.path.join("app_data",outputs_folder) 
+        self.status_folder = os.path.join("app_data",status_folder)
         self.enabled_scrapers = enabled_scrapers
         self.enabled_file_types = enabled_file_types
-        self.occasions = (
-            occasions if occasions is not None else ["12:00", "17:30", "23:00"]
-        )
+
+        self.num_of_occasions = num_of_occasions
+        
         self.limit = limit
-
-        assert (
-            os.environ["TZ"] == "Asia/Jerusalem"
-        ), "The timezone should be set to Asia/Jerusalem"
         self.today = datetime.datetime.now()
+        self.completed_by = completed_by if completed_by else self._end_of_day()
         self.executed_jobs = 0
+        self.occasions = self._compute_occasions()
 
+    def _check_tz(self):
+        assert datetime.datetime.now().hour == datetime.datetime.now(pytz.timezone("Asia/Jerusalem")).hour, "The timezone should be set to Asia/Jerusalem"
+        
+    def _compute_occasions(self):
+        """Compute the occasions for the scraping tasks"""
+        interval = (self.completed_by - self.today).total_seconds() / self.num_of_occasions
+        occasions = [
+            (self.today + datetime.timedelta(seconds=interval * i)).strftime("%H:%M")
+            for i in range(1, self.num_of_occasions + 1)
+        ]
+        return occasions
+        
+    def _end_of_day(self):
+        """Return the end of the day"""
+        return datetime.datetime.combine(self.today, datetime.time(23, 59))
+    
     def run_scraping(self):
         try:
             logging.info("Starting the scraping task")
@@ -106,6 +122,7 @@ class SupermarketDataPublisher:
                 shutil.rmtree(folder)
 
     def run(self):
+        self._check_tz()
         try:
             self._setup_schedule()
             self._execute_scraping()
