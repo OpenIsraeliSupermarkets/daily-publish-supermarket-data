@@ -2,9 +2,11 @@ import shutil
 import schedule
 import time
 import logging
+import datetime
+import pytz
 
 import os
-from il_supermarket_scarper import ScarpingTask
+from il_supermarket_scarper import ScarpingTask,ScraperFactory
 from il_supermarket_parsers import ConvertingTask
 from kaggle_database_manager import KaggleDatasetManager
 
@@ -17,24 +19,31 @@ number_of_processes = 4
 data_folder = "app_data/dumps"
 outputs_folder = "app_data/outputs"
 status_folder = "app_data/dumps/status"
-enabled_scrapers = None
+enabled_scrapers = [ScraperFactory.BAREKET.name]
 enabled_file_types = None
-occasions = ["12:00", "17:00", "23:00"]
+occasions = ["12:04", "12:05"]
+today = datetime.datetime.now(pytz.timezone("Asia/Jerusalem"))
 executed_jobs = 0
 
 
 def run_scraping():
+    global executed_jobs
     try:
+        logging.info("Starting the scraping task")
         ScarpingTask(
             enabled_scrapers=enabled_scrapers,
             files_types=enabled_file_types,
             dump_folder_name=data_folder,
             multiprocessing=number_of_processes,
             lookup_in_db=True,
-            only_latest=True,
+            when_date=today,
+            limit=1
         ).start()
     except Exception:
         pass
+    finally:
+        executed_jobs+=1
+        logging.info("Scraping task is done")
 
 
 if __name__ == "__main__":
@@ -62,15 +71,15 @@ if __name__ == "__main__":
             output_folder=outputs_folder,
         ).start()
 
-        logging.info("Converting task is done, starting the database task")
-        database = KaggleDatasetManager(
-            dataset="israeli-supermarkets-2024",
-            enabled_scrapers=enabled_scrapers,
-            enabled_file_types=enabled_file_types,
-        )
-        database.compose(outputs_folder=outputs_folder, status_folder=status_folder)
-        database.upload_to_dataset()
-        database.clean()
+        # logging.info("Converting task is done, starting the database task")
+        # database = KaggleDatasetManager(
+        #     dataset="israeli-supermarkets-2024",
+        #     enabled_scrapers=enabled_scrapers,
+        #     enabled_file_types=enabled_file_types,
+        # )
+        # database.compose(outputs_folder=outputs_folder, status_folder=status_folder)
+        # database.upload_to_dataset()
+        # database.clean()
 
     finally:
         # clean the folders in case of an error
