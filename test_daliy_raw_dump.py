@@ -17,7 +17,7 @@ class TestSupermarketDataPublisher(unittest.TestCase):
         self, mock_upload_to_dataset, mock_clean_folders, mock_increase_index
     ):
         # params
-        num_of_occasions = 1
+        num_of_occasions = 3
         file_per_run = 1
         app_folder = "app_data"
         data_folder = "dumps"
