@@ -71,15 +71,15 @@ if __name__ == "__main__":
             output_folder=outputs_folder,
         ).start()
 
-        # logging.info("Converting task is done, starting the database task")
-        # database = KaggleDatasetManager(
-        #     dataset="israeli-supermarkets-2024",
-        #     enabled_scrapers=enabled_scrapers,
-        #     enabled_file_types=enabled_file_types,
-        # )
-        # database.compose(outputs_folder=outputs_folder, status_folder=status_folder)
-        # database.upload_to_dataset()
-        # database.clean()
+        logging.info("Converting task is done, starting the database task")
+        database = KaggleDatasetManager(
+            dataset="israeli-supermarkets-2024",
+            enabled_scrapers=enabled_scrapers,
+            enabled_file_types=enabled_file_types,
+        )
+        database.compose(outputs_folder=outputs_folder, status_folder=status_folder)
+        database.upload_to_dataset()
+        database.clean()
 
     finally:
         # clean the folders in case of an error
