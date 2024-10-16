@@ -25,6 +25,7 @@ class SupermarketDataPublisher:
         enabled_scrapers=None,
         enabled_file_types=None,
         occasions=None,
+        limit=None,
     ):
         self.number_of_processes = number_of_processes
         self.data_folder = data_folder
@@ -35,6 +36,7 @@ class SupermarketDataPublisher:
         self.occasions = (
             occasions if occasions is not None else ["12:00", "17:30", "23:00"]
         )
+        self.limit = limit
 
         assert (
             os.environ["TZ"] == "Asia/Jerusalem"
@@ -52,6 +54,7 @@ class SupermarketDataPublisher:
                 multiprocessing=self.number_of_processes,
                 lookup_in_db=True,
                 when_date=self.today,
+                limit=self.limit,
             ).start()
         except Exception as e:
             logging.error(f"An error occurred during scraping: {e}")
