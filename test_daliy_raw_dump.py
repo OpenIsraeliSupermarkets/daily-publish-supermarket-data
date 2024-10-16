@@ -1,6 +1,7 @@
 # test_daliy_raw_dump.py
 import unittest
 from unittest.mock import patch
+import shutil
 import os
 import datetime
 from daliy_raw_dump import SupermarketDataPublisher
@@ -8,7 +9,6 @@ from il_supermarket_scarper.scrappers_factory import ScraperFactory
 
 
 class TestSupermarketDataPublisher(unittest.TestCase):
-        
 
     @patch("daliy_raw_dump.KaggleDatasetManager.clean")
     @patch("daliy_raw_dump.KaggleDatasetManager.upload_to_dataset")
@@ -16,25 +16,46 @@ class TestSupermarketDataPublisher(unittest.TestCase):
     def test_upload_to_kaggle_with_limited_scrapers_and_files(
         self, mock_upload_to_dataset, mock_clean_folders, mock_increase_index
     ):
-        # arrange
-        num_of_occasions = 3
-        
+        # params
+        num_of_occasions = 1
+        file_per_run = 1
+        app_folder = "app_data"
+        data_folder = "dumps"
+
+        # run the process for couple of times
         self.publisher = SupermarketDataPublisher(
+            app_folder=app_folder,
+            data_folder=data_folder,
             enabled_scrapers=ScraperFactory.sample(1),
-            limit=1,
-            completed_by=datetime.datetime.now() + datetime.timedelta(minutes=num_of_occasions),
-            num_of_occasions=num_of_occasions
+            limit=file_per_run,
+            completed_by=datetime.datetime.now()
+            + datetime.timedelta(minutes=num_of_occasions),
+            num_of_occasions=num_of_occasions,
         )
-        self.publisher._clean_folders()
-        # Act
         self.publisher.run()
 
-        # Assert
+        # make sure the kaggle calls was called
         mock_upload_to_dataset.assert_called_once()
         mock_clean_folders.assert_called_once()
         mock_increase_index.assert_called_once()
-        
+
+        # make sure we've downloaded the requested amont of files
+        data_folder = os.path.join(app_folder, data_folder)
+        folders = os.listdir(data_folder)
+        assert "status" in folders, "status folder should be created"
+        folders.remove("status")
+        selected_chain = folders[0]
+        #
+        assert (
+            len(os.listdir(os.path.join(data_folder, selected_chain)))
+            == num_of_occasions * file_per_run
+        ), "should download the requested amount of files"
+
+        # clean data
         self.publisher._clean_folders()
+
+        # clean data that we would've upload to kaggle
+        shutil.rmtree("israeli-supermarkets-data")
 
 
 if __name__ == "__main__":
