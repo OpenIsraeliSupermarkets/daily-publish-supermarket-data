@@ -1,11 +1,17 @@
 import shutil
 import schedule
 import time
+import logging
 
 import os
 from il_supermarket_scarper import ScarpingTask
 from il_supermarket_parsers import ConvertingTask
 from kaggle_database_manager import KaggleDatasetManager
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
 
 number_of_processes = 4
 data_folder = "app_data/dumps"
@@ -32,18 +38,22 @@ def run_scraping():
 
 
 if __name__ == "__main__":
-    #
-    for occasion in occasions:
-        schedule.every().day.at(occasion).do(run_scraping)
-    
-    #   
+
     try:
-        # 
+        #
+        logging.info(f"Sceduling the scraping tasks in {occasions}")
+        for occasion in occasions:
+            schedule.every().day.at(occasion).do(run_scraping)
+
+        #
+        logging.info("Starting the scraping tasks")
         while executed_jobs < len(occasions):
             schedule.run_pending()
             time.sleep(1)
-        
+        logging.info(f"Scraping tasks are done, starting the converting task")
+
         #
+        logging.info("Starting the converting task")
         ConvertingTask(
             enabled_parsers=enabled_scrapers,
             files_types=enabled_file_types,
@@ -52,6 +62,7 @@ if __name__ == "__main__":
             output_folder=outputs_folder,
         ).start()
 
+        logging.info("Converting task is done, starting the database task")
         database = KaggleDatasetManager(
             dataset="israeli-supermarkets-2024",
             enabled_scrapers=enabled_scrapers,
