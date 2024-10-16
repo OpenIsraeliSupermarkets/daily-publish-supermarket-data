@@ -55,27 +55,32 @@ class SupermarketDataPublisher:
 
     def _compute_occasions(self):
         """Compute the occasions for the scraping tasks"""
-        interval_start = max(self.start_at,self.today)
+        interval_start = max(self.start_at, self.today)
         interval = (
-             self.completed_by - interval_start
+            self.completed_by - interval_start
         ).total_seconds() / self.num_of_occasions
-        occasions = [
-            (interval_start + datetime.timedelta(seconds=interval * i)).strftime("%H:%M")
-            for i in range(1, self.num_of_occasions + 1)
+        occasions = [interval_start.strftime("%H:%M")] + [
+            (interval_start + datetime.timedelta(seconds=interval * i)).strftime(
+                "%H:%M"
+            )
+            for i in range(1, self.num_of_occasions)
         ]
         return occasions
 
     def _get_time_to_execute(self):
         return datetime.timedelta(hours=1)
-    
+
     def _end_of_day(self):
         """Return the end of the day"""
-        return datetime.datetime.combine(self.today, datetime.time(23, 59)) - self._get_time_to_execute()
+        return (
+            datetime.datetime.combine(self.today, datetime.time(23, 59))
+            - self._get_time_to_execute()
+        )
 
     def _non(self):
         """Return the start of the day"""
         return datetime.datetime.combine(self.today, datetime.time(12, 0))
-    
+
     def run_scraping(self):
         try:
             logging.info("Starting the scraping task")
