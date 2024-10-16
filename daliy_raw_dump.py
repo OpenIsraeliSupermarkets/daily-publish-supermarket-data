@@ -108,7 +108,6 @@ class SupermarketDataPublisher:
 
     def run(self):
         try:
-
             self._setup_schedule()
             self._execute_scraping()
             self._execute_converting()
