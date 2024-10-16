@@ -86,7 +86,7 @@ class SupermarketDataPublisher:
     def _upload_to_kaggle(self):
         logging.info("Starting the database task")
         database = KaggleDatasetManager(
-            dataset="israeli-supermarkets-2024",
+            dataset="israeli-supermarkets-data",
             enabled_scrapers=self.enabled_scrapers,
             enabled_file_types=self.enabled_file_types,
         )
