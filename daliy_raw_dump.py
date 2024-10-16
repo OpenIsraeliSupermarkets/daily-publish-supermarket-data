@@ -26,6 +26,7 @@ class SupermarketDataPublisher:
         status_folder="dumps/status",
         enabled_scrapers=None,
         enabled_file_types=None,
+        start_at=None,
         completed_by=None,
         num_of_occasions=3,
         limit=None,
@@ -42,6 +43,7 @@ class SupermarketDataPublisher:
         self.limit = limit
         self.today = datetime.datetime.now()
         self.completed_by = completed_by if completed_by else self._end_of_day()
+        self.start_at = start_at if start_at else self._non()
         self.executed_jobs = 0
         self.occasions = self._compute_occasions()
 
@@ -54,10 +56,10 @@ class SupermarketDataPublisher:
     def _compute_occasions(self):
         """Compute the occasions for the scraping tasks"""
         interval = (
-            self.completed_by - self.today
+            self.start_at - self.today
         ).total_seconds() / self.num_of_occasions
         occasions = [
-            (self.today + datetime.timedelta(seconds=interval * i)).strftime("%H:%M")
+            (self.start_at + datetime.timedelta(seconds=interval * i)).strftime("%H:%M")
             for i in range(1, self.num_of_occasions + 1)
         ]
         return occasions
@@ -66,6 +68,10 @@ class SupermarketDataPublisher:
         """Return the end of the day"""
         return datetime.datetime.combine(self.today, datetime.time(23, 59))
 
+    def _non(self):
+        """Return the start of the day"""
+        return datetime.datetime.combine(self.today, datetime.time(12, 0))
+    
     def run_scraping(self):
         try:
             logging.info("Starting the scraping task")
