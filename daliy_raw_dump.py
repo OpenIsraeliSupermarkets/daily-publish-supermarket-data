@@ -57,7 +57,7 @@ class SupermarketDataPublisher:
         """Compute the occasions for the scraping tasks"""
         interval_start = max(self.start_at,self.today)
         interval = (
-             interval_start - self.today
+             self.completed_by - interval_start
         ).total_seconds() / self.num_of_occasions
         occasions = [
             (interval_start + datetime.timedelta(seconds=interval * i)).strftime("%H:%M")
@@ -65,9 +65,12 @@ class SupermarketDataPublisher:
         ]
         return occasions
 
+    def _get_time_to_execute(self):
+        return datetime.timedelta(hours=1)
+    
     def _end_of_day(self):
         """Return the end of the day"""
-        return datetime.datetime.combine(self.today, datetime.time(23, 59))
+        return datetime.datetime.combine(self.today, datetime.time(23, 59)) - self._get_time_to_execute()
 
     def _non(self):
         """Return the start of the day"""
