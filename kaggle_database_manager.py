@@ -5,15 +5,19 @@ import datetime
 import pytz
 from kaggle import KaggleApi
 
+
 class KaggleDatasetManager:
     def __init__(self, dataset, enabled_scrapers=None, enabled_file_types=None):
         self.api = KaggleApi()
         self.api.authenticate()
         self.dataset = dataset
         self.when = self._now()
-        self.enabled_scrapers = "ALL" if not enabled_scrapers else ",".join(enabled_scrapers)
-        self.enabled_file_types = "ALL" if not enabled_file_types else ",".join(enabled_file_types)
-
+        self.enabled_scrapers = (
+            "ALL" if not enabled_scrapers else ",".join(enabled_scrapers)
+        )
+        self.enabled_file_types = (
+            "ALL" if not enabled_file_types else ",".join(enabled_file_types)
+        )
 
     def _now(self):
         return datetime.datetime.now(pytz.timezone("Asia/Jerusalem")).strftime(
@@ -32,9 +36,8 @@ class KaggleDatasetManager:
                 },
                 file,
             )
-        shutil.copytree(outputs_folder, self.dataset, dirs_exist_ok=True)    
+        shutil.copytree(outputs_folder, self.dataset, dirs_exist_ok=True)
         shutil.copytree(status_folder, self.dataset, dirs_exist_ok=True)
-
 
         self.increase_index()
 
@@ -46,7 +49,7 @@ class KaggleDatasetManager:
         :param path: str, the path where to save the dataset (default is current directory)
         """
 
-        self.api.dataset_download_cli(self.dataset, file_name="index.json",force=True)
+        self.api.dataset_download_cli(self.dataset, file_name="index.json", force=True)
         print(f"Dataset '{self.dataset}' downloaded successfully")
 
         with open("index.json", "r") as file:
@@ -67,14 +70,17 @@ class KaggleDatasetManager:
         """
         try:
             self.api.dataset_create_version(
-                self.dataset, version_notes=f"Update-Time: {self.when}, Scrapers:{self.enabled_scrapers}, Files:{self.enabled_file_types}", delete_old_versions=False
-            ) 
+                self.dataset,
+                version_notes=f"Update-Time: {self.when}, Scrapers:{self.enabled_scrapers}, Files:{self.enabled_file_types}",
+                delete_old_versions=False,
+            )
         except Exception as e:
             print(f"Error uploading file: {e}")
 
     def clean(self):
         shutil.rmtree(self.dataset)
         os.remove("index.json")
+
 
 # Example usage:
 if __name__ == "__main__":

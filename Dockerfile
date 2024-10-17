@@ -1,4 +1,7 @@
 FROM node:20-bookworm as base
+
+ENV TZ="Asia/Jerusalem"
+
 ARG PY_VERSION="3.11.0"
 
 ENV HOME="/root"
