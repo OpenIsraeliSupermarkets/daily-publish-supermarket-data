@@ -4,13 +4,11 @@
 name: Last Mile
 
 on: 
-  workflow_run:
-    workflows: [Non Scrape Itreation]
-    types:
-      - completed
+  schedule:
+  - cron: '00 20 * * *'
 
 jobs:
   call-workflow:
     uses: OpenIsraeliSupermarkets/daily-publish-supermarket-data/.github/workflows/template.yml@dev
     with:
-      opreation: "all"
+      opreation: "scraping"
