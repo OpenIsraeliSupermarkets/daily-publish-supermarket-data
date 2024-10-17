@@ -55,6 +55,7 @@ class BaseSupermarketDataPublisher:
                 lookup_in_db=True,
                 when_date=self.today,
                 limit=self.limit,
+                suppress_exception=True
             ).start()
         except Exception as e:
             logging.error(f"An error occurred during scraping: {e}")
