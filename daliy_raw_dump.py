@@ -8,6 +8,7 @@ import os
 from il_supermarket_scarper import ScarpingTask
 from il_supermarket_parsers import ConvertingTask
 from kaggle_database_manager import KaggleDatasetManager
+import sys
 
 
 logging.basicConfig(
@@ -15,7 +16,7 @@ logging.basicConfig(
 )
 
 
-class SupermarketDataPublisher:
+class BaseSupermarketDataPublisher:
 
     def __init__(
         self,
@@ -26,9 +27,6 @@ class SupermarketDataPublisher:
         status_folder="dumps/status",
         enabled_scrapers=None,
         enabled_file_types=None,
-        start_at=None,
-        completed_by=None,
-        num_of_occasions=3,
         limit=None,
     ):
         self.number_of_processes = number_of_processes
@@ -37,15 +35,8 @@ class SupermarketDataPublisher:
         self.status_folder = os.path.join(app_folder, data_folder, status_folder)
         self.enabled_scrapers = enabled_scrapers
         self.enabled_file_types = enabled_file_types
-
-        self.num_of_occasions = num_of_occasions
-
         self.limit = limit
         self.today = datetime.datetime.now()
-        self.completed_by = completed_by if completed_by else self._end_of_day()
-        self.start_at = start_at if start_at else self._non()
-        self.executed_jobs = 0
-        self.occasions = self._compute_occasions()
 
     def _check_tz(self):
         assert (
@@ -53,35 +44,7 @@ class SupermarketDataPublisher:
             == datetime.datetime.now(pytz.timezone("Asia/Jerusalem")).hour
         ), "The timezone should be set to Asia/Jerusalem"
 
-    def _compute_occasions(self):
-        """Compute the occasions for the scraping tasks"""
-        interval_start = max(self.start_at, self.today)
-        interval = (
-            self.completed_by - interval_start
-        ).total_seconds() / self.num_of_occasions
-        occasions = [interval_start.strftime("%H:%M")] + [
-            (interval_start + datetime.timedelta(seconds=interval * i)).strftime(
-                "%H:%M"
-            )
-            for i in range(1, self.num_of_occasions)
-        ]
-        return occasions
-
-    def _get_time_to_execute(self):
-        return datetime.timedelta(hours=1)
-
-    def _end_of_day(self):
-        """Return the end of the day"""
-        return (
-            datetime.datetime.combine(self.today, datetime.time(23, 59))
-            - self._get_time_to_execute()
-        )
-
-    def _non(self):
-        """Return the start of the day"""
-        return datetime.datetime.combine(self.today, datetime.time(12, 0))
-
-    def run_scraping(self):
+    def _execute_scraping(self):
         try:
             logging.info("Starting the scraping task")
             ScarpingTask(
@@ -92,24 +55,13 @@ class SupermarketDataPublisher:
                 lookup_in_db=True,
                 when_date=self.today,
                 limit=self.limit,
+                suppress_exception=True
             ).start()
         except Exception as e:
             logging.error(f"An error occurred during scraping: {e}")
         finally:
             self.executed_jobs += 1
             logging.info("Scraping task is done")
-
-    def _setup_schedule(self):
-        logging.info(f"Scheduling the scraping tasks at {self.occasions}")
-        for occasion in self.occasions:
-            schedule.every().day.at(occasion).do(self.run_scraping)
-
-    def _execute_scraping(self):
-        logging.info("Starting the scraping tasks")
-        while self.executed_jobs < len(self.occasions):
-            schedule.run_pending()
-            time.sleep(1)
-        logging.info("Scraping tasks are done, starting the converting task")
 
     def _execute_converting(self):
         logging.info("Starting the converting task")
@@ -142,17 +94,118 @@ class SupermarketDataPublisher:
             if os.path.exists(folder):
                 shutil.rmtree(folder)
 
+
+class SupermarketDataPublisher(BaseSupermarketDataPublisher):
+
+    def __init__(
+        self,
+        number_of_processes=4,
+        app_folder="app_data",
+        data_folder="dumps",
+        outputs_folder="outputs",
+        status_folder="dumps/status",
+        enabled_scrapers=None,
+        enabled_file_types=None,
+        start_at=None,
+        completed_by=None,
+        num_of_occasions=3,
+        limit=None,
+    ):
+        super().__init__(
+            number_of_processes,
+            app_folder=app_folder,
+            data_folder=data_folder,
+            outputs_folder=outputs_folder,
+            status_folder=status_folder,
+            enabled_scrapers=enabled_scrapers,
+            enabled_file_types=enabled_file_types,
+            limit=limit
+        )
+        self.num_of_occasions = num_of_occasions
+        self.completed_by = completed_by if completed_by else self._end_of_day()
+        self.start_at = start_at if start_at else self._non()
+        self.executed_jobs = 0
+        self.occasions = self._compute_occasions()
+
+    def _setup_schedule(self):
+        logging.info(f"Scheduling the scraping tasks at {self.occasions}")
+        for occasion in self.occasions:
+            schedule.every().day.at(occasion).do(self._execute_scraping)
+
+    def _track_scraping(self):
+        logging.info("Starting the scraping tasks")
+        while self.executed_jobs < len(self.occasions):
+            schedule.run_pending()
+            time.sleep(1)
+        logging.info("Scraping tasks are done, starting the converting task")
+
+    def _compute_occasions(self):
+        """Compute the occasions for the scraping tasks"""
+        interval_start = max(self.start_at, self.today)
+        interval = (
+            self.completed_by - interval_start
+        ).total_seconds() / self.num_of_occasions
+        occasions = [(interval_start + datetime.timedelta(mintues=1)).strftime("%H:%M")] + [
+            (interval_start + datetime.timedelta(seconds=interval * i)).strftime(
+                "%H:%M"
+            )
+            for i in range(1, self.num_of_occasions)
+        ]
+        return occasions
+
+    def _get_time_to_execute(self):
+        return datetime.timedelta(hours=1)
+
+    def _end_of_day(self):
+        """Return the end of the day"""
+        return (
+            datetime.datetime.combine(self.today, datetime.time(23, 59))
+            - self._get_time_to_execute()
+        )
+
+    def _non(self):
+        """Return the start of the day"""
+        return datetime.datetime.combine(self.today, datetime.time(12, 0))
+
     def run(self):
         self._check_tz()
         try:
             self._setup_schedule()
-            self._execute_scraping()
+            self._track_scraping()
             self._execute_converting()
             self._upload_to_kaggle()
         finally:
             self._clean_folders()
 
 
+class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
+
+    def __init__(self, operation="all", **kwargs):
+        super().__init__(**kwargs)
+        self.operation = operation
+
+    def run(self):
+        self._check_tz()
+        if self.operation == "scraping":
+            self._execute_scraping()
+        elif self.operation == "publishing":
+            self._execute_converting()
+            self._upload_to_kaggle()
+            self._clean_folders()
+        elif self.operation == "all":
+            self._execute_scraping()
+            self._execute_converting()
+            self._upload_to_kaggle()
+            self._clean_folders()
+        else:
+            raise ValueError(f"Invalid operation {operation}")
+
+
 if __name__ == "__main__":
-    publisher = SupermarketDataPublisher()
+    if len(sys.argv) != 2:
+        print("Usage: python daliy_raw_dump.py <operation>")
+        sys.exit(1)
+
+    operation = sys.argv[1]
+    publisher = SupermarketDataPublisherInterface(operation=operation)
     publisher.run()

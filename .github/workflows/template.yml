@@ -1,15 +1,18 @@
 # This workflow will install Python dependencies, run tests and lint with a variety of Python versions
 # For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
 
-name: Publish Data to Kaggle
+name: Scrape Itreation 
 
+on:
+  workflow_call:
+    inputs:
+      opreation:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: true
 
-on: 
-  schedule:
-    - cron: '00 08 * * *'
-  workflow_dispatch:
-
-  
 jobs:
   build:
 
@@ -18,6 +21,9 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.11.0"]
+
+    env:
+      OPREATION: ${{ inputs.opreation }}
 
     steps:
     - name: Clean Old
@@ -45,5 +51,6 @@ jobs:
             -v ./app_data:/usr/src/app/app_data \
             -e KAGGLE_KEY=$KAGGLE_KEY \
             -e KAGGLE_USERNAME=$KAGGLE_USERNAME \
+            -e OPREATION="${{ env.OPREATION }}" \
             --name publisher-runner erlichsefi/israeli-supermarket-publisher:prod &&
            docker builder prune -f
