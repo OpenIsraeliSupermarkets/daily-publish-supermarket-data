@@ -5,11 +5,11 @@ name: Last Mile
 
 on: 
   schedule:
-  - cron: '00 23 * * *'
+  - cron: '00 20 * * *'
 
 jobs:
   call-workflow:
-    uses: OpenIsraeliSupermarkets/daily-publish-supermarket-data/.github/workflows/template.yml@dev
+    uses: OpenIsraeliSupermarkets/daily-publish-supermarket-data/.github/workflows/template.yml@main
     with:
       opreation: "scraping"
     

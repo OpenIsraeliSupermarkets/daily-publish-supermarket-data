@@ -5,10 +5,10 @@ name: Morning Scrape Itreation
 
 on: 
   schedule:
-    - cron: '00 08 * * *'
+    - cron: '00 05 * * *'
 
 jobs:
   call-workflow:
-    uses: OpenIsraeliSupermarkets/daily-publish-supermarket-data/.github/workflows/template.yml@dev
+    uses: OpenIsraeliSupermarkets/daily-publish-supermarket-data/.github/workflows/template.yml@main
     with:
       opreation: "scraping"
