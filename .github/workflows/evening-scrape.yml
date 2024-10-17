@@ -1,0 +1,16 @@
+# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
+# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+
+name: Last Mile
+
+on: 
+  workflow_run:
+    workflows: [Non Scrape Itreation]
+    types:
+      - completed
+
+jobs:
+  call-workflow:
+    uses: OpenIsraeliSupermarkets/daily-publish-supermarket-data/.github/workflows/template.yml@dev
+    with:
+      opreation: "all"

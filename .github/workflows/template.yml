@@ -3,13 +3,15 @@
 
 name: Scrape Itreation 
 
-on: 
-  schedule:
-    - cron: '00 08 * * *'
-    - cron: '00 12 * * *'
-    - cron: '00 17 * * *'
-    - cron: '00 21 * * *'
-  workflow_dispatch:
+on:
+  workflow_call:
+    inputs:
+      opreation:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: true
 
 jobs:
   build:
@@ -21,7 +23,7 @@ jobs:
         python-version: ["3.11.0"]
 
     env:
-      OPREATION: "scraping"
+      OPREATION: ${{ inputs.opreation }}
 
     steps:
     - name: Clean Old
