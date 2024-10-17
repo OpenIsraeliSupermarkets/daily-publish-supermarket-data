@@ -187,10 +187,10 @@ class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
         self._check_tz()
         if self.operation == "scraping":
             self._execute_scraping()
-        elif self.operation == "parsing":
-            self._execute_converting()
         elif self.operation == "publishing":
+            self._execute_converting()
             self._upload_to_kaggle()
+            self._clean_folders()
         elif self.operation == "all":
             self._execute_scraping()
             self._execute_converting()
