@@ -131,7 +131,7 @@ class SupermarketDataPublisher(BaseSupermarketDataPublisher):
         for occasion in self.occasions:
             schedule.every().day.at(occasion).do(self._execute_scraping)
 
-    def _execute_scraping(self):
+    def _track_scraping(self):
         logging.info("Starting the scraping tasks")
         while self.executed_jobs < len(self.occasions):
             schedule.run_pending()
@@ -144,7 +144,7 @@ class SupermarketDataPublisher(BaseSupermarketDataPublisher):
         interval = (
             self.completed_by - interval_start
         ).total_seconds() / self.num_of_occasions
-        occasions = [interval_start.strftime("%H:%M")] + [
+        occasions = [(interval_start + datetime.timedelta(mintues=1)).strftime("%H:%M")] + [
             (interval_start + datetime.timedelta(seconds=interval * i)).strftime(
                 "%H:%M"
             )
@@ -170,7 +170,7 @@ class SupermarketDataPublisher(BaseSupermarketDataPublisher):
         self._check_tz()
         try:
             self._setup_schedule()
-            self._execute_scraping()
+            self._track_scraping()
             self._execute_converting()
             self._upload_to_kaggle()
         finally:
