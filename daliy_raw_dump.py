@@ -42,7 +42,7 @@ class BaseSupermarketDataPublisher:
         self.limit = limit
 
     def _dump_folder_name(self, data_folder):
-        return data_folder #f"{data_folder}_{self.today.strftime('%Y%m%d')}" # TBD: if we want to add the date we need to make sure hte publisher will get the correct date
+        return data_folder  # f"{data_folder}_{self.today.strftime('%Y%m%d')}" # TBD: if we want to add the date we need to make sure hte publisher will get the correct date
 
     def _check_tz(self):
         assert (
@@ -63,11 +63,10 @@ class BaseSupermarketDataPublisher:
                 limit=self.limit,
                 suppress_exception=True,
             ).start()
+            logging.info("Scraping task is done")
         except Exception as e:
             logging.error(f"An error occurred during scraping: {e}")
-        finally:
-            self.executed_jobs += 1
-            logging.info("Scraping task is done")
+            raise e
 
     def _execute_converting(self):
         logging.info("Starting the converting task")
@@ -137,6 +136,13 @@ class SupermarketDataPublisher(BaseSupermarketDataPublisher):
         logging.info(f"Scheduling the scraping tasks at {self.occasions}")
         for occasion in self.occasions:
             schedule.every().day.at(occasion).do(self._execute_scraping)
+
+    def _execute_scraping(self):
+        try:
+            super()._execute_scraping()
+        finally:
+            self.executed_jobs += 1
+            logging.info("Scraping task is done")
 
     def _track_scraping(self):
         logging.info("Starting the scraping tasks")
