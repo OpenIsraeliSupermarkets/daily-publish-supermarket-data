@@ -217,5 +217,8 @@ class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
 
 
 if __name__ == "__main__":
-    publisher = SupermarketDataPublisherInterface(operation=os.environ["OPREATION"])
+    publisher = SupermarketDataPublisherInterface(
+        operation=os.environ["OPREATION"],
+        app_folder=os.environ.get("APP_DATA_PATH", "app_data"),
+    )
     publisher.run()
