@@ -6,7 +6,7 @@ name: Scrape Itreation
 on:
   workflow_call:
     inputs:
-      opreation:
+      operation:
         required: true
         type: string
     secrets:
@@ -23,7 +23,7 @@ jobs:
         python-version: ["3.11.0"]
 
     env:
-      OPREATION: ${{ inputs.opreation }}
+      OPERATION: ${{ inputs.operation }}
 
     steps:
     - name: Clean Old
@@ -51,6 +51,6 @@ jobs:
             -v ./app_data:/usr/src/app/app_data \
             -e KAGGLE_KEY=$KAGGLE_KEY \
             -e KAGGLE_USERNAME=$KAGGLE_USERNAME \
-            -e OPREATION="${{ env.OPREATION }}" \
+            -e OPREATION="${{ env.OPERATION }}" \
             --name publisher-runner erlichsefi/israeli-supermarket-publisher:prod &&
            docker builder prune -f
