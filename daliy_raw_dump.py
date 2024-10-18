@@ -194,11 +194,12 @@ class SupermarketDataPublisher(BaseSupermarketDataPublisher):
 
 class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
 
-    def __init__(self, operation="all", **kwargs):
+    def __init__(self, operation, **kwargs):
         super().__init__(**kwargs)
         self.operation = operation
 
     def run(self):
+        logging.info(f"Starting the operation={self.operation}")
         self._check_tz()
         if self.operation == "scraping":
             self._execute_scraping()
@@ -212,14 +213,9 @@ class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
             self._upload_to_kaggle()
             self._clean_folders()
         else:
-            raise ValueError(f"Invalid operation {operation}")
+            raise ValueError(f"Invalid operation {self.operation}")
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: python daliy_raw_dump.py <operation>")
-        sys.exit(1)
-
-    operation = sys.argv[1]
-    publisher = SupermarketDataPublisherInterface(operation=operation)
+    publisher = SupermarketDataPublisherInterface(operation=os.environ["OPREATION"])
     publisher.run()

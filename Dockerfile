@@ -22,8 +22,7 @@ RUN pip install -r requirements.txt
 
 FROM base as prod
 
-ENV OPERATION="all"
-CMD python daliy_raw_dump.py ${OPERATION}
+CMD python daliy_raw_dump.py
 
 #
 
