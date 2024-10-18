@@ -23,7 +23,8 @@ jobs:
       OPERATION: ${{ inputs.operation }}
 
     steps:
-    # - name: Clean Old
+    # TBD: removing old code will remove the data folder too
+    # - name: Clean Old 
     #   run: |
     #     sudo rm -rf "${{ github.workspace }}"
     #     mkdir "${{ github.workspace }}"
