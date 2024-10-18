@@ -2,12 +2,12 @@
 Daliy publish to Kaggle
 -------
 
-This repository defines a cron job that runs every day at 11 PM israel time.
+This repository defines a cron jobs that runs every day.
 The cron: 
-  - Fetch the data from all supermarkets.
-  - Converted to data frame.
-  - Compose kaggle dataset with a binding between the version number and the scrape date.
-  - Create new version in Kaggle.
+  - Fetch the data from all supermarkets (every 4 hours)
+  - Converted to data frame. (at midnight)
+  - Compose kaggle dataset with a binding between the version number and the scrape date. (at midnight)
+  - Create new version in Kaggle. (at midnight)
 
 
 [Link to Kaggle](https://www.kaggle.com/datasets/erlichsefi/israeli-supermarkets-data)
