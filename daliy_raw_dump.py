@@ -24,7 +24,7 @@ class BaseSupermarketDataPublisher:
         app_folder="app_data",
         data_folder="dumps",
         outputs_folder="outputs",
-        status_folder="dumps/status",
+        status_folder="status",
         enabled_scrapers=None,
         enabled_file_types=None,
         limit=None,
@@ -41,7 +41,7 @@ class BaseSupermarketDataPublisher:
         self.limit = limit
 
     def _dump_folder_name(self, data_folder):
-        return os.path.join(data_folder, f"{self.today.strftime('%Y%m%d')}")
+        return data_folder #f"{data_folder}_{self.today.strftime('%Y%m%d')}" # TBD: if we want to add the date we need to make sure hte publisher will get the correct date
 
     def _check_tz(self):
         assert (
@@ -108,7 +108,7 @@ class SupermarketDataPublisher(BaseSupermarketDataPublisher):
         app_folder="app_data",
         data_folder="dumps",
         outputs_folder="outputs",
-        status_folder="dumps/status",
+        status_folder="status",
         enabled_scrapers=None,
         enabled_file_types=None,
         start_at=None,
