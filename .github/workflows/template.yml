@@ -42,7 +42,7 @@ jobs:
       run: docker build -t erlichsefi/israeli-supermarket-publisher:prod --target prod .
     - name: Remove all build
       run: (docker stop publisher-runner 2>/dev/null || true) && (docker rm publisher-runner 2>/dev/null || true)
-    - name: Daily Dump
+    - name: Process Request
       run: |
            mkdir -p app_data &&
            docker run --rm \
