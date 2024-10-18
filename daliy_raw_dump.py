@@ -40,7 +40,7 @@ class BaseSupermarketDataPublisher:
         self.enabled_scrapers = enabled_scrapers
         self.enabled_file_types = enabled_file_types
         self.limit = limit
-        
+
         logging.info(f"app_folder={app_folder}")
 
     def _dump_folder_name(self, data_folder):
@@ -219,8 +219,14 @@ class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
 
 
 if __name__ == "__main__":
+
+    app_data = "app_data"
+    target_location = os.environ.get("APP_DATA_PATH")
+    if target_location:
+        app_data = os.path.join(target_location, app_data)
+
     publisher = SupermarketDataPublisherInterface(
         operation=os.environ["OPREATION"],
-        app_folder=os.environ.get("APP_DATA_PATH", "app_data"),
+        app_folder=app_data,
     )
     publisher.run()
