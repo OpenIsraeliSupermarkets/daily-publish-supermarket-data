@@ -50,6 +50,6 @@ jobs:
             -e KAGGLE_KEY=$KAGGLE_KEY \
             -e KAGGLE_USERNAME=$KAGGLE_USERNAME \
             -e OPREATION="${{ env.OPERATION }}" \
-            -e APP_DATA_PATH="${{ github.workspace }}" \
+            -e APP_DATA_PATH="${{ runner.workspace }}" \
             --name publisher-runner erlichsefi/israeli-supermarket-publisher:prod &&
            docker builder prune -f
