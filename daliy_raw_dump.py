@@ -11,6 +11,7 @@ from kaggle_database_manager import KaggleDatasetManager
 import sys
 
 
+logging.getLogger("Logger").setLevel(logging.INFO)
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
