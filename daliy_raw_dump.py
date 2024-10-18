@@ -40,6 +40,8 @@ class BaseSupermarketDataPublisher:
         self.enabled_scrapers = enabled_scrapers
         self.enabled_file_types = enabled_file_types
         self.limit = limit
+        
+        logging.info(f"app_folder={app_folder}")
 
     def _dump_folder_name(self, data_folder):
         return data_folder  # f"{data_folder}_{self.today.strftime('%Y%m%d')}" # TBD: if we want to add the date we need to make sure hte publisher will get the correct date
