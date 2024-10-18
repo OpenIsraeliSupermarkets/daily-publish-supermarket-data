@@ -6,6 +6,7 @@ name: Morning Scrape Itreation
 on: 
   schedule:
     - cron: '00 05 * * *'
+  workflow_dispatch:
 
 jobs:
   call-workflow:
