@@ -44,7 +44,6 @@ jobs:
       run: (docker stop publisher-runner 2>/dev/null || true) && (docker rm publisher-runner 2>/dev/null || true)
     - name: Process Request
       run: |
-           mkdir -p app_data &&
            docker run --rm \
             -v ./app_data:/usr/src/app/app_data \
             -e KAGGLE_KEY=$KAGGLE_KEY \
