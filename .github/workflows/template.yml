@@ -44,11 +44,11 @@ jobs:
       run: (docker stop publisher-runner 2>/dev/null || true) && (docker rm publisher-runner 2>/dev/null || true)
     - name: Process Request
       run: |
+           mkdir - p  ${{ runner.workspace }}/app_data
            docker run --rm \
-            -v ./app_data:/usr/src/app/app_data \
+            -v ${{ runner.workspace }}/app_data:/usr/src/app/app_data \
             -e KAGGLE_KEY=$KAGGLE_KEY \
             -e KAGGLE_USERNAME=$KAGGLE_USERNAME \
             -e OPREATION="${{ env.OPERATION }}" \
-            -e APP_DATA_PATH="${{ runner.workspace }}" \
             --name publisher-runner erlichsefi/israeli-supermarket-publisher:prod &&
            docker builder prune -f
