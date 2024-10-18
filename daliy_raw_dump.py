@@ -29,14 +29,19 @@ class BaseSupermarketDataPublisher:
         enabled_file_types=None,
         limit=None,
     ):
+        self.today = datetime.datetime.now()
         self.number_of_processes = number_of_processes
-        self.data_folder = os.path.join(app_folder, data_folder)
+        self.data_folder = os.path.join(app_folder, self._dump_folder_name(data_folder))
         self.outputs_folder = os.path.join(app_folder, outputs_folder)
-        self.status_folder = os.path.join(app_folder, data_folder, status_folder)
+        self.status_folder = os.path.join(
+            app_folder, self._dump_folder_name(data_folder), status_folder
+        )
         self.enabled_scrapers = enabled_scrapers
         self.enabled_file_types = enabled_file_types
         self.limit = limit
-        self.today = datetime.datetime.now()
+
+    def _dump_folder_name(self):
+        return os.path.join(self.data_folder, f"{self.today.strftime('%Y%m%d')}")
 
     def _check_tz(self):
         assert (
@@ -55,7 +60,7 @@ class BaseSupermarketDataPublisher:
                 lookup_in_db=True,
                 when_date=self.today,
                 limit=self.limit,
-                suppress_exception=True
+                suppress_exception=True,
             ).start()
         except Exception as e:
             logging.error(f"An error occurred during scraping: {e}")
@@ -119,7 +124,7 @@ class SupermarketDataPublisher(BaseSupermarketDataPublisher):
             status_folder=status_folder,
             enabled_scrapers=enabled_scrapers,
             enabled_file_types=enabled_file_types,
-            limit=limit
+            limit=limit,
         )
         self.num_of_occasions = num_of_occasions
         self.completed_by = completed_by if completed_by else self._end_of_day()
@@ -145,7 +150,9 @@ class SupermarketDataPublisher(BaseSupermarketDataPublisher):
         interval = (
             self.completed_by - interval_start
         ).total_seconds() / self.num_of_occasions
-        occasions = [(interval_start + datetime.timedelta(mintues=1)).strftime("%H:%M")] + [
+        occasions = [
+            (interval_start + datetime.timedelta(mintues=1)).strftime("%H:%M")
+        ] + [
             (interval_start + datetime.timedelta(seconds=interval * i)).strftime(
                 "%H:%M"
             )
