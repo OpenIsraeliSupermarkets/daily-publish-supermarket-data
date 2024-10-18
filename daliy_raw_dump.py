@@ -40,8 +40,8 @@ class BaseSupermarketDataPublisher:
         self.enabled_file_types = enabled_file_types
         self.limit = limit
 
-    def _dump_folder_name(self):
-        return os.path.join(self.data_folder, f"{self.today.strftime('%Y%m%d')}")
+    def _dump_folder_name(self, data_folder):
+        return os.path.join(data_folder, f"{self.today.strftime('%Y%m%d')}")
 
     def _check_tz(self):
         assert (
@@ -151,9 +151,9 @@ class SupermarketDataPublisher(BaseSupermarketDataPublisher):
             self.completed_by - interval_start
         ).total_seconds() / self.num_of_occasions
         occasions = [
-            (interval_start + datetime.timedelta(mintues=1)).strftime("%H:%M")
+            (interval_start + datetime.timedelta(minutes=1)).strftime("%H:%M")
         ] + [
-            (interval_start + datetime.timedelta(seconds=interval * i)).strftime(
+            (interval_start + datetime.timedelta(seconds=interval * (i + 1))).strftime(
                 "%H:%M"
             )
             for i in range(1, self.num_of_occasions)
