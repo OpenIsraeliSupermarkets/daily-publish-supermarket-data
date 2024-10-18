@@ -5,7 +5,7 @@ name: Evening Scrape
 
 on: 
   schedule:
-  - cron: '00 17 * * *'
+    - cron: '00 17 * * *'
 
 jobs:
   call-workflow:
