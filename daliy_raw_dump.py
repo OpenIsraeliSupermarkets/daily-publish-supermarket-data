@@ -21,7 +21,7 @@ class BaseSupermarketDataPublisher:
 
     def __init__(
         self,
-        number_of_processes=3,
+        number_of_processes=4,
         app_folder="app_data",
         data_folder="dumps",
         outputs_folder="outputs",
@@ -76,7 +76,7 @@ class BaseSupermarketDataPublisher:
             enabled_parsers=self.enabled_scrapers,
             files_types=self.enabled_file_types,
             data_folder=self.data_folder,
-            multiprocessing=self.number_of_processes,
+            multiprocessing=(self.number_of_processes - 1),
             output_folder=self.outputs_folder
         ).start()
 
