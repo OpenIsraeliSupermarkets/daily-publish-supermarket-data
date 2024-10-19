@@ -6,7 +6,8 @@ name: Publishing
 on: 
   schedule:
     - cron: '00 21 * * *'
-
+  workflow_dispatch:
+    
 jobs:
   call-workflow:
     uses: OpenIsraeliSupermarkets/daily-publish-supermarket-data/.github/workflows/template.yml@main
