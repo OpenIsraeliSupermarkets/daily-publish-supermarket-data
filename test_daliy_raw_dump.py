@@ -56,7 +56,7 @@ class TestSupermarketDataPublisher(unittest.TestCase):
         self.publisher._clean_folders()
 
         # clean data that we would've upload to kaggle
-        shutil.rmtree("israeli-supermarkets-data")
+        shutil.rmtree("israeli-supermarkets-2024")
 
 
 if __name__ == "__main__":
