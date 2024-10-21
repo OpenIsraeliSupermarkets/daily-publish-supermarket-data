@@ -32,6 +32,7 @@ class BaseSupermarketDataPublisher:
     ):
         self.today = datetime.datetime.now()
         self.number_of_processes = number_of_processes
+        self.app_folder = app_folder
         self.data_folder = os.path.join(app_folder, self._dump_folder_name(data_folder))
         self.outputs_folder = os.path.join(app_folder, outputs_folder)
         self.status_folder = os.path.join(
@@ -88,6 +89,7 @@ class BaseSupermarketDataPublisher:
             dataset="israeli-supermarkets-2024",
             enabled_scrapers=self.enabled_scrapers,
             enabled_file_types=self.enabled_file_types,
+            app_folder=self.app_folder
         )
         database.compose(
             outputs_folder=self.outputs_folder, status_folder=self.status_folder

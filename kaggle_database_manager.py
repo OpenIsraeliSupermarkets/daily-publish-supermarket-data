@@ -7,7 +7,7 @@ from kaggle import KaggleApi
 
 
 class KaggleDatasetManager:
-    def __init__(self, dataset, enabled_scrapers=None, enabled_file_types=None):
+    def __init__(self, dataset, app_folder=".", enabled_scrapers=None, enabled_file_types=None):
         self.api = KaggleApi()
         self.api.authenticate()
         self.dataset = dataset
@@ -18,6 +18,7 @@ class KaggleDatasetManager:
         self.enabled_file_types = (
             "ALL" if not enabled_file_types else ",".join(enabled_file_types)
         )
+        self.dataset_path = os.path.join(app_folder, self.dataset)
 
     def _now(self):
         return datetime.datetime.now(pytz.timezone("Asia/Jerusalem")).strftime(
@@ -25,9 +26,9 @@ class KaggleDatasetManager:
         )
 
     def compose(self, outputs_folder, status_folder):
-        shutil.rmtree(self.dataset, ignore_errors=True)
-        os.makedirs(self.dataset, exist_ok=True)
-        with open(f"{self.dataset}/dataset-metadata.json", "w") as file:
+        shutil.rmtree(self.dataset_path, ignore_errors=True)
+        os.makedirs(self.dataset_path, exist_ok=True)
+        with open(f"{self.dataset_path}/dataset-metadata.json", "w") as file:
             json.dump(
                 {
                     "title": "Israeli Supermarkets 2024",
@@ -36,8 +37,8 @@ class KaggleDatasetManager:
                 },
                 file,
             )
-        shutil.copytree(outputs_folder, self.dataset, dirs_exist_ok=True)
-        shutil.copytree(status_folder, self.dataset, dirs_exist_ok=True)
+        shutil.copytree(outputs_folder, self.dataset_path, dirs_exist_ok=True)
+        shutil.copytree(status_folder, self.dataset_path, dirs_exist_ok=True)
 
         self.increase_index()
 
@@ -57,7 +58,7 @@ class KaggleDatasetManager:
 
         index[max(map(int, index.keys())) + 1] = self.when
 
-        with open(os.path.join(self.dataset, "index.json"), "w") as file:
+        with open(os.path.join(self.dataset_path, "index.json"), "w+") as file:
             json.dump(index, file)
 
     def upload_to_dataset(self):
@@ -70,7 +71,7 @@ class KaggleDatasetManager:
         """
         try:
             self.api.dataset_create_version(
-                self.dataset,
+                self.dataset_path,
                 version_notes=f"Update-Time: {self.when}, Scrapers:{self.enabled_scrapers}, Files:{self.enabled_file_types}",
                 delete_old_versions=False,
             )
@@ -78,7 +79,7 @@ class KaggleDatasetManager:
             print(f"Error uploading file: {e}")
 
     def clean(self):
-        shutil.rmtree(self.dataset)
+        shutil.rmtree(self.dataset_path)
         os.remove("index.json")
 
 
