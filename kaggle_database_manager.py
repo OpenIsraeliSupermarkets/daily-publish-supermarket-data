@@ -52,7 +52,7 @@ class KaggleDatasetManager:
         :param path: str, the path where to save the dataset (default is current directory)
         """
 
-        self.api.dataset_download_cli(self.dataset, file_name="index.json", force=True)
+        self.api.dataset_download_cli(f"erlichsefi/{self.dataset}", file_name="index.json", force=True)
         print(f"Dataset '{self.dataset}' downloaded successfully")
 
         with open("index.json", "r") as file:
