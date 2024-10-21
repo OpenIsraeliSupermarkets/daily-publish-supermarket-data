@@ -72,6 +72,8 @@ class KaggleDatasetManager:
         :param new_file_name: str, optional new name for the file in the dataset
         """
         try:
+            logging.info(f"{os.environ['KAGGLE_USERNAME']}")
+            logging.info(f"{os.environ['KAGGLE_KEY']}")
             self.api.dataset_create_version(
                 self.dataset_path,
                 version_notes=f"Update-Time: {self.when}, Scrapers:{self.enabled_scrapers}, Files:{self.enabled_file_types}",
