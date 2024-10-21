@@ -4,7 +4,7 @@ import json
 import datetime
 import pytz
 from kaggle import KaggleApi
-
+import logging
 
 class KaggleDatasetManager:
     def __init__(self, dataset, app_folder=".", enabled_scrapers=None, enabled_file_types=None):
@@ -19,6 +19,8 @@ class KaggleDatasetManager:
             "ALL" if not enabled_file_types else ",".join(enabled_file_types)
         )
         self.dataset_path = os.path.join(app_folder, self.dataset)
+        logging.info(f"Dataset path: {self.dataset_path}")
+        
 
     def _now(self):
         return datetime.datetime.now(pytz.timezone("Asia/Jerusalem")).strftime(
