@@ -6,6 +6,9 @@
         "PY_VERSION":"3.11.0"
         }
   },
+  "mounts": [
+    "source=${localWorkspaceFolder}/app_data,target=/usr/src/app/app_data,type=bind"
+  ],
   "customizations": {
       "vscode": {
         "extensions": [
