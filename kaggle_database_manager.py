@@ -6,8 +6,11 @@ import pytz
 from kaggle import KaggleApi
 import logging
 
+
 class KaggleDatasetManager:
-    def __init__(self, dataset, app_folder=".", enabled_scrapers=None, enabled_file_types=None):
+    def __init__(
+        self, dataset, app_folder=".", enabled_scrapers=None, enabled_file_types=None
+    ):
         self.api = KaggleApi()
         self.api.authenticate()
         self.dataset = dataset
@@ -20,12 +23,40 @@ class KaggleDatasetManager:
         )
         self.dataset_path = os.path.join(app_folder, self.dataset)
         logging.info(f"Dataset path: {self.dataset_path}")
-        
 
     def _now(self):
         return datetime.datetime.now(pytz.timezone("Asia/Jerusalem")).strftime(
             "%d/%m/%Y, %H:%M:%S"
         )
+
+    def read_parser_status(self, outputs_folder):
+        with open(f"{outputs_folder}/parser-status.json", "r") as file:
+            data = json.load(file)
+
+        descriptions = []
+        for entry in data:
+
+            if len(entry["response"]["files_to_process"]) > 0:
+                descriptions.append(
+                    {
+                        "path": entry["response"]["file_created_path"],
+                        "description": f"{len(entry['response']['files_to_process'])} XML files from type {entry['response']['files_types']} published by '{entry['store_enum']}' ",
+                    }
+                )
+
+        return descriptions
+
+    def read_scraper_status_files(self, status_folder):
+        descriptions = []
+        for file in os.listdir(status_folder):
+            if file.endswith(".json"):
+                descriptions.append(
+                    {
+                        "path": file,
+                        "description": f"Scraper status file for '{file}' execution.",
+                    }
+                )
+        return descriptions
 
     def compose(self, outputs_folder, status_folder):
         shutil.rmtree(self.dataset_path, ignore_errors=True)
@@ -36,6 +67,18 @@ class KaggleDatasetManager:
                     "title": "Israeli Supermarkets 2024",
                     "id": f"erlichsefi/{self.dataset}",
                     "licenses": [{"name": "CC0-1.0"}],
+                    "resources": [
+                        {
+                            "path": "index.json",
+                            "description": "Index mapping between Kaggle versions and dataset creation times",
+                        },
+                        {
+                            "path": "parser-status.json",
+                            "description": "Parser status file",
+                        },
+                    ]
+                    + self.read_parser_status(outputs_folder)
+                    + self.read_scraper_status_files(status_folder),
                 },
                 file,
             )
@@ -52,7 +95,9 @@ class KaggleDatasetManager:
         :param path: str, the path where to save the dataset (default is current directory)
         """
 
-        self.api.dataset_download_cli(f"erlichsefi/{self.dataset}", file_name="index.json", force=True)
+        self.api.dataset_download_cli(
+            f"erlichsefi/{self.dataset}", file_name="index.json", force=True
+        )
         print(f"Dataset '{self.dataset}' downloaded successfully")
 
         with open("index.json", "r") as file:

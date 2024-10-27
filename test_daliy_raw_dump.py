@@ -58,19 +58,17 @@ class TestSupermarketDataPublisher(unittest.TestCase):
         # clean data that we would've upload to kaggle
         shutil.rmtree("israeli-supermarkets-2024")
 
-
     @patch("daliy_raw_dump.KaggleDatasetManager.upload_to_dataset")
-    def test_upload_to_kaggle(self,upload_to_dataset_mock):
-         # params
+    def test_upload_to_kaggle(self, upload_to_dataset_mock):
+        # params
         num_of_occasions = 3
         file_per_run = 1
         app_folder = "app_data"
         data_folder = "dumps"
 
-        os.makedirs(f"{app_folder}/outputs",exist_ok=True)
-        os.makedirs(f"{app_folder}/{data_folder}/status",exist_ok=True)
-        
-        
+        os.makedirs(f"{app_folder}/outputs", exist_ok=True)
+        os.makedirs(f"{app_folder}/{data_folder}/status", exist_ok=True)
+
         # os.mkdir("app_data")
         self.publisher = SupermarketDataPublisher(
             app_folder=app_folder,
@@ -83,7 +81,7 @@ class TestSupermarketDataPublisher(unittest.TestCase):
             num_of_occasions=num_of_occasions,
         )
         self.publisher._upload_to_kaggle()
-        
+
 
 if __name__ == "__main__":
     unittest.main()
