@@ -6,6 +6,7 @@ name: Noon Scrape Itreation
 on: 
   schedule:
     - cron: '00 09 * * *'
+  workflow_dispatch:
 
 jobs:
   call-workflow:
