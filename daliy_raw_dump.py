@@ -78,7 +78,7 @@ class BaseSupermarketDataPublisher:
             files_types=self.enabled_file_types,
             data_folder=self.data_folder,
             multiprocessing=(self.number_of_processes - 1),
-            output_folder=self.outputs_folder
+            output_folder=self.outputs_folder,
         ).start()
 
         logging.info("Converting task is done")
@@ -89,7 +89,7 @@ class BaseSupermarketDataPublisher:
             dataset="israeli-supermarkets-2024",
             enabled_scrapers=self.enabled_scrapers,
             enabled_file_types=self.enabled_file_types,
-            app_folder=self.app_folder
+            app_folder=self.app_folder,
         )
         database.compose(
             outputs_folder=self.outputs_folder, status_folder=self.status_folder
