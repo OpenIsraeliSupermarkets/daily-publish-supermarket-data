@@ -95,7 +95,19 @@ class BaseSupermarketDataPublisher:
             outputs_folder=self.outputs_folder, status_folder=self.status_folder
         )
         database.upload_to_dataset()
+        # clean the dataset only if the data was uploaded successfully (upload_to_dataset raise an exception)
+        # if not, "compose" will clean it next time
         database.clean()
+
+    def _upload_and_clean(self):
+        try:
+            self._upload_to_kaggle()
+        except ValueError as e:
+            logging.error("Failed to upload to kaggle")
+            raise e
+        finally:
+            # clean data allways after uploading
+            self._clean_folders()
 
     def _clean_folders(self):
         # Clean the folders in case of an error
@@ -190,8 +202,7 @@ class SupermarketDataPublisher(BaseSupermarketDataPublisher):
         try:
             self._setup_schedule()
             self._track_scraping()
-            self._execute_converting()
-            self._upload_to_kaggle()
+            self._upload_and_clean()
         finally:
             self._clean_folders()
 
@@ -209,13 +220,11 @@ class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
             self._execute_scraping()
         elif self.operation == "publishing":
             self._execute_converting()
-            self._upload_to_kaggle()
-            self._clean_folders()
+            self._upload_and_clean()
         elif self.operation == "all":
             self._execute_scraping()
             self._execute_converting()
-            self._upload_to_kaggle()
-            self._clean_folders()
+            self._upload_and_clean()
         else:
             raise ValueError(f"Invalid operation {self.operation}")
 

@@ -39,7 +39,9 @@ class KaggleDatasetManager:
             if len(entry["response"]["files_to_process"]) > 0:
                 descriptions.append(
                     {
-                        "path": entry["response"]["file_created_path"],
+                        "path": os.path.split(entry["response"]["file_created_path"])[
+                            -1
+                        ],
                         "description": f"{len(entry['response']['files_to_process'])} XML files from type {entry['response']['files_types']} published by '{entry['store_enum']}' ",
                     }
                 )
@@ -123,7 +125,8 @@ class KaggleDatasetManager:
                 delete_old_versions=False,
             )
         except Exception as e:
-            print(f"Error uploading file: {e}")
+            logging.critical(f"Error uploading file: {e}")
+            raise ValueError(f"Error uploading file: {e}")
 
     def clean(self):
         shutil.rmtree(self.dataset_path)
