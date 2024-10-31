@@ -10,7 +10,8 @@
             "request": "launch",
             "program": "daliy_raw_dump.py",
             "console": "integratedTerminal",
-            "justMyCode": false
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env"
         },
         {
             "name": "Python: Debug Tests",

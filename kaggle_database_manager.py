@@ -36,7 +36,7 @@ class KaggleDatasetManager:
         descriptions = []
         for entry in data:
 
-            if len(entry["response"]["files_to_process"]) > 0:
+            if "response" in entry and len(entry["response"]["files_to_process"]) > 0:
                 descriptions.append(
                     {
                         "path": entry["response"]["file_created_path"],
@@ -66,7 +66,6 @@ class KaggleDatasetManager:
                 {
                     "title": "Israeli Supermarkets 2024",
                     "id": f"erlichsefi/{self.dataset}",
-                    "licenses": [{"name": "CC0-1.0"}],
                     "resources": [
                         {
                             "path": "index.json",
