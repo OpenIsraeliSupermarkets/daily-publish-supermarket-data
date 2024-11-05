@@ -77,7 +77,7 @@ class BaseSupermarketDataPublisher:
             enabled_parsers=self.enabled_scrapers,
             files_types=self.enabled_file_types,
             data_folder=self.data_folder,
-            multiprocessing=(self.number_of_processes - 1),
+            multiprocessing=(self.number_of_processes - 2),
             output_folder=self.outputs_folder,
         ).start()
 
