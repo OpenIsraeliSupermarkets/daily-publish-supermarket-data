@@ -11,7 +11,10 @@
             "program": "daliy_raw_dump.py",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "envFile": "${workspaceFolder}/.env"
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "OPREATION":"all"
+            }
         },
         {
             "name": "Python: Debug Tests",

@@ -36,7 +36,7 @@ class KaggleDatasetManager:
         descriptions = []
         for entry in data:
 
-            if "response" in entry and len(entry["response"]["files_to_process"]) > 0:
+            if "response" in entry and entry["response"]["file_was_created"]:
                 descriptions.append(
                     {
                         "path": os.path.split(entry["response"]["file_created_path"])[
