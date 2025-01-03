@@ -221,6 +221,10 @@ class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
         elif self.operation == "publishing":
             self._execute_converting()
             self._upload_and_clean()
+        elif self.operation == "upload":
+            self._upload_and_clean()
+        elif self.operation == "force-clean":
+            self._clean_folders()
         elif self.operation == "all":
             self._execute_scraping()
             self._execute_converting()
