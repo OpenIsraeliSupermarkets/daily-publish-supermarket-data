@@ -83,7 +83,7 @@ class BaseSupermarketDataPublisher:
 
         logging.info("Converting task is done")
 
-    def _upload_to_kaggle(self):
+    def _upload_to_kaggle(self,compose=True):
         logging.info("Starting the database task")
         database = KaggleDatasetManager(
             dataset="israeli-supermarkets-2024",
@@ -91,17 +91,18 @@ class BaseSupermarketDataPublisher:
             enabled_file_types=self.enabled_file_types,
             app_folder=self.app_folder,
         )
-        database.compose(
-            outputs_folder=self.outputs_folder, status_folder=self.status_folder
-        )
+        if compose:
+            database.compose(
+                outputs_folder=self.outputs_folder, status_folder=self.status_folder
+            )
         database.upload_to_dataset()
         # clean the dataset only if the data was uploaded successfully (upload_to_dataset raise an exception)
         # if not, "compose" will clean it next time
         database.clean()
 
-    def _upload_and_clean(self):
+    def _upload_and_clean(self,compose=True):
         try:
-            self._upload_to_kaggle()
+            self._upload_to_kaggle(compose=compose)
         except ValueError as e:
             logging.error("Failed to upload to kaggle")
             raise e
@@ -221,8 +222,10 @@ class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
         elif self.operation == "publishing":
             self._execute_converting()
             self._upload_and_clean()
-        elif self.operation == "upload":
-            self._upload_and_clean()
+        elif self.operation == "upload_compose":
+            self._upload_and_clean(compose=True)
+        elif self.operation == "upload_no_compose":
+            self._upload_and_clean(compose=False)
         elif self.operation == "force-clean":
             self._clean_folders()
         elif self.operation == "all":
