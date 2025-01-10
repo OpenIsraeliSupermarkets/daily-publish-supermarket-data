@@ -7,8 +7,8 @@ import datetime
 import os
 from il_supermarket_scarper import ScarpingTask
 from il_supermarket_parsers import ConvertingTask
-from kaggle_database_manager import KaggleDatasetManager
-import sys
+from kaggle_database_manager import RemoteDatasetManager
+from remotes import KaggleUploader
 
 
 logging.getLogger("Logger").setLevel(logging.INFO)
@@ -21,6 +21,7 @@ class BaseSupermarketDataPublisher:
 
     def __init__(
         self,
+        remote_upload_class=KaggleUploader,
         number_of_processes=3,
         app_folder="app_data",
         data_folder="dumps",
@@ -30,6 +31,7 @@ class BaseSupermarketDataPublisher:
         enabled_file_types=None,
         limit=None,
     ):
+        self.remote_upload_class = remote_upload_class
         self.today = datetime.datetime.now()
         self.number_of_processes = number_of_processes
         self.app_folder = app_folder
@@ -83,10 +85,11 @@ class BaseSupermarketDataPublisher:
 
         logging.info("Converting task is done")
 
-    def _upload_to_kaggle(self,compose=True):
+    def _upload_to_kaggle(self, compose=True):
         logging.info("Starting the database task")
-        database = KaggleDatasetManager(
+        database = RemoteDatasetManager(
             dataset="israeli-supermarkets-2024",
+            remote_upload_class=self.remote_upload_class,
             enabled_scrapers=self.enabled_scrapers,
             enabled_file_types=self.enabled_file_types,
             app_folder=self.app_folder,
@@ -95,12 +98,12 @@ class BaseSupermarketDataPublisher:
             database.compose(
                 outputs_folder=self.outputs_folder, status_folder=self.status_folder
             )
-        database.upload_to_dataset()
+        database.upload()
         # clean the dataset only if the data was uploaded successfully (upload_to_dataset raise an exception)
         # if not, "compose" will clean it next time
         database.clean()
 
-    def _upload_and_clean(self,compose=True):
+    def _upload_and_clean(self, compose=True):
         try:
             self._upload_to_kaggle(compose=compose)
         except ValueError as e:
@@ -108,19 +111,62 @@ class BaseSupermarketDataPublisher:
             raise e
         finally:
             # clean data allways after uploading
-            self._clean_folders()
+            self._clean_all_source_data()
 
-    def _clean_folders(self):
+    def _clean_all_dump_files(self):
+        # Clean the folders in case of an error
+        for folder in [self.data_folder]:
+            if os.path.exists(folder):
+                for filename in os.listdir(folder):
+                    file_path = os.path.join(folder, filename)
+                    if file_path != self.status_folder:
+                        shutil.rmtree(file_path)
+
+    def _clean_all_source_data(self):
         # Clean the folders in case of an error
         for folder in [self.data_folder, self.outputs_folder, self.status_folder]:
             if os.path.exists(folder):
                 shutil.rmtree(folder)
 
 
-class SupermarketDataPublisher(BaseSupermarketDataPublisher):
+class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def run(self, operations):
+        logging.info(f"Starting executing DAG= {operations}")
+        self._check_tz()
+        for operation in operations.split(","):
+
+            logging.info(f"Starting the operation={operation}")
+            if operation == "scraping":
+                self._execute_scraping()
+            elif operation == "converting":
+                self._execute_converting()
+            elif operation == "clean_dump_files":
+                self._clean_all_dump_files()
+            elif operation == "publishing":
+                self._upload_and_clean()
+            elif operation == "upload_compose":
+                self._upload_and_clean(compose=True)
+            elif operation == "upload_no_compose":
+                self._upload_and_clean(compose=False)
+            elif operation == "clean_all_source_data":
+                self._clean_all_source_data()
+            elif operation == "all":
+                self._execute_scraping()
+                self._execute_converting()
+                self._upload_and_clean()
+            else:
+                raise ValueError(f"Invalid operation {operation}")
+
+
+class SupermarketDataPublisher(SupermarketDataPublisherInterface):
 
     def __init__(
         self,
+        remote_upload_class=KaggleUploader,
         number_of_processes=4,
         app_folder="app_data",
         data_folder="dumps",
@@ -134,7 +180,8 @@ class SupermarketDataPublisher(BaseSupermarketDataPublisher):
         limit=None,
     ):
         super().__init__(
-            number_of_processes,
+            number_of_processes=number_of_processes,
+            remote_upload_class=remote_upload_class,
             app_folder=app_folder,
             data_folder=data_folder,
             outputs_folder=outputs_folder,
@@ -149,20 +196,20 @@ class SupermarketDataPublisher(BaseSupermarketDataPublisher):
         self.executed_jobs = 0
         self.occasions = self._compute_occasions()
 
-    def _setup_schedule(self):
+    def _setup_schedule(self, operations):
         logging.info(f"Scheduling the scraping tasks at {self.occasions}")
         for occasion in self.occasions:
-            schedule.every().day.at(occasion).do(self._execute_scraping)
+            schedule.every().day.at(occasion).do(self._execute_operations, operations)
 
-    def _execute_scraping(self):
+    def _execute_operations(self, operations):
         try:
-            super()._execute_scraping()
+            super().run(operations)
         finally:
             self.executed_jobs += 1
             logging.info("Scraping task is done")
 
-    def _track_scraping(self):
-        logging.info("Starting the scraping tasks")
+    def _track_task(self):
+        logging.info("Starting the tracking tasks")
         while self.executed_jobs < len(self.occasions):
             schedule.run_pending()
             time.sleep(1)
@@ -198,48 +245,17 @@ class SupermarketDataPublisher(BaseSupermarketDataPublisher):
         """Return the start of the day"""
         return datetime.datetime.combine(self.today, datetime.time(12, 0))
 
-    def run(self):
+    def run(self, itreative_operations,final_operations):
         self._check_tz()
-        try:
-            self._setup_schedule()
-            self._track_scraping()
-            self._upload_and_clean()
-        finally:
-            self._clean_folders()
-
-
-class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
-
-    def __init__(self, operation, **kwargs):
-        super().__init__(**kwargs)
-        self.operation = operation
-
-    def run(self):
-        logging.info(f"Starting the operation={self.operation}")
-        self._check_tz()
-        if self.operation == "scraping":
-            self._execute_scraping()
-        elif self.operation == "publishing":
-            self._execute_converting()
-            self._upload_and_clean()
-        elif self.operation == "upload_compose":
-            self._upload_and_clean(compose=True)
-        elif self.operation == "upload_no_compose":
-            self._upload_and_clean(compose=False)
-        elif self.operation == "force-clean":
-            self._clean_folders()
-        elif self.operation == "all":
-            self._execute_scraping()
-            self._execute_converting()
-            self._upload_and_clean()
-        else:
-            raise ValueError(f"Invalid operation {self.operation}")
+        self._setup_schedule(itreative_operations)
+        self._track_task()
+        super().run(operations=final_operations)
+        
 
 
 if __name__ == "__main__":
 
     publisher = SupermarketDataPublisherInterface(
-        operation=os.environ["OPREATION"],
         app_folder="app_data",
     )
-    publisher.run()
+    publisher.run(operations=os.environ["OPREATION"])
