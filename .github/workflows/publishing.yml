@@ -12,5 +12,5 @@ jobs:
   call-workflow:
     uses: OpenIsraeliSupermarkets/daily-publish-supermarket-data/.github/workflows/template.yml@main
     with:
-      operation: "publishing"
+      operation: "publishing,clean_all_source_data"
     secrets: inherit
