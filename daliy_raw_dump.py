@@ -30,9 +30,11 @@ class BaseSupermarketDataPublisher:
         enabled_scrapers=None,
         enabled_file_types=None,
         limit=None,
+        when_date=None
     ):
         self.remote_upload_class = remote_upload_class
         self.today = datetime.datetime.now()
+        self.when_date = when_date if when_date else self.today
         self.number_of_processes = number_of_processes
         self.app_folder = app_folder
         self.data_folder = os.path.join(app_folder, self._dump_folder_name(data_folder))
@@ -64,7 +66,7 @@ class BaseSupermarketDataPublisher:
                 dump_folder_name=self.data_folder,
                 multiprocessing=self.number_of_processes,
                 lookup_in_db=True,
-                when_date=self.today,
+                when_date=self.when_date,
                 limit=self.limit,
                 suppress_exception=True,
             ).start()
@@ -178,6 +180,7 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
         completed_by=None,
         num_of_occasions=3,
         limit=None,
+        when_date=None
     ):
         super().__init__(
             number_of_processes=number_of_processes,
@@ -189,6 +192,7 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
             enabled_scrapers=enabled_scrapers,
             enabled_file_types=enabled_file_types,
             limit=limit,
+            when_date=when_date
         )
         self.num_of_occasions = num_of_occasions
         self.completed_by = completed_by if completed_by else self._end_of_day()
