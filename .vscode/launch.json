@@ -22,7 +22,7 @@
             "justMyCode": false,
             "envFile": "${workspaceFolder}/.env",
             "env": {
-                "OPREATION":"scraping,converting,clean_dump_files"
+                "OPREATION":"scraping,converting,clean_dump_files,publishing,clean_all_source_data"
             }
         },
         {
