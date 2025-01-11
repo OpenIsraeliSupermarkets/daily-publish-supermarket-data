@@ -5,6 +5,15 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Test Daliy Raw Dump",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "test_daliy_raw_dump.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env",
+        },
+        {
             "name": "Daliy Raw Dump",
             "type": "debugpy",
             "request": "launch",
