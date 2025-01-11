@@ -137,7 +137,7 @@ class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
         super().__init__(**kwargs)
 
     def run(self, operations):
-        logging.info(f"Starting executing DAG= {operations}")
+        logging.info(f"Starting executing DAG = {operations}")
         self._check_tz()
         for operation in operations.split(","):
 
