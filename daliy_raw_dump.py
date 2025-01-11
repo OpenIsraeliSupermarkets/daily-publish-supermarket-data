@@ -22,7 +22,8 @@ class BaseSupermarketDataPublisher:
     def __init__(
         self,
         remote_upload_class=KaggleUploader,
-        number_of_processes=3,
+        number_of_scraping_processes=3,
+        number_of_parseing_processs=None,
         app_folder="app_data",
         data_folder="dumps",
         outputs_folder="outputs",
@@ -35,7 +36,8 @@ class BaseSupermarketDataPublisher:
         self.remote_upload_class = remote_upload_class
         self.today = datetime.datetime.now()
         self.when_date = when_date if when_date else self.today
-        self.number_of_processes = number_of_processes
+        self.number_of_scraping_processes = number_of_scraping_processes
+        self.number_of_parseing_processs = number_of_parseing_processs if number_of_parseing_processs else number_of_scraping_processes - 2
         self.app_folder = app_folder
         self.data_folder = os.path.join(app_folder, self._dump_folder_name(data_folder))
         self.outputs_folder = os.path.join(app_folder, outputs_folder)
@@ -64,7 +66,7 @@ class BaseSupermarketDataPublisher:
                 enabled_scrapers=self.enabled_scrapers,
                 files_types=self.enabled_file_types,
                 dump_folder_name=self.data_folder,
-                multiprocessing=self.number_of_processes,
+                multiprocessing=self.number_of_scraping_processes,
                 lookup_in_db=True,
                 when_date=self.when_date,
                 limit=self.limit,
@@ -81,7 +83,7 @@ class BaseSupermarketDataPublisher:
             enabled_parsers=self.enabled_scrapers,
             files_types=self.enabled_file_types,
             data_folder=self.data_folder,
-            multiprocessing=(self.number_of_processes - 2),
+            multiprocessing=self.number_of_parseing_processs,
             output_folder=self.outputs_folder,
         ).start()
 
@@ -169,7 +171,8 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
     def __init__(
         self,
         remote_upload_class=KaggleUploader,
-        number_of_processes=4,
+        number_of_scraping_processes=4,
+        number_of_parseing_processs=None,
         app_folder="app_data",
         data_folder="dumps",
         outputs_folder="outputs",
@@ -183,7 +186,8 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
         when_date=None
     ):
         super().__init__(
-            number_of_processes=number_of_processes,
+            number_of_scraping_processes=number_of_scraping_processes,
+            number_of_parseing_processs=number_of_parseing_processs,
             remote_upload_class=remote_upload_class,
             app_folder=app_folder,
             data_folder=data_folder,
