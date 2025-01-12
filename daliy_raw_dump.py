@@ -98,10 +98,9 @@ class BaseSupermarketDataPublisher:
             enabled_file_types=self.enabled_file_types,
             app_folder=self.app_folder,
         )
-        if compose:
-            database.compose(
-                outputs_folder=self.outputs_folder, status_folder=self.status_folder
-            )
+        database.compose(
+            outputs_folder=self.outputs_folder, status_folder=self.status_folder
+        )
         database.upload()
         # clean the dataset only if the data was uploaded successfully (upload_to_dataset raise an exception)
         # if not, "compose" will clean it next time
@@ -265,5 +264,8 @@ if __name__ == "__main__":
 
     publisher = SupermarketDataPublisherInterface(
         app_folder="app_data",
+        number_of_scraping_processes=os.cpu_count(),
+        number_of_parseing_processs=os.cpu_count(),
+        when_date=datetime.datetime(2025,1,11,0,0,0)
     )
     publisher.run(operations=os.environ["OPREATION"])
