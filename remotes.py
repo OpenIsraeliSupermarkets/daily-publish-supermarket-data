@@ -36,9 +36,10 @@ class Dummy(RemoteDatabaseUploader):
     Uploads data to a remote database.
     """
 
-    def __init__(self, dataset_remote_name, dataset_path):
+    def __init__(self, dataset_remote_name, dataset_path,when):
         self.dataset_remote_name = dataset_remote_name
         self.dataset_path = dataset_path
+        self.when = when
 
     def increase_index(self):
         """
@@ -65,9 +66,10 @@ class Dummy(RemoteDatabaseUploader):
 
 class KaggleUploader(RemoteDatabaseUploader):
 
-    def __init__(self, dataset_remote_name, dataset_path):
+    def __init__(self, dataset_remote_name, dataset_path, when):
         self.dataset_remote_name = dataset_remote_name
         self.dataset_path = dataset_path
+        self.when = when
         self.api = KaggleApi()
         self.api.authenticate()
 

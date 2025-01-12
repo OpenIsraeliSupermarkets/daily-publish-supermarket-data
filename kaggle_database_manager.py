@@ -26,7 +26,7 @@ class RemoteDatasetManager:
             "ALL" if not enabled_file_types else ",".join(enabled_file_types)
         )
         self.dataset_path = os.path.join(app_folder, self.dataset)
-        self.remote_database = remote_upload_class(dataset_remote_name=dataset, dataset_path=self.dataset_path)
+        self.remote_database = remote_upload_class(dataset_remote_name=dataset, dataset_path=self.dataset_path,when=self.when)
         logging.info(f"Dataset path: {self.dataset_path}")
 
     def _now(self):
