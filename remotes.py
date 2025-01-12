@@ -96,7 +96,7 @@ class KaggleUploader(RemoteDatabaseUploader):
 
     def upload_to_dataset(self, message):
         self.api.dataset_create_version(
-            self.dataset_path,
+            folder=self.dataset_path,
             version_notes=message,
             delete_old_versions=False,
         )
