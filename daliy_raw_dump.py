@@ -22,7 +22,8 @@ class BaseSupermarketDataPublisher:
     def __init__(
         self,
         remote_upload_class=KaggleUploader,
-        number_of_processes=3,
+        number_of_scraping_processes=3,
+        number_of_parseing_processs=None,
         app_folder="app_data",
         data_folder="dumps",
         outputs_folder="outputs",
@@ -30,10 +31,13 @@ class BaseSupermarketDataPublisher:
         enabled_scrapers=None,
         enabled_file_types=None,
         limit=None,
+        when_date=None
     ):
         self.remote_upload_class = remote_upload_class
         self.today = datetime.datetime.now()
-        self.number_of_processes = number_of_processes
+        self.when_date = when_date if when_date else self.today
+        self.number_of_scraping_processes = number_of_scraping_processes
+        self.number_of_parseing_processs = number_of_parseing_processs if number_of_parseing_processs else number_of_scraping_processes - 2
         self.app_folder = app_folder
         self.data_folder = os.path.join(app_folder, self._dump_folder_name(data_folder))
         self.outputs_folder = os.path.join(app_folder, outputs_folder)
@@ -62,9 +66,9 @@ class BaseSupermarketDataPublisher:
                 enabled_scrapers=self.enabled_scrapers,
                 files_types=self.enabled_file_types,
                 dump_folder_name=self.data_folder,
-                multiprocessing=self.number_of_processes,
+                multiprocessing=self.number_of_scraping_processes,
                 lookup_in_db=True,
-                when_date=self.today,
+                when_date=self.when_date,
                 limit=self.limit,
                 suppress_exception=True,
             ).start()
@@ -79,7 +83,7 @@ class BaseSupermarketDataPublisher:
             enabled_parsers=self.enabled_scrapers,
             files_types=self.enabled_file_types,
             data_folder=self.data_folder,
-            multiprocessing=(self.number_of_processes - 2),
+            multiprocessing=self.number_of_parseing_processs,
             output_folder=self.outputs_folder,
         ).start()
 
@@ -94,10 +98,9 @@ class BaseSupermarketDataPublisher:
             enabled_file_types=self.enabled_file_types,
             app_folder=self.app_folder,
         )
-        if compose:
-            database.compose(
-                outputs_folder=self.outputs_folder, status_folder=self.status_folder
-            )
+        database.compose(
+            outputs_folder=self.outputs_folder, status_folder=self.status_folder
+        )
         database.upload()
         # clean the dataset only if the data was uploaded successfully (upload_to_dataset raise an exception)
         # if not, "compose" will clean it next time
@@ -135,7 +138,7 @@ class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
         super().__init__(**kwargs)
 
     def run(self, operations):
-        logging.info(f"Starting executing DAG= {operations}")
+        logging.info(f"Starting executing DAG = {operations}")
         self._check_tz()
         for operation in operations.split(","):
 
@@ -167,7 +170,8 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
     def __init__(
         self,
         remote_upload_class=KaggleUploader,
-        number_of_processes=4,
+        number_of_scraping_processes=4,
+        number_of_parseing_processs=None,
         app_folder="app_data",
         data_folder="dumps",
         outputs_folder="outputs",
@@ -178,9 +182,11 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
         completed_by=None,
         num_of_occasions=3,
         limit=None,
+        when_date=None
     ):
         super().__init__(
-            number_of_processes=number_of_processes,
+            number_of_scraping_processes=number_of_scraping_processes,
+            number_of_parseing_processs=number_of_parseing_processs,
             remote_upload_class=remote_upload_class,
             app_folder=app_folder,
             data_folder=data_folder,
@@ -189,6 +195,7 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
             enabled_scrapers=enabled_scrapers,
             enabled_file_types=enabled_file_types,
             limit=limit,
+            when_date=when_date
         )
         self.num_of_occasions = num_of_occasions
         self.completed_by = completed_by if completed_by else self._end_of_day()
@@ -257,5 +264,7 @@ if __name__ == "__main__":
 
     publisher = SupermarketDataPublisherInterface(
         app_folder="app_data",
+        number_of_scraping_processes=os.cpu_count(),
+        number_of_parseing_processs=os.cpu_count(),
     )
     publisher.run(operations=os.environ["OPREATION"])
