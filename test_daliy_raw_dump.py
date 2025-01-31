@@ -6,6 +6,7 @@ import os
 import datetime
 from daliy_raw_dump import SupermarketDataPublisher
 from il_supermarket_scarper.scrappers_factory import ScraperFactory
+from il_supermarket_scarper import FileTypesFilters
 from remotes import Dummy
 
 
@@ -23,6 +24,7 @@ def test_daliy_raw_dump():
         app_folder=app_folder,
         data_folder=data_folder,
         enabled_scrapers=ScraperFactory.sample(1),
+        enabled_file_types=None,
         limit=file_per_run,
         start_at=datetime.datetime.now(),
         completed_by=datetime.datetime.now()

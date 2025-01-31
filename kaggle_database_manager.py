@@ -26,7 +26,7 @@ class RemoteDatasetManager:
             "ALL" if not enabled_file_types else ",".join(enabled_file_types)
         )
         self.dataset_path = os.path.join(app_folder, self.dataset)
-        self.remote_database = remote_upload_class(dataset_remote_name=dataset, dataset_path=self.dataset_path)
+        self.remote_database = remote_upload_class(dataset_remote_name=dataset, dataset_path=self.dataset_path,when=self.when)
         logging.info(f"Dataset path: {self.dataset_path}")
 
     def _now(self):
@@ -66,32 +66,32 @@ class RemoteDatasetManager:
         return descriptions
 
     def compose(self, outputs_folder, status_folder):
-        shutil.rmtree(self.dataset_path, ignore_errors=True)
-        os.makedirs(self.dataset_path, exist_ok=True)
-        with open(f"{self.dataset_path}/dataset-metadata.json", "w") as file:
-            json.dump(
-                {
-                    "title": "Israeli Supermarkets 2024",
-                    "id": f"erlichsefi/{self.dataset}",
-                    "resources": [
-                        {
-                            "path": "index.json",
-                            "description": "Index mapping between Kaggle versions and dataset creation times",
-                        },
-                        {
-                            "path": "parser-status.json",
-                            "description": "Parser status file",
-                        },
-                    ]
-                    + self.read_parser_status(outputs_folder)
-                    + self.read_scraper_status_files(status_folder),
-                },
-                file,
-            )
-        shutil.copytree(outputs_folder, self.dataset_path, dirs_exist_ok=True)
-        shutil.copytree(status_folder, self.dataset_path, dirs_exist_ok=True)
+        if not os.path.exists(self.dataset_path):
+            os.makedirs(self.dataset_path, exist_ok=True)
+            with open(f"{self.dataset_path}/dataset-metadata.json", "w") as file:
+                json.dump(
+                    {
+                        "title": "Israeli Supermarkets 2024",
+                        "id": f"erlichsefi/{self.dataset}",
+                        "resources": [
+                            {
+                                "path": "index.json",
+                                "description": "Index mapping between Kaggle versions and dataset creation times",
+                            },
+                            {
+                                "path": "parser-status.json",
+                                "description": "Parser status file",
+                            },
+                        ]
+                        + self.read_parser_status(outputs_folder)
+                        + self.read_scraper_status_files(status_folder),
+                    },
+                    file,
+                )
+            shutil.copytree(outputs_folder, self.dataset_path, dirs_exist_ok=True)
+            shutil.copytree(status_folder, self.dataset_path, dirs_exist_ok=True)
 
-        self.remote_database.increase_index()
+            self.remote_database.increase_index()
 
     def upload(self):
         """
