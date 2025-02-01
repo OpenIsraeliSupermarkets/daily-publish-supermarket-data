@@ -44,7 +44,7 @@ class DynamoDBDatasetManager:
         for entry in data:
             
             if "response" in entry and entry["response"]["file_was_created"]:
-                filename = entry["response"]["file_created_path"]
+                filename = os.path.basename(entry["response"]["file_created_path"])
                 table_name = entry['response']['files_types'] + entry['store_enum']
                 
                 self._create_tables('row_index',[('row_index',str)],table_name)
@@ -139,6 +139,18 @@ class DynamoDBDatasetManager:
                 if file.endswith(".json"):
                     with open(os.path.join(status_folder, file), "r") as f:
                         data = json.load(f)
+                        # Convert float types to Decimal types
+                        from decimal import Decimal
+                        def convert_floats(item):
+                            if isinstance(item, list):
+                                return [convert_floats(i) for i in item]
+                            elif isinstance(item, dict):
+                                return {k: convert_floats(v) for k, v in item.items()}
+                            elif isinstance(item, float):
+                                return Decimal(str(item))
+                            return item
+                        
+                        data = convert_floats(data)
                         scraper_table.put_item(Item={"file_name": file, "content": data})
             logging.info("Scraper status files stored in DynamoDB successfully.")
         except (BotoCoreError, NoCredentialsError) as e:
@@ -151,7 +163,7 @@ class DynamoDBDatasetManager:
             table_target_name = file_targets[file]
             table_target = self.dynamodb.Table(table_target_name)
             
-            with open(file, "r") as csv_file:
+            with open(os.path.join(outputs_folder,file), "r") as csv_file:
                 reader = csv.DictReader(csv_file)  # Use DictReader to read rows as dictionaries
                 for row in reader:
                     # Prepare the item to insert into DynamoDB
