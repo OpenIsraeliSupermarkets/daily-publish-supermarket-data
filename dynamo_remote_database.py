@@ -5,7 +5,6 @@ import datetime
 import pytz
 import logging
 import boto3
-import pandas as pd
 from botocore.exceptions import BotoCoreError, NoCredentialsError
 
 
@@ -14,17 +13,8 @@ class DynamoDBDatasetManager:
         self,
         parser_table_name="ParserStatus",
         scraper_table_name="ScraperStatus",
-        enabled_scrapers=None,
-        enabled_file_types=None,
         region_name="us-east-1",
     ):
-        self.when = self._now()
-        self.enabled_scrapers = (
-            "ALL" if not enabled_scrapers else ",".join(enabled_scrapers)
-        )
-        self.enabled_file_types = (
-            "ALL" if not enabled_file_types else ",".join(enabled_file_types)
-        )
         self.dynamodb = boto3.resource("dynamodb", region_name=region_name)
         self.dynamodb_client = boto3.client("dynamodb", region_name=region_name)
 
@@ -98,7 +88,7 @@ class DynamoDBDatasetManager:
             waiter = self.dynamodb_client.get_waiter("table_exists")
             waiter.wait(TableName=table_name)
         except Exception as e:
-            print(f"Error: {e}")
+            logging.error(f"Error: {e}")
 
     def _clean_all_tables(self):
         # List all tables
@@ -106,20 +96,20 @@ class DynamoDBDatasetManager:
         tables = response.get("TableNames", [])
 
         if not tables:
-            print("No tables found in the region.")
+            logging.debug("No tables found in the region.")
         else:
             for table in tables:
-                print(f"Deleting table: {table}")
+                logging.info(f"Deleting table: {table}")
                 self.dynamodb_client.delete_table(TableName=table)
 
-            print("Waiting for tables to be deleted...")
+            logging.info("Waiting for tables to be deleted...")
 
             # Wait for all tables to be deleted
             waiter = self.dynamodb_client.get_waiter("table_not_exists")
             for table in tables:
                 waiter.wait(TableName=table)
 
-            print("All tables deleted successfully!")
+            logging.info("All tables deleted successfully!")
 
     def push_parser_status(self, outputs_folder):
         with open(f"{outputs_folder}/parser-status.json", "r") as file:
