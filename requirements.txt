@@ -4,3 +4,5 @@ kaggle==1.6.17
 schedule==1.2.2
 kaggle==1.6.17
 schedule==1.2.2
+boto3==1.36
+botocore==1.36

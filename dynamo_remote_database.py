@@ -11,15 +11,12 @@ from botocore.exceptions import BotoCoreError, NoCredentialsError
 class DynamoDBDatasetManager:
     def __init__(
         self,
-        dataset,
         parser_table_name="ParserStatus",
         scraper_table_name="ScraperStatus",
-        app_folder=".",
         enabled_scrapers=None,
         enabled_file_types=None,
         region_name="us-east-1",
     ):
-        self.dataset = dataset
         self.when = self._now()
         self.enabled_scrapers = (
             "ALL" if not enabled_scrapers else ",".join(enabled_scrapers)
@@ -27,7 +24,6 @@ class DynamoDBDatasetManager:
         self.enabled_file_types = (
             "ALL" if not enabled_file_types else ",".join(enabled_file_types)
         )
-        self.dataset_path = os.path.join(app_folder, self.dataset)
         self.dynamodb = boto3.resource("dynamodb", region_name=region_name)
         self.parser_table_name = parser_table_name
         self.scraper_table_name = scraper_table_name

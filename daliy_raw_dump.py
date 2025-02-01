@@ -8,6 +8,7 @@ import os
 from il_supermarket_scarper import ScarpingTask
 from il_supermarket_parsers import ConvertingTask
 from kaggle_database_manager import KaggleDatasetManager
+from dynamo_remote_database import DynamoDBDatasetManager
 import sys
 
 
@@ -83,6 +84,10 @@ class BaseSupermarketDataPublisher:
 
         logging.info("Converting task is done")
 
+    def _update_api_database(self):
+        database = DynamoDBDatasetManager(region_name="il-central-1")
+        database.compose(outputs_folder=self.outputs_folder, status_folder=self.status_folder)
+        
     def _upload_to_kaggle(self):
         logging.info("Starting the database task")
         database = KaggleDatasetManager(
@@ -202,6 +207,7 @@ class SupermarketDataPublisher(BaseSupermarketDataPublisher):
         try:
             self._setup_schedule()
             self._track_scraping()
+            self._update_api_database()
             self._upload_and_clean()
         finally:
             self._clean_folders()
