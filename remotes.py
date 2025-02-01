@@ -5,6 +5,7 @@ import logging
 import json
 import shutil
 
+
 class RemoteDatabaseUploader(ABC):
     """
     Abstract class for uploading data to a remote database.
@@ -31,12 +32,13 @@ class RemoteDatabaseUploader(ABC):
         """
         pass
 
+
 class Dummy(RemoteDatabaseUploader):
     """
     Uploads data to a remote database.
     """
 
-    def __init__(self, dataset_remote_name, dataset_path,when):
+    def __init__(self, dataset_remote_name, dataset_path, when):
         self.dataset_remote_name = dataset_remote_name
         self.dataset_path = dataset_path
         self.when = when
@@ -60,9 +62,10 @@ class Dummy(RemoteDatabaseUploader):
             file_path = os.path.join(self.dataset_path, filename)
             if os.path.isfile(file_path):
                 shutil.copy(file_path, server_path)
-        
+
     def clean(self):
         pass
+
 
 class KaggleUploader(RemoteDatabaseUploader):
 

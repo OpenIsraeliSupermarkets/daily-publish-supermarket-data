@@ -32,13 +32,17 @@ class BaseSupermarketDataPublisher:
         enabled_scrapers=None,
         enabled_file_types=None,
         limit=None,
-        when_date=None
+        when_date=None,
     ):
         self.remote_upload_class = remote_upload_class
         self.today = datetime.datetime.now()
         self.when_date = when_date if when_date else self.today
         self.number_of_scraping_processes = number_of_scraping_processes
-        self.number_of_parseing_processs = number_of_parseing_processs if number_of_parseing_processs else number_of_scraping_processes - 2
+        self.number_of_parseing_processs = (
+            number_of_parseing_processs
+            if number_of_parseing_processs
+            else number_of_scraping_processes - 2
+        )
         self.app_folder = app_folder
         self.data_folder = os.path.join(app_folder, self._dump_folder_name(data_folder))
         self.outputs_folder = os.path.join(app_folder, outputs_folder)
@@ -92,8 +96,10 @@ class BaseSupermarketDataPublisher:
 
     def _update_api_database(self):
         database = DynamoDBDatasetManager(region_name="il-central-1")
-        database.compose(outputs_folder=self.outputs_folder, status_folder=self.status_folder)
-        
+        database.compose(
+            outputs_folder=self.outputs_folder, status_folder=self.status_folder
+        )
+
     def _upload_to_kaggle(self, compose=True):
         logging.info("Starting the database task")
         database = RemoteDatasetManager(
@@ -189,7 +195,7 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
         completed_by=None,
         num_of_occasions=3,
         limit=None,
-        when_date=None
+        when_date=None,
     ):
         super().__init__(
             number_of_scraping_processes=number_of_scraping_processes,
@@ -202,7 +208,7 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
             enabled_scrapers=enabled_scrapers,
             enabled_file_types=enabled_file_types,
             limit=limit,
-            when_date=when_date
+            when_date=when_date,
         )
         self.num_of_occasions = num_of_occasions
         self.completed_by = completed_by if completed_by else self._end_of_day()
@@ -259,12 +265,11 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
         """Return the start of the day"""
         return datetime.datetime.combine(self.today, datetime.time(12, 0))
 
-    def run(self, itreative_operations,final_operations):
+    def run(self, itreative_operations, final_operations):
         self._check_tz()
         self._setup_schedule(itreative_operations)
         self._track_task()
         super().run(operations=final_operations)
-        
 
 
 if __name__ == "__main__":
