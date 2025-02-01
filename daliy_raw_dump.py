@@ -156,6 +156,8 @@ class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
                 self._clean_all_dump_files()
             elif operation == "publishing":
                 self._upload_and_clean()
+            elif operation == "api_update":
+                self._update_api_database()
             elif operation == "upload_compose":
                 self._upload_and_clean(compose=True)
             elif operation == "upload_no_compose":
@@ -272,4 +274,4 @@ if __name__ == "__main__":
         number_of_scraping_processes=os.cpu_count(),
         number_of_parseing_processs=os.cpu_count(),
     )
-    publisher.run(operations=os.environ["OPREATION"])
+    publisher.run(operations="api_update")

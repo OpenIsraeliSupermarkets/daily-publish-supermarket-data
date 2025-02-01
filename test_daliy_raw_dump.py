@@ -13,7 +13,7 @@ from remotes import Dummy
 def test_daliy_raw_dump():
     # params
     num_of_occasions = 3
-    file_per_run = None
+    file_per_run = 1
     app_folder = "app_data"
     data_folder = "dumps"
     when_date = None#datetime.datetime(2025,1,10,0,0,0)
@@ -32,7 +32,8 @@ def test_daliy_raw_dump():
         num_of_occasions=num_of_occasions,
         when_date=when_date
     )
-    publisher.run(itreative_operations='scraping,converting,clean_dump_files',final_operations='publishing,clean_all_source_data')
+    publisher.run(itreative_operations='scraping,converting,api_update,clean_dump_files',final_operations='publishing,clean_all_source_data')
     
 
-test_daliy_raw_dump()
+if __name__ == "__main__":
+    test_daliy_raw_dump()
