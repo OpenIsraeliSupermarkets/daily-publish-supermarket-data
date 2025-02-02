@@ -2,6 +2,8 @@ import os
 import pandas as pd
 import json
 import logging
+import datetime
+import pytz
 from remotes import DynamoDbUploader
 
 
@@ -42,7 +44,7 @@ class ShortTermDBDatasetManager:
 
     def _create_status_tables(self):
         self.uploader._create_table(
-            "file_name",
+            "index",
             self.parser_table_name,
         )
         self.uploader._create_table(
@@ -50,20 +52,42 @@ class ShortTermDBDatasetManager:
             self.scraper_table_name,
         )
 
+    def _now(self):
+        return datetime.datetime.now(pytz.timezone("Asia/Jerusalem")).strftime(
+            "%d/%m/%Y, %H:%M:%S"
+        )
+
     def push_parser_status(self, outputs_folder):
         with open(f"{outputs_folder}/parser-status.json", "r") as file:
-            data = json.load(file)
+            records = json.load(file)
 
-        records = [{"file_name": os.path.basename(file.name), "content": data}]
+        records = [
+            {
+                "index": record["file_type"] + "@" + record["store_enum"],
+                "timestamp": self._now(),
+                **record,
+            }
+            for record in records
+        ]
         self.uploader._insert_to_database(self.parser_table_name, records)
         logging.info("Parser status stored in DynamoDB successfully.")
 
     def push_scraper_status_files(self, status_folder):
         records = []
         for file in os.listdir(status_folder):
-            if file.endswith(".json"):
+            if file.endswith(".json") and file != "parser-status.json":
                 with open(os.path.join(status_folder, file), "r") as f:
-                    records.append({"file_name": file, "content": json.load(f)})
+                    data = json.load(f)
+
+                for timestamp, actions in data.items():
+
+                    if timestamp == "verified_downloads":
+                        continue
+
+                    for action in actions:
+                        records.append(
+                            {"file_name": file, "timestamp": timestamp, **action}
+                        )
 
         self.uploader._insert_to_database(self.scraper_table_name, records)
         logging.info("Scraper status files stored in DynamoDB successfully.")
@@ -72,7 +96,7 @@ class ShortTermDBDatasetManager:
         #
         for file in os.listdir(outputs_folder):
 
-            if file == "parser-status.json":
+            if not file.endswith(".csv"):
                 continue
 
             logging.info(f"Pushing {file}")
@@ -107,7 +131,7 @@ class ShortTermDBDatasetManager:
         with open(self.cache_file, "w") as file:
             json.dump(new_content, file)
 
-    def upload(self, outputs_folder):
+    def upload(self, outputs_folder, status_folder):
         local_cahce = self._load_cache()
         if not local_cahce:
             self.uploader._clean_all_tables()
@@ -115,5 +139,5 @@ class ShortTermDBDatasetManager:
 
         # push
         self.push_parser_status(outputs_folder)
-        self.push_scraper_status_files(outputs_folder)
+        self.push_scraper_status_files(status_folder)
         self.push_files_data(outputs_folder, local_cahce)

@@ -217,7 +217,24 @@ class DummyDocumentDbUploader:
     def __init__(self, db_path):
         self.db_path = os.path.join("./document_db", db_path)
         os.makedirs(self.db_path, exist_ok=True)
-        self.tables_ids = {}
+        self._load_tables_ids()
+
+    def _load_tables_ids(self):
+        tables_ids_path = os.path.join(self.db_path, "tables_ids.json")
+        if os.path.exists(tables_ids_path):
+            with open(tables_ids_path, "r") as f:
+                self.tables_ids = json.load(f)
+        else:
+            self.tables_ids = {}
+
+    def _save_tables_ids(self):
+        tables_ids_path = os.path.join(self.db_path, "tables_ids.json")
+        with open(tables_ids_path, "w") as f:
+            json.dump(self.tables_ids, f, indent=4, ensure_ascii=False)
+
+    def _clean_meta_data(self):
+        if os.path.exists(os.path.join(self.db_path, "tables_ids.json")):
+            os.remove(os.path.join(self.db_path, "tables_ids.json"))
 
     def _insert_to_database(self, table_target_name, items):
         table_path = os.path.join(self.db_path, table_target_name)
@@ -238,9 +255,11 @@ class DummyDocumentDbUploader:
         table_path = os.path.join(self.db_path, table_name)
         os.makedirs(table_path, exist_ok=True)
         self.tables_ids[table_name] = partition_id
+        self._save_tables_ids()
         logging.info(f"Created table: {table_name}")
 
     def _clean_all_tables(self):
+        self._clean_meta_data()
         for table_name in os.listdir(self.db_path):
             table_path = os.path.join(self.db_path, table_name)
             if os.path.isdir(table_path):

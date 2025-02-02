@@ -103,7 +103,9 @@ class BaseSupermarketDataPublisher:
             region_name="il-central-1",
             app_folder=self.app_folder,
         )
-        database.upload(outputs_folder=self.outputs_folder)
+        database.upload(
+            outputs_folder=self.outputs_folder, status_folder=self.status_folder
+        )
 
     def _upload_to_kaggle(self, compose=True):
         logging.info("Starting the long term database task")
@@ -282,6 +284,7 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
     def run(self, itreative_operations, final_operations, now=False):
         if now:
             self._execute_operations(itreative_operations)
+            self.executed_jobs -= 1
 
         self._check_tz()
         self._setup_schedule(itreative_operations)
