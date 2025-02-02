@@ -35,7 +35,7 @@ class RemoteDatabaseUploader(ABC):
         pass
 
 
-class Dummy(RemoteDatabaseUploader):
+class DummyFileStorge(RemoteDatabaseUploader):
     """
     Uploads data to a remote database.
     """
