@@ -7,9 +7,9 @@ import datetime
 import os
 from il_supermarket_scarper import ScarpingTask
 from il_supermarket_parsers import ConvertingTask
-from kaggle_database_manager import RemoteDatasetManager
-from dynamo_remote_database import DynamoDBDatasetManager
-from remotes import KaggleUploader
+from long_term_database_manager import LongTermDatasetManager
+from short_term_database_manager import ShortTermDBDatasetManager
+from remotes import KaggleUploader, DynamoDbUploader
 
 
 logging.getLogger("Logger").setLevel(logging.INFO)
@@ -22,7 +22,7 @@ class BaseSupermarketDataPublisher:
 
     def __init__(
         self,
-        remote_upload_class=KaggleUploader,
+        long_term_db_target=KaggleUploader,
         number_of_scraping_processes=3,
         number_of_parseing_processs=None,
         app_folder="app_data",
@@ -34,7 +34,7 @@ class BaseSupermarketDataPublisher:
         limit=None,
         when_date=None,
     ):
-        self.remote_upload_class = remote_upload_class
+        self.long_term_db_target = long_term_db_target
         self.today = datetime.datetime.now()
         self.when_date = when_date if when_date else self.today
         self.number_of_scraping_processes = number_of_scraping_processes
@@ -95,16 +95,17 @@ class BaseSupermarketDataPublisher:
         logging.info("Converting task is done")
 
     def _update_api_database(self):
-        database = DynamoDBDatasetManager(
+        logging.info("Starting the short term database task")
+        database = ShortTermDBDatasetManager(
             region_name="il-central-1", app_folder=self.app_folder
         )
         database.upload(outputs_folder=self.outputs_folder)
 
     def _upload_to_kaggle(self, compose=True):
-        logging.info("Starting the database task")
-        database = RemoteDatasetManager(
+        logging.info("Starting the long term database task")
+        database = LongTermDatasetManager(
             dataset="israeli-supermarkets-2024",
-            remote_upload_class=self.remote_upload_class,
+            long_term_db_target=self.long_term_db_target,
             enabled_scrapers=self.enabled_scrapers,
             enabled_file_types=self.enabled_file_types,
             app_folder=self.app_folder,
@@ -189,7 +190,8 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
 
     def __init__(
         self,
-        remote_upload_class=KaggleUploader,
+        long_term_db_target=KaggleUploader,
+        short_term_db_target=DynamoDbUploader,
         number_of_scraping_processes=4,
         number_of_parseing_processs=None,
         app_folder="app_data",
@@ -207,7 +209,7 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
         super().__init__(
             number_of_scraping_processes=number_of_scraping_processes,
             number_of_parseing_processs=number_of_parseing_processs,
-            remote_upload_class=remote_upload_class,
+            long_term_db_target=long_term_db_target,
             app_folder=app_folder,
             data_folder=data_folder,
             outputs_folder=outputs_folder,
