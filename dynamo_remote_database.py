@@ -8,6 +8,7 @@ import boto3
 from botocore.exceptions import BotoCoreError, NoCredentialsError
 from decimal import Decimal
 
+
 class DynamoDBDatasetManager:
     def __init__(
         self,
@@ -25,17 +26,17 @@ class DynamoDBDatasetManager:
         return datetime.datetime.now(pytz.timezone("Asia/Jerusalem")).strftime(
             "%d/%m/%Y, %H:%M:%S"
         )
-        
-    def _file_name_to_table(self,filename):
+
+    def _file_name_to_table(self, filename):
         return filename.split(".")[0]
-    
-    def _create_data_folders(self,outputs_folder):
+
+    def _create_data_folders(self, outputs_folder):
         with open(f"{outputs_folder}/parser-status.json", "r") as file:
             data = json.load(file)
 
         for entry in data:
             if "response" in entry and entry["response"]["file_was_created"]:
-                
+
                 data_file_path = entry["response"]["file_created_path"]
                 if os.path.exists(data_file_path):
                     filename = os.path.basename(entry["response"]["file_created_path"])
@@ -46,9 +47,8 @@ class DynamoDBDatasetManager:
     def _create_all_tables(self, outputs_folder):
         self._create_data_folders(outputs_folder)
         self._create_status_tables()
-        
-        
-    def _insert_to_database(self,table_target, items):
+
+    def _insert_to_database(self, table_target, items):
         # Batch write items to DynamoDB
         with table_target.batch_writer() as batch:
             for item in items:
@@ -81,14 +81,10 @@ class DynamoDBDatasetManager:
     def _create_table(self, partition_id, table_name):
         logging.info(f"creating {table_name}")
         # Define attribute definitions
-        attribute_definitions = [
-            {"AttributeName": partition_id, "AttributeType": "S"}
-        ]  
+        attribute_definitions = [{"AttributeName": partition_id, "AttributeType": "S"}]
 
         # Define key schema
-        key_schema = [
-            {"AttributeName": partition_id, "KeyType": "HASH"}
-        ] 
+        key_schema = [{"AttributeName": partition_id, "KeyType": "HASH"}]
         # Create DynamoDB table
         try:
             self.dynamodb.create_table(
@@ -101,8 +97,6 @@ class DynamoDBDatasetManager:
             waiter.wait(TableName=table_name)
         except Exception as e:
             logging.error(f"Error: {e}")
-
-
 
     def _clean_all_tables(self):
         # List all tables
@@ -134,16 +128,16 @@ class DynamoDBDatasetManager:
             "file_name",
             self.scraper_table_name,
         )
-    
-    def pre_process(self,item):
+
+    def pre_process(self, item):
         if isinstance(item, list):
             return [self.pre_process(i) for i in item]
         elif isinstance(item, dict):
             return {k: self.pre_process(v) for k, v in item.items()}
         elif isinstance(item, float):
             return Decimal(str(item))
-        return item   
-    
+        return item
+
     def push_parser_status(self, outputs_folder):
         with open(f"{outputs_folder}/parser-status.json", "r") as file:
             data = json.load(file)
@@ -176,12 +170,12 @@ class DynamoDBDatasetManager:
     def push_files_data(self, outputs_folder):
         #
         for file in os.listdir(outputs_folder):
-            
+
             if file == "parser-status.json":
                 continue
-            
+
             logging.info(f"Pushing {file}")
-            
+
             # select the correct table
             table_target_name = self._file_name_to_table(file)
             table_target = self.dynamodb.Table(table_target_name)
@@ -189,19 +183,18 @@ class DynamoDBDatasetManager:
             # Read the CSV file into a DataFrame
             df = pd.read_csv(os.path.join(outputs_folder, file))
             df = df.ffill().reset_index(names=["row_index"])
-            df['row_index'] = df['row_index'].astype(str)
+            df["row_index"] = df["row_index"].astype(str)
             items = df.to_dict(orient="records")
-            self._insert_to_database(table_target,items)
-            
+            self._insert_to_database(table_target, items)
+
             logging.info(f"Completed pushing {file}")
 
-        
         logging.info("Files data pushed in DynamoDB successfully.")
 
     def compose(self, outputs_folder, status_folder):
-        #self._clean_all_tables()
-        #self._create_all_tables(outputs_folder)
+        self._clean_all_tables()
+        self._create_all_tables(outputs_folder)
         # push
-        #self.push_parser_status(outputs_folder)
-        #self.push_scraper_status_files(outputs_folder)
+        self.push_parser_status(outputs_folder)
+        self.push_scraper_status_files(outputs_folder)
         self.push_files_data(outputs_folder)
