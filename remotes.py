@@ -112,7 +112,7 @@ class KaggleUploader(RemoteDatabaseUploader):
 
 class APIDatabaseUploader:
 
-    def __init__(self):
+    def __init__(self, *_):
         pass
 
     def _insert_to_database(self, table_target_name, items):
@@ -214,27 +214,30 @@ class DynamoDbUploader(APIDatabaseUploader):
 
 
 class DummyDocumentDbUploader:
-    def __init__(self, db_path="./document_db"):
-        self.db_path = db_path
+    def __init__(self, db_path):
+        self.db_path = os.path.join("./document_db", db_path)
         os.makedirs(self.db_path, exist_ok=True)
+        self.tables_ids = {}
 
     def _insert_to_database(self, table_target_name, items):
         table_path = os.path.join(self.db_path, table_target_name)
         os.makedirs(table_path, exist_ok=True)
 
+        id_name = self.tables_ids[table_target_name]
         for item in items:
-            item_id = item.get("id", None)
+            item_id = item.get(id_name, None)
             if not item_id:
-                logging.error("Item must have an 'id' field.")
+                logging.error(f"Item must have an '{item_id}' field.")
                 continue
 
             file_path = os.path.join(table_path, f"{item_id}.json")
             with open(file_path, "w") as f:
-                json.dump(item, f, indent=4)
+                json.dump(item, f, indent=4, ensure_ascii=False)
 
     def _create_table(self, partition_id, table_name):
         table_path = os.path.join(self.db_path, table_name)
         os.makedirs(table_path, exist_ok=True)
+        self.tables_ids[table_name] = partition_id
         logging.info(f"Created table: {table_name}")
 
     def _clean_all_tables(self):

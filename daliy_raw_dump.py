@@ -23,6 +23,7 @@ class BaseSupermarketDataPublisher:
     def __init__(
         self,
         long_term_db_target=KaggleUploader,
+        short_term_db_target=DynamoDbUploader,
         number_of_scraping_processes=3,
         number_of_parseing_processs=None,
         app_folder="app_data",
@@ -34,6 +35,7 @@ class BaseSupermarketDataPublisher:
         limit=None,
         when_date=None,
     ):
+        self.short_term_db_target = short_term_db_target
         self.long_term_db_target = long_term_db_target
         self.today = datetime.datetime.now()
         self.when_date = when_date if when_date else self.today
@@ -97,7 +99,9 @@ class BaseSupermarketDataPublisher:
     def _update_api_database(self):
         logging.info("Starting the short term database task")
         database = ShortTermDBDatasetManager(
-            region_name="il-central-1", app_folder=self.app_folder
+            short_term_db_target=self.short_term_db_target,
+            region_name="il-central-1",
+            app_folder=self.app_folder,
         )
         database.upload(outputs_folder=self.outputs_folder)
 
@@ -210,6 +214,7 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
             number_of_scraping_processes=number_of_scraping_processes,
             number_of_parseing_processs=number_of_parseing_processs,
             long_term_db_target=long_term_db_target,
+            short_term_db_target=short_term_db_target,
             app_folder=app_folder,
             data_folder=data_folder,
             outputs_folder=outputs_folder,
@@ -274,7 +279,10 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
         """Return the start of the day"""
         return datetime.datetime.combine(self.today, datetime.time(12, 0))
 
-    def run(self, itreative_operations, final_operations):
+    def run(self, itreative_operations, final_operations, now=False):
+        if now:
+            self._execute_operations(itreative_operations)
+
         self._check_tz()
         self._setup_schedule(itreative_operations)
         self._track_task()

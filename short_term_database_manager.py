@@ -1,11 +1,7 @@
 import os
 import pandas as pd
 import json
-import datetime
-import pytz
 import logging
-
-from botocore.exceptions import BotoCoreError, NoCredentialsError
 from remotes import DynamoDbUploader
 
 
@@ -72,7 +68,7 @@ class ShortTermDBDatasetManager:
         self.uploader._insert_to_database(self.scraper_table_name, records)
         logging.info("Scraper status files stored in DynamoDB successfully.")
 
-    def push_files_data(self, outputs_folder):
+    def push_files_data(self, outputs_folder, local_cahce):
         #
         for file in os.listdir(outputs_folder):
 
@@ -86,8 +82,8 @@ class ShortTermDBDatasetManager:
             # Read the CSV file into a DataFrame
             df = pd.read_csv(os.path.join(outputs_folder, file))
             df = df.reset_index(names=["row_index"])
-            df = df[df.row_index > last_pushed.get(file, -1)]
-            latast = df.row_index.max()
+            df = df[df.row_index > local_cahce.get(file, -1)]
+            latast = int(df.row_index.max())
             df["row_index"] = df["row_index"].astype(str)
             items = df.ffill().to_dict(orient="records")
             self.uploader._insert_to_database(table_target_name, items)
@@ -107,11 +103,11 @@ class ShortTermDBDatasetManager:
                 last_pushed = json.load(file)
         return last_pushed
 
-    def _upload_local_cache(self, **new_content):
+    def _upload_local_cache(self, new_content):
         with open(self.cache_file, "w") as file:
             json.dump(new_content, file)
 
-    def upload(self, app_folder, outputs_folder):
+    def upload(self, outputs_folder):
         local_cahce = self._load_cache()
         if not local_cahce:
             self.uploader._clean_all_tables()
@@ -120,4 +116,4 @@ class ShortTermDBDatasetManager:
         # push
         self.push_parser_status(outputs_folder)
         self.push_scraper_status_files(outputs_folder)
-        self.push_files_data(app_folder, outputs_folder)
+        self.push_files_data(outputs_folder, local_cahce)
