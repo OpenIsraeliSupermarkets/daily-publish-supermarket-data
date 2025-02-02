@@ -64,6 +64,7 @@ class ShortTermDBDatasetManager:
         records = [
             {
                 "index": record["file_type"] + "@" + record["store_enum"],
+                "ChainName": record["store_enum"],
                 "timestamp": self._now(),
                 **record,
             }

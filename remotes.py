@@ -6,6 +6,7 @@ import json
 import shutil
 import boto3
 from decimal import Decimal
+import datetime
 
 
 class RemoteDatabaseUploader(ABC):
@@ -124,6 +125,12 @@ class APIDatabaseUploader:
     def _clean_all_tables(self):
         pass
 
+    def _get_all_files_by_chain(self, chain: str):
+        pass
+
+    def _get_content_of_file(self, table_name, file):
+        pass
+
 
 class DynamoDbUploader(APIDatabaseUploader):
 
@@ -211,6 +218,20 @@ class DynamoDbUploader(APIDatabaseUploader):
                 waiter.wait(TableName=table)
 
             logging.info("All tables deleted successfully!")
+
+    def _get_all_files_by_chain(self, chain: str):
+        table = self.dynamodb.Table("ParserStatus")
+        response = table.query(
+            KeyConditionExpression=boto3.dynamodb.conditions.Key("ChainName").eq(chain)
+        )
+        return response.get("Items", [])
+
+    def _get_content_of_file(self, table_name, file):
+        table = self.dynamodb.Table(table_name)
+        response = table.query(
+            KeyConditionExpression=boto3.dynamodb.conditions.Key("file_name").eq(file)
+        )
+        return response.get("Items", [])
 
 
 class DummyDocumentDbUploader:
