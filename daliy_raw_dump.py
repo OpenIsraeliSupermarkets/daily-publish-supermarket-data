@@ -96,8 +96,9 @@ class BaseSupermarketDataPublisher:
 
     def _update_api_database(self):
         database = DynamoDBDatasetManager(region_name="il-central-1")
-        database.compose(
-            outputs_folder=self.outputs_folder, status_folder=self.status_folder
+        database.upload(
+            app_folder=self.app_folder,
+            outputs_folder=self.outputs_folder
         )
 
     def _upload_to_kaggle(self, compose=True):
