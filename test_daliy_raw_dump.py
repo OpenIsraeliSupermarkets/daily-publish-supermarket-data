@@ -12,7 +12,7 @@ from remotes import DummyFileStorge, DummyDocumentDbUploader
 
 def test_daliy_raw_dump():
     # params
-    num_of_occasions = 1
+    num_of_occasions = 2
     file_per_run = 1
     app_folder = "app_data"
     data_folder = "dumps"
@@ -34,7 +34,7 @@ def test_daliy_raw_dump():
         when_date=when_date,
     )
     publisher.run(
-        now=True,
+        now=False,
         itreative_operations="scraping,converting,api_update,clean_dump_files",
         final_operations="publishing,clean_all_source_data",
     )

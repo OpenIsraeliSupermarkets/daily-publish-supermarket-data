@@ -86,7 +86,11 @@ class ShortTermDBDatasetManager:
 
                     for action in actions:
                         records.append(
-                            {"file_name": file, "timestamp": timestamp, **action}
+                            {
+                                "file_name": file.split(".")[0],
+                                "timestamp": timestamp,
+                                **action,
+                            }
                         )
 
         self.uploader._insert_to_database(self.scraper_table_name, records)
