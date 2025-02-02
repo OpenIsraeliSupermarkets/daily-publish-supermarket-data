@@ -20,7 +20,7 @@ class DynamoDBDatasetManager:
         self.dynamodb = boto3.resource("dynamodb", region_name=region_name)
         self.dynamodb_client = boto3.client("dynamodb", region_name=region_name)
 
-        self.cache_file = os.path.join(app_folder,".push_cache")
+        self.cache_file = os.path.join(app_folder, ".push_cache")
         self.parser_table_name = parser_table_name
         self.scraper_table_name = scraper_table_name
 
@@ -184,14 +184,14 @@ class DynamoDBDatasetManager:
 
             # Read the CSV file into a DataFrame
             df = pd.read_csv(os.path.join(outputs_folder, file))
-            df = df.reset_index(names=["row_index"])    
-            df = df[df.row_index > last_pushed.get(file,-1)]
+            df = df.reset_index(names=["row_index"])
+            df = df[df.row_index > last_pushed.get(file, -1)]
             latast = df.row_index.max()
             df["row_index"] = df["row_index"].astype(str)
             items = df.ffill().to_dict(orient="records")
             self._insert_to_database(table_target, items)
-            
-            last_pushed = {file:latast}
+
+            last_pushed = {file: latast}
 
             logging.info(f"Completed pushing {file}")
 
@@ -200,22 +200,22 @@ class DynamoDBDatasetManager:
 
     def _load_cache(self):
         last_pushed = {}
-        
+
         if os.path.exists(self.cache_file):
-            with open(self.cache_file, 'r') as file:
+            with open(self.cache_file, "r") as file:
                 last_pushed = json.load(file)
         return last_pushed
-    
-    def _upload_local_cache(self,**new_content):
-        with open(self.cache_file, 'w') as file:
-            json.dump(new_content,file)
-    
+
+    def _upload_local_cache(self, **new_content):
+        with open(self.cache_file, "w") as file:
+            json.dump(new_content, file)
+
     def upload(self, app_folder, outputs_folder):
         local_cahce = self._load_cache()
         if not local_cahce:
             self._clean_all_tables()
             self._create_all_tables(outputs_folder)
-        
+
         # push
         self.push_parser_status(outputs_folder)
         self.push_scraper_status_files(outputs_folder)
