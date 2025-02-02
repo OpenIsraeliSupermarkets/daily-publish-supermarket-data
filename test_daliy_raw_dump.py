@@ -7,7 +7,7 @@ import datetime
 from daliy_raw_dump import SupermarketDataPublisher
 from il_supermarket_scarper.scrappers_factory import ScraperFactory
 from il_supermarket_scarper import FileTypesFilters
-from remotes import Dummy, DummyDocumentDbUploader
+from remotes import DummyFileStorge, DummyDocumentDbUploader
 
 
 def test_daliy_raw_dump():
@@ -20,7 +20,7 @@ def test_daliy_raw_dump():
 
     # run the process for couple of times
     publisher = SupermarketDataPublisher(
-        long_term_db_target=Dummy,
+        long_term_db_target=DummyFileStorge,
         short_term_db_target=DummyDocumentDbUploader,
         app_folder=app_folder,
         data_folder=data_folder,
