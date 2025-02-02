@@ -109,12 +109,14 @@ class ShortTermDBDatasetManager:
 
             # Read the CSV file into a DataFrame
             df = pd.read_csv(os.path.join(outputs_folder, file))
-            df = df.reset_index(names=["row_index"])
-            df = df[df.row_index > local_cahce.get(file, -1)]
-            latast = int(df.row_index.max())
-            df["row_index"] = df["row_index"].astype(str)
-            items = df.ffill().to_dict(orient="records")
-            self.uploader._insert_to_database(table_target_name, items)
+            latast = -1
+            if not df.empty:
+                df = df.reset_index(names=["row_index"])
+                df = df[df.row_index > local_cahce.get(file, -1)]
+                latast = int(df.row_index.max())
+                df["row_index"] = df["row_index"].astype(str)
+                items = df.ffill().to_dict(orient="records")
+                self.uploader._insert_to_database(table_target_name, items)
 
             last_pushed = {file: latast}
 
