@@ -95,8 +95,10 @@ class BaseSupermarketDataPublisher:
         logging.info("Converting task is done")
 
     def _update_api_database(self):
-        database = DynamoDBDatasetManager(region_name="il-central-1")
-        database.upload(app_folder=self.app_folder, outputs_folder=self.outputs_folder)
+        database = DynamoDBDatasetManager(
+            region_name="il-central-1", app_folder=self.app_folder
+        )
+        database.upload(outputs_folder=self.outputs_folder)
 
     def _upload_to_kaggle(self, compose=True):
         logging.info("Starting the database task")
@@ -139,6 +141,13 @@ class BaseSupermarketDataPublisher:
         for folder in [self.data_folder, self.outputs_folder, self.status_folder]:
             if os.path.exists(folder):
                 shutil.rmtree(folder)
+
+        for folder in [self.app_folder]:
+            for root, dirs, files in os.walk(folder):
+                for file in files:
+                    os.remove(os.path.join(root, file))
+                for dir in dirs:
+                    shutil.rmtree(os.path.join(root, dir))
 
 
 class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):

@@ -19,7 +19,6 @@ class DynamoDBDatasetManager:
     ):
         self.dynamodb = boto3.resource("dynamodb", region_name=region_name)
         self.dynamodb_client = boto3.client("dynamodb", region_name=region_name)
-
         self.cache_file = os.path.join(app_folder, ".push_cache")
         self.parser_table_name = parser_table_name
         self.scraper_table_name = scraper_table_name
