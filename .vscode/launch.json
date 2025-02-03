@@ -37,5 +37,14 @@
                 "hidden": true, // keep original launch order in 'run and debug' tab
             }
         },
+        {
+            "name": "FastAPI: Dev Main",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/access_layer.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env",
+        }
     ]
 }

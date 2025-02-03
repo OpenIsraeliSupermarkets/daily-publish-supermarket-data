@@ -26,9 +26,7 @@ async def read_files(chain: str):
 
 
 @app.get("/file_content/v0")
-async def file_content(
-    chain: str, file: str
-):
+async def file_content(chain: str, file: str):
     if not chain:
         raise HTTPException(status_code=400, detail="chain parameter is required")
     if not file:

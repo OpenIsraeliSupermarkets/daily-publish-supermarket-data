@@ -125,10 +125,10 @@ class APIDatabaseUploader:
     def _clean_all_tables(self):
         pass
 
-    def _get_all_files_by_chain(self,chain:str):
+    def _get_all_files_by_chain(self, chain: str):
         pass
-    
-    def _get_content_of_file(self,table_name,file):
+
+    def _get_content_of_file(self, table_name, file):
         pass
 
 
@@ -219,22 +219,25 @@ class DynamoDbUploader(APIDatabaseUploader):
 
             logging.info("All tables deleted successfully!")
 
-
-    def _get_all_files_by_chain(self,chain:str):
-        table = self.dynamodb.Table('ParserStatus')
+    def _get_all_files_by_chain(self, chain: str):
+        table = self.dynamodb.Table("ParserStatus")
         response = table.query(
-            KeyConditionExpression=boto3.dynamodb.conditions.Key('ChainName').eq(chain)
+            KeyConditionExpression=boto3.dynamodb.conditions.Key("ChainName").eq(chain)
         )
-        return response.get('Items', [])
-    
-    
-    def _get_content_of_file(self,table_name, file):
+
+        result = []
+        for item in response.get("Items", []):
+            result.extend(item["response"]["files_to_process"])
+        return result
+
+    def _get_content_of_file(self, table_name, file):
         table = self.dynamodb.Table(table_name)
         response = table.query(
-            KeyConditionExpression=boto3.dynamodb.conditions.Key('file_name').eq(file)
+            KeyConditionExpression=boto3.dynamodb.conditions.Key("file_name").eq(file)
         )
-        return response.get('Items', [])
-    
+        return response.get("Items", [])
+
+
 class DummyDocumentDbUploader:
     def __init__(self, db_path):
         self.db_path = os.path.join("./document_db", db_path)
@@ -290,23 +293,28 @@ class DummyDocumentDbUploader:
                 os.rmdir(table_path)
         logging.info("All tables deleted successfully!")
 
-    def _get_all_files_by_chain(self, chain: str):
-        chain_path = os.path.join(self.db_path, chain)
+    def _get_all_files_by_chain(self, chain: str, file_type: str = None):
+        chain_path = os.path.join(self.db_path, "ParserStatus")
         if not os.path.exists(chain_path):
-            logging.error(f"Chain '{chain}' does not exist.")
             return []
 
-        return [
-            os.path.join(chain_path, file)
-            for file in os.listdir(chain_path)
-            if os.path.isfile(os.path.join(chain_path, file))
-        ]
+        file_found = []
+        for file in os.listdir(chain_path):
+            if chain in file and (file_type is None or file_type in file):
+                with open(os.path.join(chain_path, file), "r") as file:
+                    file_found.extend(json.load(file)["response"]["files_to_process"])
+        return file_found
 
-    def _get_content_of_file(self, table_name, file):
-        file_path = os.path.join(self.db_path, table_name, file)
-        if not os.path.exists(file_path):
+    def _get_content_of_file(self, table_name, content_of_file):
+        foler_path = os.path.join(self.db_path, table_name)
+        if not os.path.exists(foler_path):
             logging.error(f"File '{file}' does not exist in table '{table_name}'.")
             return None
 
-        with open(file_path, "r") as f:
-            return json.load(f)
+        file_found = []
+        for file in os.listdir(foler_path):
+            with open(os.path.join(foler_path, file), "r") as file:
+                data = json.load(file)
+                if data["file_name"] == content_of_file:
+                    file_found.append(data)
+        return file_found
