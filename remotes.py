@@ -154,30 +154,6 @@ class DynamoDbUploader(APIDatabaseUploader):
             for item in items:
                 batch.put_item(Item=self.pre_process(item))
 
-    def get_dynamodb_type(self, py_type):
-        """
-        Maps a Python type to a DynamoDB type string.
-
-        :param py_type: Python type (e.g., str, int, list)
-        :return: Corresponding DynamoDB type string
-        """
-        type_mapping = {
-            str: "S",  # String
-            int: "N",  # Number
-            float: "N",  # Number
-            bool: "BOOL",  # Boolean
-            type(None): "NULL",  # Null
-            list: "L",  # List
-            dict: "M",  # Map
-            set: "SS",  # Default to StringSet (caller must ensure correct type)
-            bytes: "B",  # Binary
-            bytearray: "B",  # Binary
-        }
-
-        return type_mapping.get(
-            py_type, "UNKNOWN"
-        )  # Default to UNKNOWN if type is not mapped
-
     def _create_table(self, partition_id, table_name):
         logging.info(f"creating {table_name}")
         # Define attribute definitions
