@@ -1,12 +1,10 @@
-from typing import Annotated
-
 from il_supermarket_scarper import ScraperFactory, FileTypesFilters
-from remotes import DummyDocumentDbUploader
+from remotes import DummyDocumentDbUploader, DynamoDbUploader
 
 
 class API:
 
-    database_connector = DummyDocumentDbUploader("il-central-1")
+    database_connector = DynamoDbUploader("il-central-1")
 
     def list_files(cls, chain: str, file_type: str = None):
         if not chain:
@@ -48,7 +46,7 @@ class API:
 if __name__ == "__main__":
 
     api = API()
-    files = api.list_files(chain="SHEFA_BARCART_ASHEM")
+    files = api.list_files(chain="SALACH_DABACH")
     for file in files:
-        content = api.get_file_content(chain="SHEFA_BARCART_ASHEM", file=file)
+        content = api.get_file_content(chain="SALACH_DABACH", file=file)
         print(len(content))

@@ -7,11 +7,12 @@ import datetime
 from daliy_raw_dump import SupermarketDataPublisher
 from il_supermarket_scarper.scrappers_factory import ScraperFactory
 from il_supermarket_scarper import FileTypesFilters
-from remotes import DummyFileStorge, DummyDocumentDbUploader
+from remotes import DummyFileStorge, DynamoDbUploader
 
 
 def test_daliy_raw_dump():
     # params
+    expected_duration_in_minutes = 2
     num_of_occasions = 2
     file_per_run = 1
     app_folder = "app_data"
@@ -21,7 +22,7 @@ def test_daliy_raw_dump():
     # run the process for couple of times
     publisher = SupermarketDataPublisher(
         long_term_db_target=DummyFileStorge,
-        short_term_db_target=DummyDocumentDbUploader,
+        short_term_db_target=DynamoDbUploader,
         app_folder=app_folder,
         data_folder=data_folder,
         enabled_scrapers=ScraperFactory.sample(1),
@@ -29,7 +30,7 @@ def test_daliy_raw_dump():
         limit=file_per_run,
         start_at=datetime.datetime.now(),
         completed_by=datetime.datetime.now()
-        + datetime.timedelta(minutes=num_of_occasions),
+        + datetime.timedelta(minutes=num_of_occasions * expected_duration_in_minutes),
         num_of_occasions=num_of_occasions,
         when_date=when_date,
     )

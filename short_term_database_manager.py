@@ -48,24 +48,29 @@ class ShortTermDBDatasetManager:
             self.parser_table_name,
         )
         self.uploader._create_table(
-            "file_name",
+            "index",
             self.scraper_table_name,
         )
 
     def _now(self):
         return datetime.datetime.now(pytz.timezone("Asia/Jerusalem")).strftime(
-            "%d/%m/%Y, %H:%M:%S"
+            "%d%m%Y%H%M%S"
         )
 
     def push_parser_status(self, outputs_folder):
         with open(f"{outputs_folder}/parser-status.json", "r") as file:
             records = json.load(file)
+        exection_time = self._now()
 
         records = [
             {
-                "index": record["file_type"] + "@" + record["store_enum"],
+                "index": record["file_type"]
+                + "@"
+                + record["store_enum"]
+                + "@"
+                + exection_time,
                 "ChainName": record["store_enum"],
-                "timestamp": self._now(),
+                "timestamp": exection_time,
                 **record,
             }
             for record in records
@@ -88,6 +93,11 @@ class ShortTermDBDatasetManager:
                     for action in actions:
                         records.append(
                             {
+                                "index": file.split(".")[0]
+                                + "@"
+                                + action["status"]
+                                + "@"
+                                + timestamp,
                                 "file_name": file.split(".")[0],
                                 "timestamp": timestamp,
                                 **action,
