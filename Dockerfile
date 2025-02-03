@@ -19,10 +19,13 @@ COPY . .
 
 RUN pip install -r requirements.txt
 
-FROM base as prod
+FROM base as data_processing
 
 CMD python daliy_raw_dump.py
 
 #
 
+FROM base as serving
+
+CMD fastapi run api.py
 # RUN pip install -r requirements-dev.txt

@@ -38,7 +38,7 @@ jobs:
         rm --recursive --force "$AGENT_TOOLSDIRECTORY"
         df --human-readable
     - name: Build with Docker
-      run: docker build -t erlichsefi/israeli-supermarket-publisher:prod --target prod .
+      run: docker build -t erlichsefi/israeli-supermarket-publisher:prod --target data_processing .
     - name: Remove all build
       run: (docker stop publisher-runner 2>/dev/null || true) && (docker rm publisher-runner 2>/dev/null || true)
     - name: Process Request
