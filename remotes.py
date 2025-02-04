@@ -281,14 +281,14 @@ class DummyDocumentDbUploader:
         return file_found
 
     def _get_content_of_file(self, table_name, content_of_file):
-        foler_path = os.path.join(self.db_path, table_name)
-        if not os.path.exists(foler_path):
+        folder_path = os.path.join(self.db_path, table_name)
+        if not os.path.exists(folder_path):
             logging.error(f"File '{file}' does not exist in table '{table_name}'.")
             return None
 
         file_found = []
-        for file in os.listdir(foler_path):
-            with open(os.path.join(foler_path, file), "r") as file:
+        for file in os.listdir(folder_path):
+            with open(os.path.join(folder_path, file), "r") as file:
                 data = json.load(file)
                 if data["file_name"] == content_of_file:
                     file_found.append(data)

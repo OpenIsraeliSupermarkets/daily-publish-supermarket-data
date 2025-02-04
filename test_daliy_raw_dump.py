@@ -4,7 +4,7 @@ from unittest.mock import patch
 import shutil
 import os
 import datetime
-from daliy_raw_dump import SupermarketDataPublisher
+from daily_raw_dump import SupermarketDataPublisher
 from il_supermarket_scarper.scrappers_factory import ScraperFactory
 from il_supermarket_scarper import FileTypesFilters
 from remotes import DummyFileStorge, DynamoDbUploader

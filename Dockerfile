@@ -21,11 +21,11 @@ RUN pip install -r requirements.txt
 
 FROM base as data_processing
 
-CMD python daliy_raw_dump.py
+CMD python daily_raw_dump.py
 
 #
 
 FROM base as serving
 
-CMD fastapi run api.py
+CMD uvicorn api:app --host 0.0.0.0 --port 8000
 # RUN pip install -r requirements-dev.txt
