@@ -1,0 +1,29 @@
+name: Deploy to Runner Machine
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: self-hosted  # Important: Use a self-hosted runner
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Build and tag Docker image
+        run: |
+          docker build -t erlichsefi/israeli-supermarket-publisher:prod --target serving .
+
+      - name: Start Docker daemon (if not already running)
+        run: sudo systemctl start docker || true # Start if not already running
+
+      - name: Run Docker Container
+        run: |
+          docker stop api-server || true
+          docker rm api-server || true
+          docker run -d \
+            --name api-server \
+            --restart unless-stopped \
+            -p 8000:8000 \
+            erlichsefi/israeli-supermarket-publisher:prod
