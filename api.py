@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from access_layer import AccessLayer
-from remotes import DynamoDbUploader, MongoDbUploader
+from remotes import MongoDbUploader
 
 
 app = FastAPI()
