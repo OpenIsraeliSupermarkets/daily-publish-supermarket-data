@@ -300,4 +300,4 @@ if __name__ == "__main__":
         number_of_parseing_processs=os.cpu_count(),
         limit=10,
     )
-    publisher.run(operations="api_update")
+    publisher.run(operations=os.environ["OPREATION"])
