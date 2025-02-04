@@ -167,7 +167,7 @@ class DynamoDbUploader(APIDatabaseUploader):
                 TableName=table_name,
                 KeySchema=key_schema,
                 AttributeDefinitions=attribute_definitions,
-                ProvisionedThroughput={"ReadCapacityUnits": 5, "WriteCapacityUnits": 5},
+                ProvisionedThroughput={"ReadCapacityUnits": 2, "WriteCapacityUnits": 2},
             )
             waiter = self.dynamodb_client.get_waiter("table_exists")
             waiter.wait(TableName=table_name)
