@@ -298,6 +298,5 @@ if __name__ == "__main__":
         app_folder="app_data",
         number_of_scraping_processes=os.cpu_count(),
         number_of_parseing_processs=os.cpu_count(),
-        limit=10,
     )
     publisher.run(operations=os.environ["OPREATION"])
