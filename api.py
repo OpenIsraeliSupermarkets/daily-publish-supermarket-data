@@ -1,10 +1,10 @@
 from fastapi import FastAPI, HTTPException
 from access_layer import AccessLayer
-from remotes import DynamoDbUploader
+from remotes import DynamoDbUploader, MongoDbUploader
 
 
 app = FastAPI()
-access_layer = AccessLayer(DynamoDbUploader)
+access_layer = AccessLayer(MongoDbUploader)
 
 
 @app.get("/list_chains/v0")

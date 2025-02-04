@@ -18,12 +18,10 @@ jobs:
       - name: Start Docker daemon (if not already running)
         run: sudo systemctl start docker || true # Start if not already running
 
-      - name: Run Docker Container
-        run: |
-          docker stop api-server || true
-          docker rm api-server || true
-          docker run -d \
-            --name api-server \
-            --restart unless-stopped \
-            -p 8000:8000 \
-            erlichsefi/israeli-supermarket-publisher:prod
+      - name: Run Docker Compose
+        if: ${{ matrix.compose }}
+        uses: docker/compose-action@v3
+        with:
+          compose-file: docker-compose.yml # Path to your docker-compose.yml
+          up: true
+          down: false # Don't automatically tear down on workflow completion

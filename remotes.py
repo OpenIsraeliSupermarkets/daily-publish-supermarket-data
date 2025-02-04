@@ -1,14 +1,14 @@
 from abc import ABC, abstractmethod
-from kaggle import KaggleApi
 import os
 import logging
 import json
 import shutil
 import boto3
+import re
 from decimal import Decimal
 from boto3.dynamodb.conditions import Attr, Key
-
-
+import pymongo
+    
 class RemoteDatabaseUploader(ABC):
     """
     Abstract class for uploading data to a remote database.
@@ -71,8 +71,10 @@ class DummyFileStorge(RemoteDatabaseUploader):
 
 
 class KaggleUploader(RemoteDatabaseUploader):
-
+    
     def __init__(self, dataset_remote_name, dataset_path, when):
+        from kaggle import KaggleApi
+        
         self.dataset_remote_name = dataset_remote_name
         self.dataset_path = dataset_path
         self.when = when
@@ -125,7 +127,7 @@ class APIDatabaseUploader:
     def _clean_all_tables(self):
         pass
 
-    def _get_all_files_by_chain(self, chain: str):
+    def _get_all_files_by_chain(self, chain: str, file_type=None):
         pass
 
     def _get_content_of_file(self, table_name, file):
@@ -292,3 +294,50 @@ class DummyDocumentDbUploader:
                 if data["file_name"] == content_of_file:
                     file_found.append(data)
         return file_found
+
+
+class MongoDbUploader(APIDatabaseUploader):
+
+    
+    def __init__(self, mongodb_uri):
+        self.client = pymongo.MongoClient("mongodb://host.docker.internal:27017")
+        self.db = self.client.supermarket_data
+
+    def _insert_to_database(self, table_target_name, items):
+        collection = self.db[table_target_name]
+        collection.insert_many(items)
+
+    def _create_table(self, partition_id, table_name):
+        logging.info(f"Creating collection: {table_name}")
+        try:
+            self.db.create_collection(table_name)
+            self.db[table_name].create_index([(partition_id, pymongo.ASCENDING)], unique=True)
+        except Exception as e:
+            logging.error(f"Error creating collection: {e}")
+
+    def _clean_all_tables(self):
+        for collection in self.db.list_collection_names():
+            self.db[collection].drop()
+        logging.info("All collections deleted successfully!")
+
+    def _get_all_files_by_chain(self, chain: str, file_type=None):
+        collection = self.db["ParserStatus"]
+        files = []
+        
+        filter_condition = f".*{re.escape(chain)}.*"
+        if file_type is not None:
+            filter_condition = f".*{re.escape(file_type)}.*{re.escape(chain)}.*"
+            
+        for doc in collection.find({"index" : {"$regex": filter_condition}}):
+            if "response" in doc and "files_to_process" in doc["response"]:
+                files.extend(doc["response"]["files_to_process"])
+        return files
+
+    def _get_content_of_file(self, table_name, file):
+        collection = self.db[table_name]
+        results = []
+        for obj in collection.find({"file_name": file}):
+            # Convert ObjectId to dict manually
+            obj_dict = {k: v for k,v in obj.items() if k != '_id'}
+            results.append(obj_dict)
+        return results

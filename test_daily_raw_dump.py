@@ -7,7 +7,7 @@ import datetime
 from daily_raw_dump import SupermarketDataPublisher
 from il_supermarket_scarper.scrappers_factory import ScraperFactory
 from il_supermarket_scarper import FileTypesFilters
-from remotes import DummyFileStorge, DynamoDbUploader
+from remotes import DummyFileStorge, MongoDbUploader
 
 
 def test_daliy_raw_dump():
@@ -22,7 +22,7 @@ def test_daliy_raw_dump():
     # run the process for couple of times
     publisher = SupermarketDataPublisher(
         long_term_db_target=DummyFileStorge,
-        short_term_db_target=DynamoDbUploader,
+        short_term_db_target=MongoDbUploader,
         app_folder=app_folder,
         data_folder=data_folder,
         enabled_scrapers=ScraperFactory.sample(1),
@@ -35,7 +35,7 @@ def test_daliy_raw_dump():
         when_date=when_date,
     )
     publisher.run(
-        now=False,
+        now=True,
         itreative_operations="scraping,converting,api_update,clean_dump_files",
         final_operations="publishing,clean_all_source_data",
     )

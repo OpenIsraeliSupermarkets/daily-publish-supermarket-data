@@ -9,7 +9,7 @@ from il_supermarket_scarper import ScarpingTask
 from il_supermarket_parsers import ConvertingTask
 from long_term_database_manager import LongTermDatasetManager
 from short_term_database_manager import ShortTermDBDatasetManager
-from remotes import KaggleUploader, DynamoDbUploader
+from remotes import KaggleUploader, MongoDbUploader
 
 
 logging.getLogger("Logger").setLevel(logging.INFO)
@@ -23,7 +23,7 @@ class BaseSupermarketDataPublisher:
     def __init__(
         self,
         long_term_db_target=KaggleUploader,
-        short_term_db_target=DynamoDbUploader,
+        short_term_db_target=MongoDbUploader,
         number_of_scraping_processes=3,
         number_of_parseing_processs=None,
         app_folder="app_data",
@@ -197,7 +197,7 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
     def __init__(
         self,
         long_term_db_target=KaggleUploader,
-        short_term_db_target=DynamoDbUploader,
+        short_term_db_target=MongoDbUploader,
         number_of_scraping_processes=4,
         number_of_parseing_processs=None,
         app_folder="app_data",
@@ -284,7 +284,7 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
     def run(self, itreative_operations, final_operations, now=False):
         if now:
             self._execute_operations(itreative_operations)
-            self.executed_jobs -= 1
+            self.executed_jobs = 0
 
         self._check_tz()
         self._setup_schedule(itreative_operations)
@@ -296,7 +296,8 @@ if __name__ == "__main__":
 
     publisher = SupermarketDataPublisherInterface(
         app_folder="app_data",
-        number_of_scraping_processes=os.cpu_count(),
-        number_of_parseing_processs=os.cpu_count(),
+        number_of_scraping_processes=min(os.cpu_count(), 3),
+        number_of_parseing_processs=min(os.cpu_count(), 3),
+        limit=10
     )
     publisher.run(operations=os.environ["OPREATION"])

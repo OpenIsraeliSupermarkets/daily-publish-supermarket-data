@@ -78,18 +78,23 @@ class ShortTermDBDatasetManager:
         self.uploader._insert_to_database(self.parser_table_name, records)
         logging.info("Parser status stored in DynamoDB successfully.")
 
-    def push_scraper_status_files(self, status_folder):
+    def push_scraper_status_files(self, status_folder, local_cahce):
         records = []
         for file in os.listdir(status_folder):
             if file.endswith(".json") and file != "parser-status.json":
                 with open(os.path.join(status_folder, file), "r") as f:
                     data = json.load(f)
 
+                pushed_timestamp = local_cahce.get(file, {}).get("timestamps", [])
+                
                 for timestamp, actions in data.items():
 
                     if timestamp == "verified_downloads":
                         continue
-
+                    
+                    if timestamp in pushed_timestamp:
+                        continue
+                    
                     for action in actions:
                         records.append(
                             {
@@ -103,6 +108,11 @@ class ShortTermDBDatasetManager:
                                 **action,
                             }
                         )
+                    pushed_timestamp.append(timestamp)
+            
+            local_cahce[file] = {
+                "timestamps":pushed_timestamp
+            } 
 
         self.uploader._insert_to_database(self.scraper_table_name, records)
         logging.info("Scraper status files stored in DynamoDB successfully.")
@@ -123,17 +133,16 @@ class ShortTermDBDatasetManager:
             latast = -1
             if not df.empty:
                 df = df.reset_index(names=["row_index"])
-                df = df[df.row_index > local_cahce.get(file, -1)]
+                df = df[df.row_index > local_cahce.get("last_pushed",{}).get(file, -1)]
                 latast = int(df.row_index.max())
                 df["row_index"] = df["row_index"].astype(str)
                 items = df.ffill().to_dict(orient="records")
                 self.uploader._insert_to_database(table_target_name, items)
 
-            last_pushed = {file: latast}
+            local_cahce['last_pushed'] = {file: latast}
 
             logging.info(f"Completed pushing {file}")
 
-        self._upload_local_cache(last_pushed)
         logging.info("Files data pushed in DynamoDB successfully.")
 
     def _load_cache(self):
@@ -156,5 +165,6 @@ class ShortTermDBDatasetManager:
 
         # push
         self.push_parser_status(outputs_folder)
-        self.push_scraper_status_files(status_folder)
+        self.push_scraper_status_files(status_folder,local_cahce)
         self.push_files_data(outputs_folder, local_cahce)
+        self._upload_local_cache(local_cahce)

@@ -1,10 +1,10 @@
 from il_supermarket_scarper import ScraperFactory, FileTypesFilters
-from remotes import DummyDocumentDbUploader, DynamoDbUploader
+from remotes import DummyDocumentDbUploader, MongoDbUploader
 
 
 class AccessLayer:
 
-    def __init__(self, database_connector: DynamoDbUploader):
+    def __init__(self, database_connector: MongoDbUploader):
         self.database_connector = database_connector("il-central-1")
 
     def list_all_available_chains(self):
@@ -52,8 +52,8 @@ class AccessLayer:
 
 if __name__ == "__main__":
 
-    api = AccessLayer()
-    files = api.list_files(chain="SALACH_DABACH")
+    api = AccessLayer(MongoDbUploader)
+    files = api.list_files(chain="FRESH_MARKET_AND_SUPER_DOSH")
     for file in files:
-        content = api.get_file_content(chain="SALACH_DABACH", file=file)
+        content = api.get_file_content(chain="FRESH_MARKET_AND_SUPER_DOSH", file=file)
         print(len(content))
