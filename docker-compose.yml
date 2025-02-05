@@ -21,7 +21,7 @@ services:
     depends_on:
       - mongodb
     environment:
-      - MONGODB_URI=${MONGODB_URI}
+      - MONGODB_URI=mongodb://mongodb:27017/
     networks:
       - mongo-network
 
@@ -34,7 +34,7 @@ services:
     depends_on:
       - mongodb
     environment:
-      - MONGODB_URI=${MONGODB_URI}
+      - MONGODB_URI=mongodb://mongodb:27017/
       - OPREATION=${OPREATION}
       - KAGGLE_KEY=${KAGGLE_KEY}
       - KAGGLE_USERNAME=${KAGGLE_USERNAME}
