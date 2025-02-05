@@ -39,8 +39,6 @@ jobs:
         df --human-readable
     - name: Build with Docker
       run: docker compose build
-    - name: Remove all build
-      run: (docker stop publisher-runner 2>/dev/null || true) && (docker rm publisher-runner 2>/dev/null || true)
     - name: Process Request
       run:  mkdir -p  ${{ runner.workspace }}/app_data && \
             docker-compose up -d mongodb && \
@@ -48,10 +46,9 @@ jobs:
                 echo "waiting for MongoDB..."
                 sleep 2
             done && \
-            docker-compose up \
-            -v ${{ runner.workspace }}/app_data:/usr/src/app/app_data \
-            -e KAGGLE_KEY=${{ secrets.KAGGLE_KEY }} \
-            -e KAGGLE_USERNAME=${{ secrets.KAGGLE_USERNAME }} \
-            -e OPREATION="${{ env.OPERATION }}" \
-            publisher &&
-           docker builder prune -f
+            OPREATION="${{ env.OPERATION }}" \
+            KAGGLE_USERNAME=${{ secrets.KAGGLE_USERNAME }} \ 
+            KAGGLE_KEY=${{ secrets.KAGGLE_KEY }} \ 
+            APP_DATA_PATH=${{ runner.workspace }}/app_data \ 
+            MONGO_DATA_PATH=${{ runner.workspace }}/mongo_data \ 
+            docker-compose up publisher 

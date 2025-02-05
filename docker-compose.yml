@@ -21,27 +21,41 @@ services:
     depends_on:
       - mongodb
     environment:
-      - MONGODB_URI=mongodb://mongodb:27017/
+      - MONGODB_URI=${MONGODB_URI}
     networks:
       - mongo-network
 
   publisher:
     build:
       context: .
-      target: data_processing
       dockerfile: Dockerfile
-    image: erlichsefi/israeli-supermarket-publisher:prod
-    container_name: publisher
+      target: data_processing
+    container_name: data-publisher
     depends_on:
       - mongodb
     environment:
-      - MONGODB_URI=mongodb://mongodb:27017/
+      - MONGODB_URI=${MONGODB_URI}
       - OPREATION=${OPREATION}
+      - KAGGLE_KEY=${KAGGLE_KEY}
+      - KAGGLE_USERNAME=${KAGGLE_USERNAME}
+    volumes:
+      - app_data:/usr/src/app/app_data
     networks:
       - mongo-network
 
 volumes:
   mongo-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${MONGO_DATA_PATH:-/data/mongodb}
+  app_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind 
+      device: ${APP_DATA_PATH:-/data/app}
 
 networks:
   mongo-network:
