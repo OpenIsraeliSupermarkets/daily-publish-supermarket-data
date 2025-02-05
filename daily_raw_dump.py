@@ -297,7 +297,6 @@ if __name__ == "__main__":
     publisher = SupermarketDataPublisherInterface(
         app_folder="app_data",
         number_of_scraping_processes=min(os.cpu_count(), 3),
-        number_of_parseing_processs=min(os.cpu_count(), 3),
-        limit=10
+        number_of_parseing_processs=min(os.cpu_count(), 3)
     )
     publisher.run(operations=os.environ["OPREATION"])
