@@ -23,20 +23,10 @@ jobs:
       OPERATION: ${{ inputs.operation }}
 
     steps:
-    # TBD: removing old code will remove the data folder too
-    # - name: Clean Old 
-    #   run: |
-    #     sudo rm -rf "${{ github.workspace }}"
-    #     mkdir "${{ github.workspace }}"
-      
+
     - name: Checkout
       uses: actions/checkout@v3
-    # - name: Free disk space
-    #   run: |
-    #     df --human-readable
-    #     docker 2>/dev/null 1>&2 rmi $(docker image ls --all --quiet) || true
-    #     rm --recursive --force "$AGENT_TOOLSDIRECTORY"
-    #     df --human-readable
+
     - name: Build with Docker
       run: docker compose build
 
