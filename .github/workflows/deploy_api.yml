@@ -12,28 +12,17 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Build and tag Docker image
+        run: docker compose down
+
+      - name: Build and tag Docker image
         run: docker compose build
         
       - name: Start Docker daemon (if not already running)
         run: sudo systemctl start docker || true # Start if not already running
       
       - name: Make sure mongodb is running
-        run: docker compose up -d mongodb
-
-      - name: Wait for MongoDB to be ready
-        run: |
-          while ! docker-compose exec mongodb mongosh --eval "db.runCommand('ping').ok" --quiet; do
-            echo "waiting for MongoDB..."
-            sleep 2
-          done
+        run: MONGO_DATA_PATH=${{ runner.workspace }}/mongo_data \ 
+            docker compose up -d mongodb
 
       - name: Run Docker Compose
-        if: ${{ matrix.compose }}
-        uses: docker/compose-action@v3
-        with:
-          compose-file: docker-compose.yml
-          services: |
-            mongodb
-            api
-          up: true
-          down: false # Don't automatically tear down on workflow completion
+        run: docker compose up -d api 

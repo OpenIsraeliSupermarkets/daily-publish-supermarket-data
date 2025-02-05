@@ -39,14 +39,15 @@ jobs:
         df --human-readable
     - name: Build with Docker
       run: docker compose build
+
+    - name: Make sure App Data folder exists
+      run: mkdir -p  ${{ runner.workspace }}/app_data
+
+    - name: Make sure Mongo Up
+      run: docker compose up -d mongodb
+
     - name: Process Request
-      run:  mkdir -p  ${{ runner.workspace }}/app_data && \
-            docker-compose up -d mongodb && \
-            while ! docker-compose exec mongodb mongosh --eval "db.runCommand('ping').ok" --quiet; do
-                echo "waiting for MongoDB..."
-                sleep 2
-            done && \
-            OPREATION="${{ env.OPERATION }}" \
+      run:  OPREATION="${{ env.OPERATION }}" \
             KAGGLE_USERNAME=${{ secrets.KAGGLE_USERNAME }} \ 
             KAGGLE_KEY=${{ secrets.KAGGLE_KEY }} \ 
             APP_DATA_PATH=${{ runner.workspace }}/app_data \ 
