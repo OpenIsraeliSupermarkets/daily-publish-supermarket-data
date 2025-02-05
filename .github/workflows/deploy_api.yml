@@ -18,11 +18,10 @@ jobs:
         run: docker compose build
         
       - name: Start Docker daemon (if not already running)
-        run: sudo systemctl start docker || true # Start if not already running
+        run: systemctl start docker || true # Start if not already running
       
       - name: Make sure mongodb is running
-        run: MONGO_DATA_PATH=${{ runner.workspace }}/mongo_data \ 
-            docker compose up -d mongodb
+        run: MONGO_DATA_PATH=${{ runner.workspace }}/mongo_data docker compose up -d mongodb
 
       - name: Run Docker Compose
         run: docker compose up -d api 
