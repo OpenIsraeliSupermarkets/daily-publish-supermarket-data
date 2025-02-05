@@ -25,3 +25,5 @@ jobs:
 
       - name: Run Docker Compose
         run: docker compose up -d api 
+
+      # act -P self-hosted=catthehacker/ubuntu:act-latest
