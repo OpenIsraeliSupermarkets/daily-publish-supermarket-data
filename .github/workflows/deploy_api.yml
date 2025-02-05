@@ -26,4 +26,4 @@ jobs:
       - name: Run Docker Compose
         run: docker compose up -d api 
 
-      # act -P self-hosted=catthehacker/ubuntu:act-latest
+      # act -W '.github/workflows/template.yml' -P self-hosted=catthehacker/ubuntu:act-latest

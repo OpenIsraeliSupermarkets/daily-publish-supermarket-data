@@ -48,13 +48,13 @@ volumes:
     driver_opts:
       type: none
       o: bind
-      device: ${MONGO_DATA_PATH:-/data/mongodb}
+      device: ${MONGO_DATA_PATH}
   app_data:
     driver: local
     driver_opts:
       type: none
       o: bind 
-      device: ${APP_DATA_PATH:-/data/app}
+      device: ${APP_DATA_PATH}
 
 networks:
   mongo-network:
