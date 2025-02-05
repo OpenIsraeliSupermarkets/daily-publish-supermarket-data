@@ -27,19 +27,20 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v3
 
+    - name: Adding env variables
+      run: |
+        echo "APP_DATA_PATH=${{ env.GITHUB_WORKSPACE }}/app_data" >> $GITHUB_ENV
+        echo "MONGO_DATA_PATH=${{ env.GITHUB_WORKSPACE }}/mongo_data" >> $GITHUB_ENV
+        echo "KAGGLE_USERNAME=${{ secrets.KAGGLE_USERNAME }}" >> $GITHUB_ENV
+        echo "KAGGLE_KEY=${{ secrets.KAGGLE_KEY }}" >> $GITHUB_ENV
+
     - name: Build with Docker
       run: docker compose build
 
-    - name: Print workspace
-      run: echo ${{ env.GITHUB_WORKSPACE }}
-
-    - name: Make sure folders exists
-      run: |-
-          mkdir -p  ${{ env.GITHUB_WORKSPACE }}/mongo_data &&
-          mkdir -p  ${{ env.GITHUB_WORKSPACE }}/app_data
-
-    - name: Make sure Mongo Up
-      run: docker compose up -d mongodb
+    - name: Make sure Mongo UP
+      run:  docker compose up -d mongodb
 
     - name: Process Request
-      run:  OPREATION="${{ env.OPERATION }}" KAGGLE_USERNAME=${{ secrets.KAGGLE_USERNAME }} KAGGLE_KEY=${{ secrets.KAGGLE_KEY }} APP_DATA_PATH=${{ env.GITHUB_WORKSPACE }}/app_data MONGO_DATA_PATH=${{ env.GITHUB_WORKSPACE }}/mongo_data docker compose up publisher 
+      run:  docker compose up publisher 
+
+    # act -W '.github/workflows/template.yml' -P self-hosted=catthehacker/ubuntu:act-latest

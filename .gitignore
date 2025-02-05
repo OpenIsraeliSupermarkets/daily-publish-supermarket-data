@@ -12,3 +12,5 @@ index.json
 .env
 remote_israeli-supermarkets-2024/
 document_db/
+mongo_data/
+app_data/

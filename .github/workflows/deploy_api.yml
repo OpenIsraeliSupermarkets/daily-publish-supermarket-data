@@ -11,19 +11,29 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Build and tag Docker image
+      - name: Adding env variables
+        run: |
+          echo "APP_DATA_PATH=${{ env.GITHUB_WORKSPACE }}/app_data" >> $GITHUB_ENV
+          echo "MONGO_DATA_PATH=${{ env.GITHUB_WORKSPACE }}/mongo_data" >> $GITHUB_ENV
+
+      - name: Stoping Old Container
         run: docker compose down
 
+      - name: Make sure folders exists
+        run: |-
+          mkdir -p "${{ env.APP_DATA_PATH }}" &&
+          mkdir -p "${{ env.MONGO_DATA_PATH }}"
+
       - name: Build and tag Docker image
-        run: docker compose build
+        run:  docker compose build --no-cache
         
       - name: Start Docker daemon (if not already running)
         run: systemctl start docker || true # Start if not already running
       
       - name: Make sure mongodb is running
-        run: MONGO_DATA_PATH=${{ runner.workspace }}/mongo_data docker compose up -d mongodb
+        run: docker compose up -d mongodb
 
       - name: Run Docker Compose
         run: docker compose up -d api 
 
-      # act -W '.github/workflows/template.yml' -P self-hosted=catthehacker/ubuntu:act-latest
+      # act -W '.github/workflows/deploy_api.yml' -P self-hosted=catthehacker/ubuntu:act-latest
