@@ -38,16 +38,20 @@ jobs:
         rm --recursive --force "$AGENT_TOOLSDIRECTORY"
         df --human-readable
     - name: Build with Docker
-      run: docker build -t erlichsefi/israeli-supermarket-publisher:prod --target data_processing .
+      run: docker compose build
     - name: Remove all build
       run: (docker stop publisher-runner 2>/dev/null || true) && (docker rm publisher-runner 2>/dev/null || true)
     - name: Process Request
-      run: |
-           mkdir -p  ${{ runner.workspace }}/app_data
-           docker run --rm \
+      run:  mkdir -p  ${{ runner.workspace }}/app_data && \
+            docker-compose up -d mongodb && \
+            while ! docker-compose exec mongodb mongosh --eval "db.runCommand('ping').ok" --quiet; do
+                echo "waiting for MongoDB..."
+                sleep 2
+            done && \
+            docker-compose up \
             -v ${{ runner.workspace }}/app_data:/usr/src/app/app_data \
             -e KAGGLE_KEY=${{ secrets.KAGGLE_KEY }} \
             -e KAGGLE_USERNAME=${{ secrets.KAGGLE_USERNAME }} \
             -e OPREATION="${{ env.OPERATION }}" \
-            --name publisher-runner erlichsefi/israeli-supermarket-publisher:prod &&
+            publisher &&
            docker builder prune -f

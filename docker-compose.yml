@@ -8,7 +8,10 @@ services:
       - "27017:27017"
     volumes:
       - mongo-data:/data/db
-  app:
+    networks:
+      - mongo-network
+
+  api:
     build:
       context: .
       dockerfile: Dockerfile
@@ -19,7 +22,27 @@ services:
       - mongodb
     environment:
       - MONGODB_URI=mongodb://mongodb:27017/
+    networks:
+      - mongo-network
+
+  publisher:
+    build:
+      context: .
+      target: data_processing
+      dockerfile: Dockerfile
+    image: erlichsefi/israeli-supermarket-publisher:prod
+    container_name: publisher
+    depends_on:
+      - mongodb
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017/
+      - OPREATION=${OPREATION}
+    networks:
+      - mongo-network
 
 volumes:
   mongo-data:
-    
+
+networks:
+  mongo-network:
+    driver: bridge
