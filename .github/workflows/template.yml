@@ -39,9 +39,9 @@ jobs:
       run: docker compose build
 
     - name: Make sure Mongo UP
-      run: docker compose up -d mongodb --cpu-shares=2048 --memory=4g
+      run: docker compose up -d mongodb 
 
     - name: Process Request
-      run: docker compose up publisher --cpu-shares=2048 --memory=4g
+      run: docker compose up publisher
 
     # act -W '.github/workflows/template.yml' -P self-hosted=catthehacker/ubuntu:act-latest

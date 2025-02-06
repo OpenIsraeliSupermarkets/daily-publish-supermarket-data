@@ -10,6 +10,11 @@ services:
     networks:
       - mongo-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '3'
+          memory: 4G
 
   api:
     build:
@@ -25,6 +30,7 @@ services:
     networks:
       - mongo-network
     restart: unless-stopped
+
   publisher:
     build:
       context: .
@@ -42,6 +48,11 @@ services:
       - app_data:/usr/src/app/app_data
     networks:
       - mongo-network
+    deploy:
+      resources:
+        limits:
+          cpus: '3'
+          memory: 4G
 
 volumes:
   mongo-data:
