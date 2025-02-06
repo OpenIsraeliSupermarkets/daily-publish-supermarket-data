@@ -33,6 +33,7 @@ jobs:
         echo "MONGO_DATA_PATH=${{ runner.workspace }}/mongo_data" >> $GITHUB_ENV
         echo "KAGGLE_USERNAME=${{ secrets.KAGGLE_USERNAME }}" >> $GITHUB_ENV
         echo "KAGGLE_KEY=${{ secrets.KAGGLE_KEY }}" >> $GITHUB_ENV
+        echo "OPERATION=${{ inputs.operation }}" >> $GITHUB_ENV
 
     - name: Build with Docker
       run: docker compose build
