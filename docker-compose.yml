@@ -9,6 +9,7 @@ services:
       - mongo-data:/data/db
     networks:
       - mongo-network
+    restart: unless-stopped
 
   api:
     build:
@@ -23,7 +24,7 @@ services:
       - MONGODB_URI=mongodb://mongodb:27017/
     networks:
       - mongo-network
-
+    restart: unless-stopped
   publisher:
     build:
       context: .
