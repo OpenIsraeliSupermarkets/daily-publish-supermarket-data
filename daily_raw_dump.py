@@ -7,8 +7,9 @@ import datetime
 import os
 from il_supermarket_scarper import ScarpingTask
 from il_supermarket_parsers import ConvertingTask
-from kaggle_database_manager import RemoteDatasetManager
-from remotes import KaggleUploader
+from long_term_database_manager import LongTermDatasetManager
+from short_term_database_manager import ShortTermDBDatasetManager
+from remotes import KaggleUploader, MongoDbUploader
 
 
 logging.getLogger("Logger").setLevel(logging.INFO)
@@ -21,7 +22,8 @@ class BaseSupermarketDataPublisher:
 
     def __init__(
         self,
-        remote_upload_class=KaggleUploader,
+        long_term_db_target=KaggleUploader,
+        short_term_db_target=MongoDbUploader,
         number_of_scraping_processes=3,
         number_of_parseing_processs=None,
         app_folder="app_data",
@@ -31,13 +33,18 @@ class BaseSupermarketDataPublisher:
         enabled_scrapers=None,
         enabled_file_types=None,
         limit=None,
-        when_date=None
+        when_date=None,
     ):
-        self.remote_upload_class = remote_upload_class
+        self.short_term_db_target = short_term_db_target
+        self.long_term_db_target = long_term_db_target
         self.today = datetime.datetime.now()
         self.when_date = when_date if when_date else self.today
         self.number_of_scraping_processes = number_of_scraping_processes
-        self.number_of_parseing_processs = number_of_parseing_processs if number_of_parseing_processs else number_of_scraping_processes - 2
+        self.number_of_parseing_processs = (
+            number_of_parseing_processs
+            if number_of_parseing_processs
+            else number_of_scraping_processes - 2
+        )
         self.app_folder = app_folder
         self.data_folder = os.path.join(app_folder, self._dump_folder_name(data_folder))
         self.outputs_folder = os.path.join(app_folder, outputs_folder)
@@ -89,11 +96,22 @@ class BaseSupermarketDataPublisher:
 
         logging.info("Converting task is done")
 
+    def _update_api_database(self):
+        logging.info("Starting the short term database task")
+        database = ShortTermDBDatasetManager(
+            short_term_db_target=self.short_term_db_target,
+            region_name="il-central-1",
+            app_folder=self.app_folder,
+        )
+        database.upload(
+            outputs_folder=self.outputs_folder, status_folder=self.status_folder
+        )
+
     def _upload_to_kaggle(self, compose=True):
-        logging.info("Starting the database task")
-        database = RemoteDatasetManager(
+        logging.info("Starting the long term database task")
+        database = LongTermDatasetManager(
             dataset="israeli-supermarkets-2024",
-            remote_upload_class=self.remote_upload_class,
+            long_term_db_target=self.long_term_db_target,
             enabled_scrapers=self.enabled_scrapers,
             enabled_file_types=self.enabled_file_types,
             app_folder=self.app_folder,
@@ -131,6 +149,13 @@ class BaseSupermarketDataPublisher:
             if os.path.exists(folder):
                 shutil.rmtree(folder)
 
+        for folder in [self.app_folder]:
+            for root, dirs, files in os.walk(folder):
+                for file in files:
+                    os.remove(os.path.join(root, file))
+                for dir in dirs:
+                    shutil.rmtree(os.path.join(root, dir))
+
 
 class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
 
@@ -151,6 +176,8 @@ class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
                 self._clean_all_dump_files()
             elif operation == "publishing":
                 self._upload_and_clean()
+            elif operation == "api_update":
+                self._update_api_database()
             elif operation == "upload_compose":
                 self._upload_and_clean(compose=True)
             elif operation == "upload_no_compose":
@@ -169,7 +196,8 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
 
     def __init__(
         self,
-        remote_upload_class=KaggleUploader,
+        long_term_db_target=KaggleUploader,
+        short_term_db_target=MongoDbUploader,
         number_of_scraping_processes=4,
         number_of_parseing_processs=None,
         app_folder="app_data",
@@ -182,12 +210,13 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
         completed_by=None,
         num_of_occasions=3,
         limit=None,
-        when_date=None
+        when_date=None,
     ):
         super().__init__(
             number_of_scraping_processes=number_of_scraping_processes,
             number_of_parseing_processs=number_of_parseing_processs,
-            remote_upload_class=remote_upload_class,
+            long_term_db_target=long_term_db_target,
+            short_term_db_target=short_term_db_target,
             app_folder=app_folder,
             data_folder=data_folder,
             outputs_folder=outputs_folder,
@@ -195,7 +224,7 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
             enabled_scrapers=enabled_scrapers,
             enabled_file_types=enabled_file_types,
             limit=limit,
-            when_date=when_date
+            when_date=when_date,
         )
         self.num_of_occasions = num_of_occasions
         self.completed_by = completed_by if completed_by else self._end_of_day()
@@ -252,19 +281,22 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
         """Return the start of the day"""
         return datetime.datetime.combine(self.today, datetime.time(12, 0))
 
-    def run(self, itreative_operations,final_operations):
+    def run(self, itreative_operations, final_operations, now=False):
+        if now:
+            self._execute_operations(itreative_operations)
+            self.executed_jobs = 0
+
         self._check_tz()
         self._setup_schedule(itreative_operations)
         self._track_task()
         super().run(operations=final_operations)
-        
 
 
 if __name__ == "__main__":
 
     publisher = SupermarketDataPublisherInterface(
         app_folder="app_data",
-        number_of_scraping_processes=os.cpu_count(),
-        number_of_parseing_processs=os.cpu_count(),
+        number_of_scraping_processes=min(os.cpu_count(), 3),
+        number_of_parseing_processs=min(os.cpu_count(), 3)
     )
     publisher.run(operations=os.environ["OPREATION"])

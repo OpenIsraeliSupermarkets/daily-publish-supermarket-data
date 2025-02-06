@@ -7,16 +7,16 @@ import logging
 from remotes import KaggleUploader
 
 
-class RemoteDatasetManager:
+class LongTermDatasetManager:
     def __init__(
         self,
         dataset,
-        remote_upload_class=KaggleUploader,
+        long_term_db_target=KaggleUploader,
         app_folder=".",
         enabled_scrapers=None,
         enabled_file_types=None,
     ):
-        
+
         self.dataset = dataset
         self.when = self._now()
         self.enabled_scrapers = (
@@ -26,7 +26,9 @@ class RemoteDatasetManager:
             "ALL" if not enabled_file_types else ",".join(enabled_file_types)
         )
         self.dataset_path = os.path.join(app_folder, self.dataset)
-        self.remote_database = remote_upload_class(dataset_remote_name=dataset, dataset_path=self.dataset_path,when=self.when)
+        self.remote_database = long_term_db_target(
+            dataset_remote_name=dataset, dataset_path=self.dataset_path, when=self.when
+        )
         logging.info(f"Dataset path: {self.dataset_path}")
 
     def _now(self):
@@ -112,4 +114,3 @@ class RemoteDatasetManager:
     def clean(self):
         shutil.rmtree(self.dataset_path)
         self.remote_database.clean()
-        

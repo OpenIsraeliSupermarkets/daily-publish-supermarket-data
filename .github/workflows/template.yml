@@ -23,31 +23,24 @@ jobs:
       OPERATION: ${{ inputs.operation }}
 
     steps:
-    # TBD: removing old code will remove the data folder too
-    # - name: Clean Old 
-    #   run: |
-    #     sudo rm -rf "${{ github.workspace }}"
-    #     mkdir "${{ github.workspace }}"
-      
+
     - name: Checkout
       uses: actions/checkout@v3
-    - name: Free disk space
+
+    - name: Adding env variables
       run: |
-        df --human-readable
-        docker 2>/dev/null 1>&2 rmi $(docker image ls --all --quiet) || true
-        rm --recursive --force "$AGENT_TOOLSDIRECTORY"
-        df --human-readable
+        echo "APP_DATA_PATH=${{ env.GITHUB_WORKSPACE }}/app_data" >> $GITHUB_ENV
+        echo "MONGO_DATA_PATH=${{ env.GITHUB_WORKSPACE }}/mongo_data" >> $GITHUB_ENV
+        echo "KAGGLE_USERNAME=${{ secrets.KAGGLE_USERNAME }}" >> $GITHUB_ENV
+        echo "KAGGLE_KEY=${{ secrets.KAGGLE_KEY }}" >> $GITHUB_ENV
+
     - name: Build with Docker
-      run: docker build -t erlichsefi/israeli-supermarket-publisher:prod --target prod .
-    - name: Remove all build
-      run: (docker stop publisher-runner 2>/dev/null || true) && (docker rm publisher-runner 2>/dev/null || true)
+      run: docker compose build
+
+    - name: Make sure Mongo UP
+      run:  docker compose up -d mongodb
+
     - name: Process Request
-      run: |
-           mkdir -p  ${{ runner.workspace }}/app_data
-           docker run --rm \
-            -v ${{ runner.workspace }}/app_data:/usr/src/app/app_data \
-            -e KAGGLE_KEY=${{ secrets.KAGGLE_KEY }} \
-            -e KAGGLE_USERNAME=${{ secrets.KAGGLE_USERNAME }} \
-            -e OPREATION="${{ env.OPERATION }}" \
-            --name publisher-runner erlichsefi/israeli-supermarket-publisher:prod &&
-           docker builder prune -f
+      run:  docker compose up publisher 
+
+    # act -W '.github/workflows/template.yml' -P self-hosted=catthehacker/ubuntu:act-latest

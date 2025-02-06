@@ -1,0 +1,31 @@
+name: Clean Docker
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 0'  # Run weekly at midnight on Sunday
+
+jobs:
+  clean:
+    runs-on: self-hosted
+
+    steps:
+      - name: Clean Docker system
+        run: |
+          # Remove all stopped containers
+          docker container prune -f
+          
+          # Remove unused images
+          docker image prune -a -f
+          
+          # Remove unused volumes
+          docker volume prune -f
+          
+          # Remove unused networks
+          docker network prune -f
+          
+          # Remove everything unused
+          docker system prune -a -f
+          
+          # Display disk usage after cleanup
+          df -h

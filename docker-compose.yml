@@ -1,0 +1,61 @@
+
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - mongo-network
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: supermarket-api
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mongodb
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017/
+    networks:
+      - mongo-network
+
+  publisher:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: data_processing
+    container_name: data-publisher
+    depends_on:
+      - mongodb
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017/
+      - OPREATION=${OPREATION}
+      - KAGGLE_KEY=${KAGGLE_KEY}
+      - KAGGLE_USERNAME=${KAGGLE_USERNAME}
+    volumes:
+      - app_data:/usr/src/app/app_data
+    networks:
+      - mongo-network
+
+volumes:
+  mongo-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: "${MONGO_DATA_PATH}"
+  app_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind 
+      device: "${APP_DATA_PATH}"
+
+networks:
+  mongo-network:
+    driver: bridge

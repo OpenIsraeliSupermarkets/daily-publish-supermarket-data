@@ -8,7 +8,7 @@
             "name": "Test Daliy Raw Dump",
             "type": "debugpy",
             "request": "launch",
-            "program": "test_daliy_raw_dump.py",
+            "program": "test_daily_raw_dump.py",
             "console": "integratedTerminal",
             "justMyCode": false,
             "envFile": "${workspaceFolder}/.env",
@@ -17,12 +17,12 @@
             "name": "Daliy Raw Dump",
             "type": "debugpy",
             "request": "launch",
-            "program": "daliy_raw_dump.py",
+            "program": "daily_raw_dump.py",
             "console": "integratedTerminal",
             "justMyCode": false,
             "envFile": "${workspaceFolder}/.env",
             "env": {
-                "OPREATION":"scraping,converting,clean_dump_files,publishing,clean_all_source_data"
+                "OPREATION":"scraping,converting,api_update,clean_dump_files"
             }
         },
         {
@@ -37,5 +37,14 @@
                 "hidden": true, // keep original launch order in 'run and debug' tab
             }
         },
+        {
+            "name": "FastAPI: Dev Main",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/access_layer.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env",
+        }
     ]
 }
