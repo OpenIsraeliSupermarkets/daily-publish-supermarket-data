@@ -1,7 +1,7 @@
 # This workflow will install Python dependencies, run tests and lint with a variety of Python versions
 # For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
 
-name: Scrape Itreation 
+name: Template
 
 on:
   workflow_call:
@@ -29,8 +29,8 @@ jobs:
 
     - name: Adding env variables
       run: |
-        echo "APP_DATA_PATH=${{ env.GITHUB_WORKSPACE }}/app_data" >> $GITHUB_ENV
-        echo "MONGO_DATA_PATH=${{ env.GITHUB_WORKSPACE }}/mongo_data" >> $GITHUB_ENV
+        echo "APP_DATA_PATH=${{ runner.workspace }}/app_data" >> $GITHUB_ENV
+        echo "MONGO_DATA_PATH=${{ runner.workspace }}/mongo_data" >> $GITHUB_ENV
         echo "KAGGLE_USERNAME=${{ secrets.KAGGLE_USERNAME }}" >> $GITHUB_ENV
         echo "KAGGLE_KEY=${{ secrets.KAGGLE_KEY }}" >> $GITHUB_ENV
 
