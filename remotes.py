@@ -300,7 +300,7 @@ class MongoDbUploader(APIDatabaseUploader):
 
     
     def __init__(self, mongodb_uri):
-        self.client = pymongo.MongoClient("mongodb://host.docker.internal:27017")
+        self.client = pymongo.MongoClient(os.getenv("MONGODB_URI","mongodb://host.docker.internal:27017"))
         self.db = self.client.supermarket_data
 
     def _insert_to_database(self, table_target_name, items):
