@@ -30,7 +30,7 @@ jobs:
           mkdir -p "${{ env.MONGO_DATA_PATH }}"
 
       - name: Build and tag Docker image
-        run:  docker compose build --no-cache
+        run:  docker compose build
         
       - name: Start Docker daemon (if not already running)
         run: systemctl start docker || true # Start if not already running
