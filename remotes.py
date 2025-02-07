@@ -304,6 +304,7 @@ class MongoDbUploader(APIDatabaseUploader):
         self.db = self.client.supermarket_data
 
     def _insert_to_database(self, table_target_name, items):
+        logging.info(f"Pushing to table {table_target_name}, {len(items)} items")
         collection = self.db[table_target_name]
         collection.insert_many(items)
 

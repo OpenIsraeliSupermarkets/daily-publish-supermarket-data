@@ -129,17 +129,17 @@ class ShortTermDBDatasetManager:
             table_target_name = self._file_name_to_table(file)
 
             # Read the CSV file into a DataFrame
-            df = pd.read_csv(os.path.join(outputs_folder, file))
-            latast = -1
+            last_row = local_cahce.get("last_pushed",{}).get(file, -1)
+            df = pd.read_csv(os.path.join(outputs_folder, file), skiprows=range(1, last_row + 2) if last_row > -1 else None)
+
             if not df.empty:
                 df = df.reset_index(names=["row_index"])
-                df = df[df.row_index > local_cahce.get("last_pushed",{}).get(file, -1)]
-                latast = int(df.row_index.max())
+                last_row = int(df.row_index.max())
                 df["row_index"] = df["row_index"].astype(str)
                 items = df.ffill().to_dict(orient="records")
                 self.uploader._insert_to_database(table_target_name, items)
 
-            local_cahce['last_pushed'] = {file: latast}
+            local_cahce['last_pushed'] = {file: last_row}
 
             logging.info(f"Completed pushing {file}")
 
