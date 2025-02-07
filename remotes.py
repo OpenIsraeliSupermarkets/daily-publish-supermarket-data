@@ -303,10 +303,20 @@ class MongoDbUploader(APIDatabaseUploader):
         self.client = pymongo.MongoClient(os.getenv("MONGODB_URI","mongodb://host.docker.internal:27017"))
         self.db = self.client.supermarket_data
 
+    def pre_process(self, item):
+        """Convert large integers to strings to avoid MongoDB limitations"""
+        if isinstance(item, list):
+            return [self.pre_process(i) for i in item]
+        elif isinstance(item, dict):
+            return {k: self.pre_process(v) for k, v in item.items()}
+        elif isinstance(item, int) and (item > 2**63 - 1 or item < -(2**63)):
+            return str(item)
+        return item
+
     def _insert_to_database(self, table_target_name, items):
         logging.info(f"Pushing to table {table_target_name}, {len(items)} items")
         collection = self.db[table_target_name]
-        collection.insert_many(items)
+        collection.insert_many(map(self.pre_process, items))
 
     def _create_table(self, partition_id, table_name):
         logging.info(f"Creating collection: {table_name}")

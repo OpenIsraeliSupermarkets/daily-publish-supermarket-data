@@ -131,7 +131,7 @@ class ShortTermDBDatasetManager:
             # Read the CSV file into a DataFrame
             last_row = local_cahce.get("last_pushed",{}).get(file, -1)
             # Process the CSV file in chunks to reduce memory usage
-            chunk_size = 1000
+            chunk_size = 10000
             previous_row = None
             for chunk in pd.read_csv(os.path.join(outputs_folder, file), 
                                    skiprows=range(1, last_row + 2) if last_row > -1 else None,
