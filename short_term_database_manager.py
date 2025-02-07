@@ -130,14 +130,25 @@ class ShortTermDBDatasetManager:
 
             # Read the CSV file into a DataFrame
             last_row = local_cahce.get("last_pushed",{}).get(file, -1)
-            df = pd.read_csv(os.path.join(outputs_folder, file), skiprows=range(1, last_row + 2) if last_row > -1 else None)
-
-            if not df.empty:
-                df = df.reset_index(names=["row_index"])
-                last_row = int(df.row_index.max())
-                df["row_index"] = df["row_index"].astype(str)
-                items = df.ffill().to_dict(orient="records")
-                self.uploader._insert_to_database(table_target_name, items)
+            # Process the CSV file in chunks to reduce memory usage
+            chunk_size = 1000
+            previous_row = None
+            for chunk in pd.read_csv(os.path.join(outputs_folder, file), 
+                                   skiprows=range(1, last_row + 2) if last_row > -1 else None,
+                                   chunksize=chunk_size):
+                
+                if not chunk.empty:
+                    if previous_row is not None:
+                        chunk = pd.concat([previous_row, chunk])
+                    
+                    chunk = chunk.reset_index(names=["row_index"])
+                    last_row = max(last_row,int(chunk.row_index.max()))
+                    chunk["row_index"] = chunk["row_index"].astype(str)
+                    items = chunk.ffill().to_dict(orient="records")
+                    self.uploader._insert_to_database(table_target_name, items[1:])
+                    
+                    # Save last row for next iteration
+                    previous_row = chunk.drop(columns=['row_index']).tail(1)
 
             local_cahce['last_pushed'] = {file: last_row}
 
