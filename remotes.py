@@ -316,7 +316,8 @@ class MongoDbUploader(APIDatabaseUploader):
     def _insert_to_database(self, table_target_name, items):
         logging.info(f"Pushing to table {table_target_name}, {len(items)} items")
         collection = self.db[table_target_name]
-        collection.insert_many(map(self.pre_process, items))
+        if items:
+            collection.insert_many(map(self.pre_process, items))
 
     def _create_table(self, partition_id, table_name):
         logging.info(f"Creating collection: {table_name}")
