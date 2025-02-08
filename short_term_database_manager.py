@@ -88,7 +88,7 @@ class ShortTermDBDatasetManager:
                 pushed_timestamp = local_cahce.get(file, {}).get("timestamps", [])
                 
                 for timestamp, actions in data.items():
-
+                    logging.info(f"Pushing {file}: {timestamp} vs {pushed_timestamp}")
                     if timestamp == "verified_downloads":
                         continue
                     
