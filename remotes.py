@@ -5,10 +5,14 @@ import json
 import shutil
 import boto3
 import re
+import hashlib
 from decimal import Decimal
 from boto3.dynamodb.conditions import Attr, Key
 import pymongo
-    
+from pydantic import BaseModel
+from typing import Optional, Dict
+from pymongo import MongoClient
+
 class RemoteDatabaseUploader(ABC):
     """
     Abstract class for uploading data to a remote database.
@@ -296,12 +300,53 @@ class DummyDocumentDbUploader:
         return file_found
 
 
+class User(BaseModel):
+    username: str
+    disabled: bool = False
+
+class UserInDB(User):
+    hashed_password: str
+
 class MongoDbUploader(APIDatabaseUploader):
 
     
-    def __init__(self, mongodb_uri):
-        self.client = pymongo.MongoClient(os.getenv("MONGODB_URI","mongodb://host.docker.internal:27017"))
+    def __init__(self, region: str = "il-central-1"):
+        self.client = MongoClient(os.environ.get("MONGODB_URL", "mongodb://localhost:27017/"))
         self.db = self.client.supermarket_data
+        self.users = self.client.users  # קולקציה חדשה למשתמשים
+
+    def fake_hash_password(self, password: str) -> str:
+        return hashlib.sha256(password.encode()).hexdigest()
+
+    def create_user(self, username: str, password: str) -> bool:
+        if self.users.find_one({"username": username}):
+            return False
+        
+        user_dict = {
+            "username": username,
+            "hashed_password": self.fake_hash_password(password),
+            "disabled": False
+        }
+        self.users.insert_one(user_dict)
+        return True
+
+    def get_user(self, username: str) -> Optional[UserInDB]:
+        user_dict = self.users.find_one({"username": username})
+        if user_dict:
+            # הסרת ה-_id של MongoDB לפני המרה למודל
+            user_dict.pop('_id', None)
+            return UserInDB(**user_dict)
+        return None
+
+    def authenticate_user(self, username: str, password: str) -> Optional[User]:
+        user = self.get_user(username)
+        if not user:
+            return None
+        
+        if not self.fake_hash_password(password) == user.hashed_password:
+            return None
+            
+        return user
 
     def pre_process(self, item):
         """Convert large integers to strings to avoid MongoDB limitations"""
@@ -332,7 +377,7 @@ class MongoDbUploader(APIDatabaseUploader):
             self.db[collection].drop()
         logging.info("All collections deleted successfully!")
 
-    def _get_all_files_by_chain(self, chain: str, file_type=None):
+    def _get_all_files_by_chain(self, chain: str, file_type: str = None):
         collection = self.db["ParserStatus"]
         files = []
         
@@ -345,7 +390,7 @@ class MongoDbUploader(APIDatabaseUploader):
                 files.extend(doc["response"]["files_to_process"])
         return files
 
-    def _get_content_of_file(self, table_name, file):
+    def _get_content_of_file(self, table_name: str, file: str):
         collection = self.db[table_name]
         results = []
         for obj in collection.find({"file_name": file}):

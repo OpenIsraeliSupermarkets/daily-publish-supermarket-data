@@ -1,11 +1,20 @@
 from il_supermarket_scarper import ScraperFactory, FileTypesFilters
-from remotes import DummyDocumentDbUploader, MongoDbUploader
+from remotes import MongoDbUploader, User
+from typing import Optional
 
 
 class AccessLayer:
+    def __init__(self, uploader_class):
+        self.uploader = uploader_class()
 
-    def __init__(self, database_connector: MongoDbUploader):
-        self.database_connector = database_connector("il-central-1")
+    def create_user(self, username: str, password: str) -> bool:
+        return self.uploader.create_user(username, password)
+
+    def get_user(self, username: str) -> Optional[User]:
+        return self.uploader.get_user(username)
+
+    def authenticate_user(self, username: str, password: str) -> Optional[User]:
+        return self.uploader.authenticate_user(username, password)
 
     def list_all_available_chains(self):
         return ScraperFactory.all_scrapers_name()
@@ -26,7 +35,7 @@ class AccessLayer:
                 f"file_type '{file_type}' is not a valid file type, valid file types are: {','.join(FileTypesFilters.__members__.keys())}",
             )
 
-        return self.database_connector._get_all_files_by_chain(chain, file_type)
+        return self.uploader._get_all_files_by_chain(chain, file_type)
 
     def get_file_content(self, chain: str, file: str):
         if not chain:
@@ -47,11 +56,10 @@ class AccessLayer:
             )
 
         table_name = f"{file_type.name.lower()}_{chain.lower()}"
-        return self.database_connector._get_content_of_file(table_name, file)
+        return self.uploader._get_content_of_file(table_name, file)
 
 
 if __name__ == "__main__":
-
     api = AccessLayer(MongoDbUploader)
     files = api.list_files(chain="FRESH_MARKET_AND_SUPER_DOSH")
     for file in files:

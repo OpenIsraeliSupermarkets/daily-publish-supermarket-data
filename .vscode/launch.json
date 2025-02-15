@@ -45,6 +45,15 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "envFile": "${workspaceFolder}/.env",
+        },
+        {
+            "name": "FastAPI: API",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/api.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env",
         }
     ]
 }
