@@ -89,6 +89,7 @@ class ShortTermDBDatasetManager:
                 
                 for index, (timestamp, actions) in enumerate(data.items()):
                     logging.info(f"Pushing {file}: {timestamp} vs {pushed_timestamp}")
+                    
                     if timestamp == "verified_downloads":
                         continue
                     
@@ -111,13 +112,27 @@ class ShortTermDBDatasetManager:
                             }
                         )
                     pushed_timestamp.append(timestamp)
-            
-            local_cahce[file] = {
-                "timestamps":pushed_timestamp
-            } 
+                
+                if file not in local_cahce:
+                    local_cahce[file] = {}
+                local_cahce[file]["timestamps"] = pushed_timestamp
 
-        self.uploader._insert_to_database(self.scraper_table_name, records)
-        logging.info("Scraper status files stored in DynamoDB successfully.")
+        if records:
+            try:
+                # ניסיון להכניס את כל הרשומות בבת אחת
+                self.uploader._insert_to_database(self.scraper_table_name, records)
+                logging.info(f"Successfully inserted {len(records)} records to DynamoDB")
+            except Exception as e:
+                # אם נכשל, ננסה להכניס כל רשומה בנפרד
+                logging.warning(f"Bulk insert failed, trying individual inserts: {str(e)}")
+                successful_records = 0
+                for record in records:
+                    try:
+                        self.uploader._insert_to_database(self.scraper_table_name, [record])
+                        successful_records += 1
+                    except Exception as inner_e:
+                        logging.error(f"Failed to insert record: {str(inner_e)}")
+                logging.info(f"Successfully inserted {successful_records} out of {len(records)} records")
 
     def push_files_data(self, outputs_folder, local_cahce):
         #

@@ -277,6 +277,8 @@ class DummyDocumentDbUploader:
         file_found = []
         for file in os.listdir(chain_path):
             if chain in file and (file_type is None or file_type in file):
+                if os.path.isfile(os.path.join(chain_path, file)):
+                    raise Exception(f"File {file} is not a file")
                 with open(os.path.join(chain_path, file), "r") as file:
                     file_found.extend(json.load(file)["response"]["files_to_process"])
         return file_found
@@ -317,7 +319,7 @@ class MongoDbUploader(APIDatabaseUploader):
         logging.info(f"Pushing to table {table_target_name}, {len(items)} items")
         collection = self.db[table_target_name]
         if items:
-            collection.insert_many(map(self.pre_process, items))
+            collection.insert_many(map(self.pre_process, items), ordered=False)
 
     def _create_table(self, partition_id, table_name):
         logging.info(f"Creating collection: {table_name}")
