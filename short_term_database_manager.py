@@ -36,7 +36,13 @@ class ShortTermDBDatasetManager:
                     filename = os.path.basename(entry["response"]["file_created_path"])
                     table_name = self._file_name_to_table(filename)
 
-                    self.uploader._create_table("row_index", table_name)
+                    self.uploader._create_data_table(table_name)
+    
+    def _create_data_table(self, table_name):
+        try:
+            self.uploader._create_table("row_index", table_name)
+        except Exception as e:
+            pass
 
     def _create_all_tables(self, outputs_folder):
         self._create_data_folders(outputs_folder)
@@ -118,22 +124,8 @@ class ShortTermDBDatasetManager:
                 local_cahce[file]["timestamps"] = pushed_timestamp
 
         if records:
-            try:
-                # ניסיון להכניס את כל הרשומות בבת אחת
-                self.uploader._insert_to_database(self.scraper_table_name, records)
-                logging.info(f"Successfully inserted {len(records)} records to DynamoDB")
-            except Exception as e:
-                # אם נכשל, ננסה להכניס כל רשומה בנפרד
-                logging.warning(f"Bulk insert failed, trying individual inserts: {str(e)}")
-                successful_records = 0
-                for record in records:
-                    try:
-                        self.uploader._insert_to_database(self.scraper_table_name, [record])
-                        successful_records += 1
-                    except Exception as inner_e:
-                        logging.error(f"Failed to insert record: {str(inner_e)}")
-                logging.info(f"Successfully inserted {successful_records} out of {len(records)} records")
-
+            self.uploader._insert_to_database(self.scraper_table_name, records)
+            
     def push_files_data(self, outputs_folder, local_cahce):
         #
         for file in os.listdir(outputs_folder):
@@ -144,9 +136,11 @@ class ShortTermDBDatasetManager:
             logging.info(f"Pushing {file}")
             # select the correct table
             table_target_name = self._file_name_to_table(file)
+            self._create_data_table(table_target_name)
 
             # Read the CSV file into a DataFrame
             last_row = local_cahce.get("last_pushed",{}).get(file, -1)
+            logging.info(f"Last row: {last_row}")
             # Process the CSV file in chunks to reduce memory usage
             chunk_size = 10000
             previous_row = None
@@ -155,6 +149,8 @@ class ShortTermDBDatasetManager:
                                    chunksize=chunk_size):
                 
                 if not chunk.empty:
+                    logging.info(f"Batch start: {chunk.iloc[0].name}, end: {chunk.iloc[-1].name}")
+                    
                     if previous_row is not None:
                         chunk = pd.concat([previous_row, chunk])
                     

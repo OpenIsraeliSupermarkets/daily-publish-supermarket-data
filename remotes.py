@@ -319,7 +319,21 @@ class MongoDbUploader(APIDatabaseUploader):
         logging.info(f"Pushing to table {table_target_name}, {len(items)} items")
         collection = self.db[table_target_name]
         if items:
-            collection.insert_many(map(self.pre_process, items), ordered=False)
+            processed_items = map(self.pre_process, items)
+            try:
+                # ניסיון להכניס את כל הרשומות בבת אחת
+                collection.insert_many(processed_items, ordered=False)
+                logging.info(f"Successfully inserted {len(processed_items)} records to DynamoDB")
+            except Exception as e:
+                # אם נכשל, ננסה להכניס כל רשומה בנפרד
+                logging.warning(f"Bulk insert failed, trying individual inserts: {str(e)}")
+                successful_records = 0
+                for record in processed_items:
+                    try:
+                        collection.insert_one(record)
+                        successful_records += 1
+                    except Exception as inner_e:
+                        pass
 
     def _create_table(self, partition_id, table_name):
         logging.info(f"Creating collection: {table_name}")
