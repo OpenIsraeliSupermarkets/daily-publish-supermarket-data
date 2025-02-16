@@ -145,17 +145,18 @@ class ShortTermDBDatasetManager:
             chunk_size = 10000
             previous_row = None
             for chunk in pd.read_csv(os.path.join(outputs_folder, file), 
-                                   skiprows=range(1, last_row + 2) if last_row > -1 else None,
+                                   skiprows=lambda x: x < last_row + 1,
                                    chunksize=chunk_size):
                 
                 if not chunk.empty:
+                    chunk.index = range(last_row + 1, last_row + 1 + len(chunk))
                     logging.info(f"Batch start: {chunk.iloc[0].name}, end: {chunk.iloc[-1].name}")
                     
                     if previous_row is not None:
                         chunk = pd.concat([previous_row, chunk])
                     
                     chunk = chunk.reset_index(names=["row_index"])
-                    last_row = max(last_row,int(chunk.row_index.max()))
+                    last_row = max(last_row, int(chunk.row_index.max()))
                     chunk["row_index"] = chunk["row_index"].astype(str)
                     items = chunk.ffill().to_dict(orient="records")
                     self.uploader._insert_to_database(table_target_name, items[1:])
@@ -194,3 +195,5 @@ class ShortTermDBDatasetManager:
         self.push_scraper_status_files(status_folder,local_cahce)
         self.push_files_data(outputs_folder, local_cahce)
         self._upload_local_cache(local_cahce)
+        
+        logging.info("Upload completed successfully.")
