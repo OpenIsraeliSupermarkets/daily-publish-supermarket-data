@@ -326,7 +326,7 @@ class MongoDbUploader(APIDatabaseUploader):
                 logging.info(f"Successfully inserted {len(processed_items)} records to DynamoDB")
             except Exception as e:
                 # אם נכשל, ננסה להכניס כל רשומה בנפרד
-                logging.warning(f"Bulk insert failed, trying individual inserts: {str(e)}")
+                logging.warning(f"Bulk insert failed, trying individual inserts.")
                 successful_records = 0
                 for record in processed_items:
                     try:
