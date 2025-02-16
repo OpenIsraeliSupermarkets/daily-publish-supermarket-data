@@ -36,7 +36,7 @@ class ShortTermDBDatasetManager:
                     filename = os.path.basename(entry["response"]["file_created_path"])
                     table_name = self._file_name_to_table(filename)
 
-                    self.uploader._create_data_table(table_name)
+                    self._create_data_table(table_name)
     
     def _create_data_table(self, table_name):
         try:
@@ -163,7 +163,9 @@ class ShortTermDBDatasetManager:
                     # Save last row for next iteration
                     previous_row = chunk.drop(columns=['row_index']).tail(1)
 
-            local_cahce['last_pushed'] = {file: last_row}
+            if "last_pushed" not in local_cahce:
+                local_cahce['last_pushed'] = {}
+            local_cahce['last_pushed'][file] = last_row
 
             logging.info(f"Completed pushing {file}")
 
