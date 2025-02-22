@@ -10,21 +10,39 @@ from fastapi.responses import JSONResponse
 
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        if request.url.path == "/docs" or request.url.path == "/openapi.json":
-            return await call_next(request)
+        try:
+            if request.url.path == "/docs" or request.url.path == "/openapi.json":
+                response = await call_next(request)
+                return response
+                
+            token = request.headers.get("Authorization")
+            if not token:
+                return JSONResponse(
+                    status_code=401,
+                    content={"detail": "Missing Authorization header"}
+                )
+                
+            if not token.startswith("Bearer "):
+                return JSONResponse(
+                    status_code=401,
+                    content={"detail": "Invalid token format"}
+                )
+                
+            token = token.replace("Bearer ", "")
+            if not token_validator.validate_token(token):
+                return JSONResponse(
+                    status_code=401,
+                    content={"detail": "Invalid token"}
+                )
+                
+            response = await call_next(request)
+            return response
             
-        token = request.headers.get("Authorization")
-        if not token:
-            raise HTTPException(status_code=401, detail="Missing Authorization header")
-            
-        if not token.startswith("Bearer "):
-            raise HTTPException(status_code=401, detail="Invalid token format")
-            
-        token = token.replace("Bearer ", "")
-        if not token_validator.validate_token(token):
-            raise HTTPException(status_code=401, detail="Invalid token")
-            
-        return await call_next(request)
+        except Exception as e:
+            return JSONResponse(
+                status_code=500,
+                content={"detail": str(e)}
+            )
 
 
 security = HTTPBearer()

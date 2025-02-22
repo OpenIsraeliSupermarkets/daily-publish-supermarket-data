@@ -16,6 +16,7 @@ class TokenValidator:
                 .eq('is_active', True) \
                 .execute()
             
+            print(result)
             if len(result.data) == 0:
                 return False
                 
