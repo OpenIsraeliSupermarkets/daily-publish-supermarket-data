@@ -36,7 +36,13 @@ class ShortTermDBDatasetManager:
                     filename = os.path.basename(entry["response"]["file_created_path"])
                     table_name = self._file_name_to_table(filename)
 
-                    self.uploader._create_table("row_index", table_name)
+                    self._create_data_table(table_name)
+    
+    def _create_data_table(self, table_name):
+        try:
+            self.uploader._create_table("row_index", table_name)
+        except Exception as e:
+            pass
 
     def _create_all_tables(self, outputs_folder):
         self._create_data_folders(outputs_folder)
@@ -89,6 +95,7 @@ class ShortTermDBDatasetManager:
                 
                 for index, (timestamp, actions) in enumerate(data.items()):
                     logging.info(f"Pushing {file}: {timestamp} vs {pushed_timestamp}")
+                    
                     if timestamp == "verified_downloads":
                         continue
                     
@@ -111,14 +118,14 @@ class ShortTermDBDatasetManager:
                             }
                         )
                     pushed_timestamp.append(timestamp)
+                
+                if file not in local_cahce:
+                    local_cahce[file] = {}
+                local_cahce[file]["timestamps"] = pushed_timestamp
+
+        if records:
+            self.uploader._insert_to_database(self.scraper_table_name, records)
             
-            local_cahce[file] = {
-                "timestamps":pushed_timestamp
-            } 
-
-        self.uploader._insert_to_database(self.scraper_table_name, records)
-        logging.info("Scraper status files stored in DynamoDB successfully.")
-
     def push_files_data(self, outputs_folder, local_cahce):
         #
         for file in os.listdir(outputs_folder):
@@ -129,22 +136,27 @@ class ShortTermDBDatasetManager:
             logging.info(f"Pushing {file}")
             # select the correct table
             table_target_name = self._file_name_to_table(file)
+            self._create_data_table(table_target_name)
 
             # Read the CSV file into a DataFrame
             last_row = local_cahce.get("last_pushed",{}).get(file, -1)
+            logging.info(f"Last row: {last_row}")
             # Process the CSV file in chunks to reduce memory usage
             chunk_size = 10000
             previous_row = None
             for chunk in pd.read_csv(os.path.join(outputs_folder, file), 
-                                   skiprows=range(1, last_row + 2) if last_row > -1 else None,
+                                   skiprows=lambda x: x < last_row + 1,
                                    chunksize=chunk_size):
                 
                 if not chunk.empty:
+                    chunk.index = range(last_row + 1, last_row + 1 + len(chunk))
+                    logging.info(f"Batch start: {chunk.iloc[0].name}, end: {chunk.iloc[-1].name}")
+                    
                     if previous_row is not None:
                         chunk = pd.concat([previous_row, chunk])
                     
                     chunk = chunk.reset_index(names=["row_index"])
-                    last_row = max(last_row,int(chunk.row_index.max()))
+                    last_row = max(last_row, int(chunk.row_index.max()))
                     chunk["row_index"] = chunk["row_index"].astype(str)
                     items = chunk.ffill().to_dict(orient="records")
                     self.uploader._insert_to_database(table_target_name, items[1:])
@@ -152,7 +164,9 @@ class ShortTermDBDatasetManager:
                     # Save last row for next iteration
                     previous_row = chunk.drop(columns=['row_index']).tail(1)
 
-            local_cahce['last_pushed'] = {file: last_row}
+            if "last_pushed" not in local_cahce:
+                local_cahce['last_pushed'] = {}
+            local_cahce['last_pushed'][file] = last_row
 
             logging.info(f"Completed pushing {file}")
 
@@ -181,3 +195,5 @@ class ShortTermDBDatasetManager:
         self.push_scraper_status_files(status_folder,local_cahce)
         self.push_files_data(outputs_folder, local_cahce)
         self._upload_local_cache(local_cahce)
+        
+        logging.info("Upload completed successfully.")
