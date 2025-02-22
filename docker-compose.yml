@@ -27,6 +27,8 @@ services:
       - mongodb
     environment:
       - MONGODB_URI=mongodb://mongodb:27017/
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - SUPABASE_URL=${SUPABASE_URL}
     networks:
       - mongo-network
     restart: unless-stopped

@@ -6,6 +6,8 @@ kaggle==1.6.17
 schedule==1.2.2
 boto3==1.36
 botocore==1.36
-fastapi==0.115.4
+fastapi[all]==0.109.2
 uvicorn==0.29.0
 pymongo==4.6.3
+starlette==0.36.3
+supabase
