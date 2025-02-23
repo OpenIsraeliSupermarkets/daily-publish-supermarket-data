@@ -116,13 +116,13 @@ async def list_chains(
 @app.get("/list_file_types")
 async def list_file_types(
     credentials: HTTPAuthorizationCredentials = Security(security),
-) -> list[TypeOfFileScraped]:
+) -> TypeOfFileScraped:
     return TypeOfFileScraped(
         list_of_file_types=access_layer.list_all_available_file_types()
     )
 
 
-@app.get("raw/list_scraped_files")
+@app.get("/list_scraped_files")
 async def read_files(
     chain: str,
     file_type: Optional[str] = None,
@@ -136,7 +136,7 @@ async def read_files(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("raw/file_content")
+@app.get("/raw/file_content")
 async def file_content(
     chain: str,
     file: str,
