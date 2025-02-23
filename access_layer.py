@@ -1,19 +1,21 @@
 from il_supermarket_scarper import ScraperFactory, FileTypesFilters
 from remotes import DummyDocumentDbUploader, MongoDbUploader
 from token_validator import TokenValidator
+from response_models import ScrapedFile, TypeOfFileScraped, ScrapedFiles
+
 
 class AccessLayer:
 
     def __init__(self, database_connector: MongoDbUploader):
         self.database_connector = database_connector("il-central-1")
 
-    def list_all_available_chains(self):
+    def list_all_available_chains(self) -> list[str]:
         return ScraperFactory.all_scrapers_name()
 
-    def list_all_available_file_types(self):
-        return list(FileTypesFilters.__members__.keys())
+    def list_all_available_file_types(self) -> list[str]:
+        return FileTypesFilters.__members__.keys()
 
-    def list_files(self, chain: str, file_type: str = None):
+    def list_files(self, chain: str, file_type: str = None) -> ScrapedFiles:
         if not chain:
             raise Exception("'chain' parameter is required")
 
@@ -26,7 +28,10 @@ class AccessLayer:
                 f"file_type '{file_type}' is not a valid file type, valid file types are: {','.join(FileTypesFilters.__members__.keys())}",
             )
 
-        return self.database_connector._get_all_files_by_chain(chain, file_type)
+        return map(
+            lambda file: ScrapedFile(file_name=file),
+            self.database_connector._get_all_files_by_chain(chain, file_type),
+        )
 
     def get_file_content(self, chain: str, file: str):
         if not chain:
@@ -53,8 +58,8 @@ class AccessLayer:
 if __name__ == "__main__":
 
     token_validator = TokenValidator()
-    print(token_validator.validate_token("fb9d898e-d64d-4f87-af98-7f2242e8fc63"))
-    
+    assert token_validator.validate_token("fb9d898e-d64d-4f87-af98-7f2242e8fc63")
+
     api = AccessLayer(MongoDbUploader)
     files = api.list_files(chain="FRESH_MARKET_AND_SUPER_DOSH")
     for file in files:

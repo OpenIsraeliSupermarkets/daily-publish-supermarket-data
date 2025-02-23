@@ -7,7 +7,7 @@ import datetime
 from daily_raw_dump import SupermarketDataPublisher
 from il_supermarket_scarper.scrappers_factory import ScraperFactory
 from il_supermarket_scarper import FileTypesFilters
-from remotes import DummyFileStorge, MongoDbUploader,DummyDocumentDbUploader
+from remotes import DummyFileStorge, MongoDbUploader, DummyDocumentDbUploader
 
 
 def test_daliy_raw_dump():
