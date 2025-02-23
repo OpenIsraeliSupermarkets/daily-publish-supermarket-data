@@ -9,12 +9,8 @@ class TokenValidator:
 
     def validate_token(self, token: str) -> bool:
         try:
-            # בדיקה האם הטוקן קיים בטבלת הטוקנים ופעיל
-            result = self.supabase.table('api_tokens') \
-                .select('*') \
-                .eq('token', token) \
-                .eq('is_active', True) \
-                .execute()
+            # בדיקה האם הטוקן קיים בטבלת הטוקנים ופעיל באמצעות שאילתת SQL ישירה
+            result = self.supabase.rpc('validate_token', {'input_token': token}).execute()
             
             print(result)
             if len(result.data) == 0:
@@ -22,10 +18,7 @@ class TokenValidator:
                 
             # עדכון זמן השימוש האחרון
             token_id = result.data[0]['id']
-            self.supabase.table('api_tokens') \
-                .update({"last_used_at": "now()"}) \
-                .eq('id', token_id) \
-                .execute()
+            self.supabase.rpc('update_token_last_used', {'token_id': token_id}).execute()
                 
             return True
             
