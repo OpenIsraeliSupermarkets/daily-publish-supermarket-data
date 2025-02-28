@@ -26,7 +26,7 @@ services:
     depends_on:
       - mongodb
     environment:
-      - MONGODB_URI=mongodb://mongodb:27017/
+      - MONGODB_URI=mongodb://${MONGO_URL}:${MONGO_PORT}/
       - SUPABASE_KEY=${SUPABASE_KEY}
       - SUPABASE_URL=${SUPABASE_URL}
     networks:
@@ -42,10 +42,13 @@ services:
     depends_on:
       - mongodb
     environment:
-      - MONGODB_URI=mongodb://mongodb:27017/
+      - MONGODB_URI=mongodb://${MONGO_URL}:${MONGO_PORT}/
       - OPREATION=${OPREATION}
       - KAGGLE_KEY=${KAGGLE_KEY}
       - KAGGLE_USERNAME=${KAGGLE_USERNAME}
+      - LONG_TERM_MEMORY=${LONG_TERM_MEMORY}
+      - SHORT_TERM_MEMORY=${SHORT_TERM_MEMORY}
+      - LIMIT=${LIMIT}
     volumes:
       - app_data:/usr/src/app/app_data
     networks:

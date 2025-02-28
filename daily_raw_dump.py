@@ -9,7 +9,7 @@ from il_supermarket_scarper import ScarpingTask
 from il_supermarket_parsers import ConvertingTask
 from long_term_database_manager import LongTermDatasetManager
 from short_term_database_manager import ShortTermDBDatasetManager
-from remotes import KaggleUploader, MongoDbUploader
+from remotes import KaggleUploader, MongoDbUploader, DummyFileStorge,DummyDocumentDbUploader
 
 
 logging.getLogger("Logger").setLevel(logging.INFO)
@@ -294,9 +294,23 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
 
 if __name__ == "__main__":
 
+    storage_classes = {
+        "KaggleUploader": KaggleUploader,
+        "MongoDbUploader": MongoDbUploader,
+        "DummyFileStorge": DummyFileStorge,
+        "DummyDocumentDbUploader": DummyDocumentDbUploader
+    }
+    
+    limit = os.environ.get("LIMIT", None)
+    if limit:
+        limit = int(limit)
+    
     publisher = SupermarketDataPublisherInterface(
         app_folder="app_data",
+        long_term_db_target=storage_classes[os.environ.get("LONG_TERM_MEMORY", "KaggleUploader")],
+        short_term_db_target=storage_classes[os.environ.get("SHORT_TERM_MEMORY", "MongoDbUploader")],
         number_of_scraping_processes=min(os.cpu_count(), 3),
         number_of_parseing_processs=min(os.cpu_count(), 3),
+        limit=limit,
     )
     publisher.run(operations=os.environ["OPREATION"])

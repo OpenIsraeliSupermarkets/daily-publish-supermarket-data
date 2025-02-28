@@ -4,6 +4,7 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+
         {
             "name": "Test Daliy Raw Dump",
             "type": "debugpy",
@@ -38,13 +39,28 @@
             }
         },
         {
-            "name": "FastAPI: Dev Main",
+            "name": "Access Layer",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/access_layer.py",
             "console": "integratedTerminal",
             "justMyCode": false,
             "envFile": "${workspaceFolder}/.env",
+        },
+        {
+            "name": "FastAPI",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "uvicorn",
+            "args": [
+                "api:app",
+                "--reload",
+                "--port",
+                "8000"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env"
         }
     ]
 }

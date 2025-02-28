@@ -63,5 +63,5 @@ if __name__ == "__main__":
     api = AccessLayer(MongoDbUploader)
     files = api.list_files(chain="FRESH_MARKET_AND_SUPER_DOSH")
     for file in files:
-        content = api.get_file_content(chain="FRESH_MARKET_AND_SUPER_DOSH", file=file)
+        content = api.get_file_content(chain="FRESH_MARKET_AND_SUPER_DOSH", file=file.file_name)
         print(len(content))
