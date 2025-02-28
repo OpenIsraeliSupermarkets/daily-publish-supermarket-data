@@ -8,7 +8,8 @@ import re
 from decimal import Decimal
 from boto3.dynamodb.conditions import Attr, Key
 import pymongo
-    
+
+
 class RemoteDatabaseUploader(ABC):
     """
     Abstract class for uploading data to a remote database.
@@ -71,10 +72,10 @@ class DummyFileStorge(RemoteDatabaseUploader):
 
 
 class KaggleUploader(RemoteDatabaseUploader):
-    
+
     def __init__(self, dataset_remote_name, dataset_path, when):
         from kaggle import KaggleApi
-        
+
         self.dataset_remote_name = dataset_remote_name
         self.dataset_path = dataset_path
         self.when = when
@@ -168,7 +169,7 @@ class DynamoDbUploader(APIDatabaseUploader):
             self.dynamodb.create_table(
                 TableName=table_name,
                 KeySchema=key_schema,
-                AttributeDefinitions=attribute_definitions
+                AttributeDefinitions=attribute_definitions,
             )
             waiter = self.dynamodb_client.get_waiter("table_exists")
             waiter.wait(TableName=table_name)
@@ -300,9 +301,10 @@ class DummyDocumentDbUploader:
 
 class MongoDbUploader(APIDatabaseUploader):
 
-    
     def __init__(self, mongodb_uri):
-        self.client = pymongo.MongoClient(os.getenv("MONGODB_URI","mongodb://host.docker.internal:27017"))
+        self.client = pymongo.MongoClient(
+            os.getenv("MONGODB_URI", "mongodb://host.docker.internal:27017")
+        )
         self.db = self.client.supermarket_data
 
     def pre_process(self, item):
@@ -323,7 +325,9 @@ class MongoDbUploader(APIDatabaseUploader):
             try:
                 # ניסיון להכניס את כל הרשומות בבת אחת
                 collection.insert_many(processed_items, ordered=False)
-                logging.info(f"Successfully inserted {len(processed_items)} records to DynamoDB")
+                logging.info(
+                    f"Successfully inserted {len(processed_items)} records to DynamoDB"
+                )
             except Exception as e:
                 # אם נכשל, ננסה להכניס כל רשומה בנפרד
                 logging.warning(f"Bulk insert failed, trying individual inserts.")
@@ -339,7 +343,9 @@ class MongoDbUploader(APIDatabaseUploader):
         logging.info(f"Creating collection: {table_name}")
         try:
             self.db.create_collection(table_name)
-            self.db[table_name].create_index([(partition_id, pymongo.ASCENDING)], unique=True)
+            self.db[table_name].create_index(
+                [(partition_id, pymongo.ASCENDING)], unique=True
+            )
         except Exception as e:
             logging.error(f"Error creating collection: {e}")
 
@@ -351,12 +357,12 @@ class MongoDbUploader(APIDatabaseUploader):
     def _get_all_files_by_chain(self, chain: str, file_type=None):
         collection = self.db["ParserStatus"]
         files = []
-        
+
         filter_condition = f".*{re.escape(chain)}.*"
         if file_type is not None:
             filter_condition = f".*{re.escape(file_type)}.*{re.escape(chain)}.*"
-            
-        for doc in collection.find({"index" : {"$regex": filter_condition}}):
+
+        for doc in collection.find({"index": {"$regex": filter_condition}}):
             if "response" in doc and "files_to_process" in doc["response"]:
                 files.extend(doc["response"]["files_to_process"])
         return files
@@ -366,6 +372,6 @@ class MongoDbUploader(APIDatabaseUploader):
         results = []
         for obj in collection.find({"file_name": file}):
             # Convert ObjectId to dict manually
-            obj_dict = {k: v for k,v in obj.items() if k != '_id'}
+            obj_dict = {k: v for k, v in obj.items() if k != "_id"}
             results.append(obj_dict)
         return results
