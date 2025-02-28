@@ -12,7 +12,7 @@
             "program": "test_daily_raw_dump.py",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "envFile": "${workspaceFolder}/.env",
+            "envFile": "${workspaceFolder}/.env.test",
         },
         {
             "name": "Daliy Raw Dump",
@@ -21,7 +21,7 @@
             "program": "daily_raw_dump.py",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "envFile": "${workspaceFolder}/.env",
+            "envFile": "${workspaceFolder}/.env.test",
             "env": {
                 "OPREATION":"scraping,converting,api_update,clean_dump_files"
             }
@@ -45,7 +45,7 @@
             "program": "${workspaceFolder}/access_layer.py",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "envFile": "${workspaceFolder}/.env",
+            "envFile": "${workspaceFolder}/.env.test",
         },
         {
             "name": "FastAPI",
@@ -60,7 +60,7 @@
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
-            "envFile": "${workspaceFolder}/.env"
+            "envFile": "${workspaceFolder}/.env.test"
         }
     ]
 }
