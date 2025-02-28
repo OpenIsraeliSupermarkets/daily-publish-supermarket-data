@@ -42,9 +42,7 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
             "response_size_bytes": len(response_body),
             "client_ip": request.client.host if request.client else None,
             "user_agent": request.headers.get("user-agent"),
-            "authorization_method": request.headers.get("authorization", "").startswith(
-                "Bearer "
-            ),
+            "authorization_method": request.headers.get("Authorization", ""),
         }
 
         # שליחת הנתונים ל-Supabase
