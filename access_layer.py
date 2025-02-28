@@ -1,3 +1,4 @@
+import os
 from il_supermarket_scarper import ScraperFactory, FileTypesFilters
 from remotes import DummyDocumentDbUploader, MongoDbUploader
 from token_validator import TokenValidator
@@ -58,7 +59,7 @@ class AccessLayer:
 if __name__ == "__main__":
 
     token_validator = TokenValidator()
-    assert token_validator.validate_token("fb9d898e-d64d-4f87-af98-7f2242e8fc63")
+    assert token_validator.validate_token(os.getenv("SUPABASE_TOKEN"))
 
     api = AccessLayer(MongoDbUploader)
     files = api.list_files(chain="FRESH_MARKET_AND_SUPER_DOSH")
