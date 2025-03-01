@@ -300,15 +300,22 @@ if __name__ == "__main__":
         "DummyFileStorge": DummyFileStorge,
         "DummyDocumentDbUploader": DummyDocumentDbUploader
     }
-    
+  
+    def get_class_from_env(env_var_name, default_class):
+        class_name = os.environ.get(env_var_name, "KaggleUploader")
+        if class_name in storage_classes:
+            return storage_classes[class_name]
+        else:
+            return default_class
+          
     limit = os.environ.get("LIMIT", None)
     if limit:
         limit = int(limit)
     
     publisher = SupermarketDataPublisherInterface(
         app_folder="app_data",
-        long_term_db_target=storage_classes[os.environ.get("LONG_TERM_MEMORY", "KaggleUploader")],
-        short_term_db_target=storage_classes[os.environ.get("SHORT_TERM_MEMORY", "MongoDbUploader")],
+        long_term_db_target=get_class_from_env("LONG_TERM_MEMORY", KaggleUploader),
+        short_term_db_target=get_class_from_env("SHORT_TERM_MEMORY", MongoDbUploader),
         number_of_scraping_processes=min(os.cpu_count(), 3),
         number_of_parseing_processs=min(os.cpu_count(), 3),
         limit=limit,
