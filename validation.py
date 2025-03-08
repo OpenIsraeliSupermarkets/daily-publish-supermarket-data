@@ -51,8 +51,9 @@ def match_parsing_timestamps(parser_status_collection, sample_timestamp, chain_n
     min_delta = None
     associated_stamp = None
     for parsing_timestamp in all_parsing_timestamps:
-        diff = datetime.datetime.strptime(parsing_timestamp, "%d%m%Y%H%M%S") - scraping_timestamp
-        if min_delta is None or diff < min_delta:
+        parsing_timestamp_dt = datetime.datetime.strptime(parsing_timestamp, "%d%m%Y%H%M%S")
+        diff = parsing_timestamp_dt - scraping_timestamp
+        if min_delta is None or parsing_timestamp_dt > scraping_timestamp and diff < min_delta:
             associated_stamp = parsing_timestamp
             min_delta = diff
     return associated_stamp
@@ -66,31 +67,28 @@ def match_chain_names(chain_name):
 
 def get_parsing_status(parser_status_collection, matched_chain_name, matched_timestamp):
     """קבלת נתוני פרסור"""
-    files_to_parse = list(chain.from_iterable(
-        map(lambda x: map(
-            lambda y: y.replace(".aspx.xml", ""),
-            x['response']['files_to_process']
-        ), 
-        parser_status_collection.find({
+    
+    parsing_results = list(parser_status_collection.find({
             "store_enum": matched_chain_name,
             "timestamp": matched_timestamp
-        })
+    }))
+    assert len(parsing_results) == 5
+    files_to_parse = list(chain.from_iterable(
+        map(lambda x: list(map(
+            lambda y: y.replace(".aspx", "").replace(".xml", ""),
+            x['response']['files_to_process']
+        )), 
+        parsing_results
     )))
     
     parsing_results_success = list(chain.from_iterable(
         map(lambda x: [log['file_name'].replace(".aspx", "").replace(".xml", "") for log in x['response']['execution_log'] if log.get('status') == True],
-        parser_status_collection.find({
-            "store_enum": matched_chain_name,
-            "timestamp": matched_timestamp
-        })
+        parsing_results
     )))
     
     parsing_results_failed = list(chain.from_iterable(
         map(lambda x: [log for log in x['response']['execution_log'] if log.get('status') != True],
-        parser_status_collection.find({
-            "store_enum": matched_chain_name,
-            "timestamp": matched_timestamp
-        })
+        parsing_results
     )))
     
     return files_to_parse, parsing_results_success, parsing_results_failed
@@ -123,7 +121,7 @@ def collect_validation_results():
         
         # קבלת נתוני פרסור
         files_to_parse, parsing_results_success, parsing_results_failed = get_parsing_status(
-            parser_status_collection, folder_name, matched_timestamp)
+            parser_status_collection, chain_name, matched_timestamp)
         
         # בדיקת סטטוס עבור כל קובץ
         for file in files_saw:
