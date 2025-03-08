@@ -23,6 +23,7 @@ jobs:
           echo "MONGO_DATA_PATH=${{ runner.workspace}}/mongo_data" >> $GITHUB_ENV
           echo "MONGO_URL=${{ secrets.MONGO_URL }}" >> $GITHUB_ENV
           echo "MONGO_PORT=${{ secrets.MONGO_PORT }}" >> $GITHUB_ENV
+          echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> $GITHUB_ENV
           echo "SUPABASE_KEY=${{ secrets.SUPABASE_KEY }}" >> $GITHUB_ENV
           echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> $GITHUB_ENV
 
