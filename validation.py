@@ -176,6 +176,7 @@ def collect_validation_results():
 
         validation_results[chain_name] = {}
         used_timestamp = []
+        saw = []
         for itreation_timestamp in file_name_dict[folder_name.lower()]:
 
             validation_results[chain_name][itreation_timestamp] = {}
@@ -202,11 +203,12 @@ def collect_validation_results():
 
             # בדיקת סטטוס עבור כל קובץ
             pipeline = {
+                "new_files": list(set(files_saw) - set(saw)),
                 "saw": len(files_saw),
                 "fail_downloaded": 0,
                 "not_collected_by_parser": 0,
                 "fail_parsed": 0,
-                "success_downloaded": 0,
+                "succesful_processed": 0,
             }
             for file in files_saw:
                 # failed at download
@@ -221,11 +223,12 @@ def collect_validation_results():
                     elif file in parsing_results_failed:
                         pipeline["fail_parsed"] += 1
                     elif file in parsing_results_success:
-                        pipeline["success_downloaded"] += 1
+                        pipeline["succesful_processed"] += 1
                     else:
                         raise ValueError(f"file {file} is not in any of the lists")
                 else:
                     raise ValueError(f"file {file} is not in any of the lists")
+            saw = set(files_saw) | set(saw)
             validation_results[chain_name][itreation_timestamp] = pipeline
     return validation_results
 
