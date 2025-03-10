@@ -14,6 +14,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import JSONResponse, Response
 import time
 from datetime import datetime
+from flask import jsonify
 
 
 class TelemetryMiddleware(BaseHTTPMiddleware):
@@ -144,3 +145,11 @@ async def file_content(
         return FileContent(rows=access_layer.get_file_content(chain=chain, file=file))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.route('/health')
+def health_check():
+    return jsonify({
+        'status': 'healthy',
+        'timestamp': datetime.datetime.utcnow().isoformat()
+    }), 200
