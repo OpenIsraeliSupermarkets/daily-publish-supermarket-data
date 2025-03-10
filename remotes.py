@@ -8,6 +8,7 @@ import re
 from decimal import Decimal
 from boto3.dynamodb.conditions import Attr, Key
 import pymongo
+from datetime import datetime
 
 
 class RemoteDatabaseUploader(ABC):
@@ -36,13 +37,27 @@ class RemoteDatabaseUploader(ABC):
         """
         pass
 
+    @abstractmethod
+    def was_updated_in_last_24h(self) -> bool:
+        """
+        Check if the database was updated in the last 24 hours.
+        Returns:
+            bool: True if the database was updated in the last 24 hours, False otherwise.
+        """
+        pass
+
 
 class DummyFileStorge(RemoteDatabaseUploader):
     """
     Uploads data to a remote database.
     """
 
-    def __init__(self, dataset_remote_name, dataset_path, when):
+    def __init__(
+        self,
+        dataset_path="/",
+        when=datetime.now(),
+        dataset_remote_name="israeli-supermarkets-2024",
+    ):
         self.dataset_remote_name = dataset_remote_name
         self.dataset_path = dataset_path
         self.when = when
@@ -70,10 +85,38 @@ class DummyFileStorge(RemoteDatabaseUploader):
     def clean(self):
         pass
 
+    def was_updated_in_last_24h(self) -> bool:
+        server_path = f"remote_{self.dataset_remote_name}"
+        if not os.path.exists(server_path):
+            return False
+
+        from datetime import datetime, timedelta
+
+        now = datetime.now()
+        last_modified = None
+
+        # Check all files in the directory for the most recent modification
+        for filename in os.listdir(server_path):
+            file_path = os.path.join(server_path, filename)
+            if os.path.isfile(file_path):
+                mtime = datetime.fromtimestamp(os.path.getmtime(file_path))
+                if last_modified is None or mtime > last_modified:
+                    last_modified = mtime
+
+        if last_modified is None:
+            return False
+
+        return (now - last_modified) < timedelta(hours=24)
+
 
 class KaggleUploader(RemoteDatabaseUploader):
 
-    def __init__(self, dataset_remote_name, dataset_path, when):
+    def __init__(
+        self,
+        dataset_path="/",
+        when=datetime.now(),
+        dataset_remote_name="israeli-supermarkets-2024",
+    ):
         from kaggle import KaggleApi
 
         self.dataset_remote_name = dataset_remote_name
@@ -113,6 +156,21 @@ class KaggleUploader(RemoteDatabaseUploader):
     def clean(self):
         os.remove("index.json")
 
+    def was_updated_in_last_24h(self) -> bool:
+        try:
+            from datetime import datetime, timedelta
+
+            dataset_info = self.api.dataset_view(
+                f"erlichsefi/{self.dataset_remote_name}"
+            )
+            last_update = datetime.strptime(
+                dataset_info.lastUpdated, "%Y-%m-%dT%H:%M:%S.%fZ"
+            )
+            return (datetime.utcnow() - last_update) < timedelta(hours=24)
+        except Exception as e:
+            logging.error(f"Error checking Kaggle dataset update time: {e}")
+            return False
+
 
 class APIDatabaseUploader:
 
@@ -134,10 +192,18 @@ class APIDatabaseUploader:
     def _get_content_of_file(self, table_name, file):
         pass
 
+    def is_parser_updated_last_hour(self) -> bool:
+        """
+        Check if the parser collection was updated in the last hour.
+        Returns:
+            bool: True if the parser collection was updated in the last hour, False otherwise.
+        """
+        pass
+
 
 class DynamoDbUploader(APIDatabaseUploader):
 
-    def __init__(self, region_name):
+    def __init__(self, region_name="us-east-1"):
         self.dynamodb = boto3.resource("dynamodb", region_name=region_name)
         self.dynamodb_client = boto3.client("dynamodb", region_name=region_name)
 
@@ -214,9 +280,31 @@ class DynamoDbUploader(APIDatabaseUploader):
         response = table.scan(FilterExpression=Attr("file_name").eq(file))
         return response.get("Items", [])
 
+    def is_parser_updated_last_hour(self) -> bool:
+        try:
+            from datetime import datetime, timedelta
+
+            # Get the ParserStatus table
+            table = self.dynamodb.Table("ParserStatus")
+
+            # Get the table description to check last update time
+            table_desc = self.dynamodb_client.describe_table(TableName="ParserStatus")
+            last_modified = table_desc["Table"].get("LastUpdateTime", None)
+
+            if not last_modified:
+                return False
+
+            return (datetime.now(last_modified.tzinfo) - last_modified) < timedelta(
+                hours=1
+            )
+
+        except Exception as e:
+            logging.error(f"Error checking DynamoDB ParserStatus update time: {e}")
+            return False
+
 
 class DummyDocumentDbUploader:
-    def __init__(self, db_path):
+    def __init__(self, db_path="us-east-1"):
         self.db_path = os.path.join("./document_db", db_path)
         os.makedirs(self.db_path, exist_ok=True)
         self._load_tables_ids()
@@ -298,6 +386,37 @@ class DummyDocumentDbUploader:
                     file_found.append(data)
         return file_found
 
+    def is_parser_updated_last_hour(self) -> bool:
+        try:
+            from datetime import datetime, timedelta
+
+            parser_path = os.path.join(self.db_path, "ParserStatus")
+
+            if not os.path.exists(parser_path):
+                return False
+
+            now = datetime.now()
+            last_modified = None
+
+            # Check all files in the ParserStatus directory
+            for filename in os.listdir(parser_path):
+                file_path = os.path.join(parser_path, filename)
+                if os.path.isfile(file_path):
+                    mtime = datetime.fromtimestamp(os.path.getmtime(file_path))
+                    if last_modified is None or mtime > last_modified:
+                        last_modified = mtime
+
+            if last_modified is None:
+                return False
+
+            return (now - last_modified) < timedelta(hours=1)
+
+        except Exception as e:
+            logging.error(
+                f"Error checking DummyDocumentDb ParserStatus update time: {e}"
+            )
+            return False
+
 
 class MongoDbUploader(APIDatabaseUploader):
 
@@ -375,3 +494,26 @@ class MongoDbUploader(APIDatabaseUploader):
             obj_dict = {k: v for k, v in obj.items() if k != "_id"}
             results.append(obj_dict)
         return results
+
+    def is_parser_updated_last_hour(self) -> bool:
+        try:
+            from datetime import datetime, timedelta
+
+            # Get the ParserStatus collection
+            collection = self.db["ParserStatus"]
+
+            # Find the most recently modified document
+            latest_doc = collection.find_one(sort=[("_id", pymongo.DESCENDING)])
+
+            if not latest_doc:
+                return False
+
+            # Get the timestamp from the ObjectId
+            last_modified = latest_doc["_id"].generation_time
+            return (datetime.now(last_modified.tzinfo) - last_modified) < timedelta(
+                hours=1
+            )
+
+        except Exception as e:
+            logging.error(f"Error checking MongoDB ParserStatus update time: {e}")
+            return False

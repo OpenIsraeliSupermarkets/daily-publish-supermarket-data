@@ -13,10 +13,9 @@ class ShortTermDBDatasetManager:
         app_folder,
         short_term_db_target=DynamoDbUploader,
         parser_table_name="ParserStatus",
-        scraper_table_name="ScraperStatus",
-        region_name="us-east-1",
+        scraper_table_name="ScraperStatus"
     ):
-        self.uploader = short_term_db_target(region_name)
+        self.uploader = short_term_db_target()
         self.cache_file = os.path.join(app_folder, ".push_cache")
         self.parser_table_name = parser_table_name
         self.scraper_table_name = scraper_table_name

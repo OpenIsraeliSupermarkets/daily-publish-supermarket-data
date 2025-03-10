@@ -10,14 +10,12 @@ from remotes import KaggleUploader
 class LongTermDatasetManager:
     def __init__(
         self,
-        dataset,
         long_term_db_target=KaggleUploader,
         app_folder=".",
         enabled_scrapers=None,
         enabled_file_types=None,
     ):
 
-        self.dataset = dataset
         self.when = self._now()
         self.enabled_scrapers = (
             "ALL" if not enabled_scrapers else ",".join(enabled_scrapers)
@@ -27,7 +25,7 @@ class LongTermDatasetManager:
         )
         self.dataset_path = os.path.join(app_folder, self.dataset)
         self.remote_database = long_term_db_target(
-            dataset_remote_name=dataset, dataset_path=self.dataset_path, when=self.when
+            dataset_path=self.dataset_path, when=self.when
         )
         logging.info(f"Dataset path: {self.dataset_path}")
 

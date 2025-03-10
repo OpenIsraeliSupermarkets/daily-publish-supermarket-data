@@ -14,7 +14,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import JSONResponse, Response
 import time
 from datetime import datetime, timedelta
-from pydantic import BaseModel
+from utils import get_long_term_database_connector, get_short_term_database_connector
 
 
 class TelemetryMiddleware(BaseHTTPMiddleware):
@@ -43,7 +43,9 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
             "response_size_bytes": len(response_body),
             "client_ip": request.client.host if request.client else None,
             "user_agent": request.headers.get("user-agent"),
-            "authorization_method": str(request.headers.get("Authorization", "").replace("Bearer ", "")),
+            "authorization_method": str(
+                request.headers.get("Authorization", "").replace("Bearer ", "")
+            ),
         }
 
         # שליחת הנתונים ל-Supabase
@@ -102,7 +104,10 @@ app.add_middleware(AuthMiddleware)
 app.add_middleware(TelemetryMiddleware)
 
 # Initialize the access layer and token validator
-access_layer = AccessLayer(MongoDbUploader)
+access_layer = AccessLayer(
+    short_term_database_connector=get_short_term_database_connector(),
+    long_term_database_connector=get_long_term_database_connector(),
+)
 
 
 @app.get("/list_chains")
@@ -147,9 +152,26 @@ async def file_content(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get('/health')
+@app.get("/service_health")
 async def service_health_check():
-    return {
-        'status': 'healthy',
-        'timestamp': datetime.utcnow().isoformat()
-    }
+    return {"status": "healthy", "timestamp": datetime.now(datetime.UTC).isoformat()}
+
+
+@app.get("/api_health")
+async def is_short_term_updated():
+    last_update = access_layer.is_short_term_updated()
+    if not last_update:
+        return {"is_updated": False, "last_update": None}
+
+    is_recent = datetime.now(datetime.UTC) - last_update <= timedelta(hours=1)
+    return {"is_updated": is_recent, "last_update": last_update.isoformat()}
+
+
+@app.get("/long_term_health")
+async def is_long_term_updated():
+    last_update = access_layer.is_long_term_updated()
+    if not last_update:
+        return {"is_updated": False, "last_update": None}
+
+    is_recent = datetime.now(datetime.UTC) - last_update <= timedelta(hours=1)
+    return {"is_updated": is_recent, "last_update": last_update.isoformat()}
