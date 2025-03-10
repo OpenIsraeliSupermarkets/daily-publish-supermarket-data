@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Header, Request, Security
 from starlette.middleware.base import BaseHTTPMiddleware
 from access_layer import AccessLayer
-from remotes import MongoDbUploader
+from remotes import MongoDbUploader, KaggleUploader
 from typing import Optional
 from token_validator import TokenValidator, SupabaseTelemetry
 from response_models import (
@@ -13,7 +13,8 @@ from response_models import (
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import JSONResponse, Response
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
+from pydantic import BaseModel
 
 
 class TelemetryMiddleware(BaseHTTPMiddleware):
@@ -144,3 +145,11 @@ async def file_content(
         return FileContent(rows=access_layer.get_file_content(chain=chain, file=file))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get('/health')
+async def service_health_check():
+    return {
+        'status': 'healthy',
+        'timestamp': datetime.utcnow().isoformat()
+    }
