@@ -190,7 +190,7 @@ class APIDatabaseUploader:
     def _get_content_of_file(self, table_name, file):
         pass
 
-    def is_parser_updated_last_hour(self) -> bool:
+    def is_parser_updated(self) -> bool:
         """
         Check if the parser collection was updated in the last hour.
         Returns:
@@ -278,7 +278,7 @@ class DynamoDbUploader(APIDatabaseUploader):
         response = table.scan(FilterExpression=Attr("file_name").eq(file))
         return response.get("Items", [])
 
-    def is_parser_updated_last_hour(self) -> bool:
+    def is_parser_updated(self) -> bool:
         try:
             from datetime import datetime, timedelta
 
@@ -293,7 +293,7 @@ class DynamoDbUploader(APIDatabaseUploader):
                 return False
 
             return (datetime.now(last_modified.tzinfo) - last_modified) < timedelta(
-                hours=1
+                hours=3
             )
 
         except Exception as e:
@@ -384,7 +384,7 @@ class DummyDocumentDbUploader:
                     file_found.append(data)
         return file_found
 
-    def is_parser_updated_last_hour(self) -> bool:
+    def is_parser_updated(self) -> bool:
         try:
             from datetime import datetime, timedelta
 
@@ -407,7 +407,7 @@ class DummyDocumentDbUploader:
             if last_modified is None:
                 return False
 
-            return (now - last_modified) < timedelta(hours=1)
+            return (now - last_modified) < timedelta(hours=3)
 
         except Exception as e:
             logging.error(
@@ -493,7 +493,7 @@ class MongoDbUploader(APIDatabaseUploader):
             results.append(obj_dict)
         return results
 
-    def is_parser_updated_last_hour(self) -> bool:
+    def is_parser_updated(self) -> bool:
         try:
             from datetime import datetime, timedelta
 
@@ -509,7 +509,7 @@ class MongoDbUploader(APIDatabaseUploader):
             # Get the timestamp from the ObjectId
             last_modified = latest_doc["_id"].generation_time
             return (datetime.now(last_modified.tzinfo) - last_modified) < timedelta(
-                hours=1
+                hours=3
             )
 
         except Exception as e:

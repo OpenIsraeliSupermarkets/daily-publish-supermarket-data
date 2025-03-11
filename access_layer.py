@@ -24,7 +24,7 @@ class AccessLayer:
         return FileTypesFilters.__members__.keys()
 
     def is_short_term_updated(self) -> bool:
-        return self.short_term_database_connector.is_parser_updated_last_hour()
+        return self.short_term_database_connector.is_parser_updated()
 
     def is_long_term_updated(self) -> bool:
         return self.long_term_database_connector.was_updated_in_last_24h()
