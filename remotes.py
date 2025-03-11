@@ -160,13 +160,11 @@ class KaggleUploader(RemoteDatabaseUploader):
         try:
             from datetime import datetime, timedelta
 
-            dataset_info = self.api.dataset_view(
-                f"erlichsefi/{self.dataset_remote_name}"
-            )
-            last_update = datetime.strptime(
-                dataset_info.lastUpdated, "%Y-%m-%dT%H:%M:%S.%fZ"
-            )
-            return (datetime.utcnow() - last_update) < timedelta(hours=24)
+            # השתמש ב-dataset_list במקום dataset_view
+            dataset_info = self.api.dataset_list(
+                search=f"erlichsefi/{self.dataset_remote_name}"
+            )[0]
+            return (datetime.now() - dataset_info.lastUpdated) < timedelta(hours=24)
         except Exception as e:
             logging.error(f"Error checking Kaggle dataset update time: {e}")
             return False

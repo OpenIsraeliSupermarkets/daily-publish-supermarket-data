@@ -9,6 +9,9 @@ from response_models import (
     TypeOfFileScraped,
     AvailableChains,
     FileContent,
+    ServiceHealth,
+    LongTermDatabaseHealth,
+    ShortTermDatabaseHealth,
 )
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import JSONResponse, Response
@@ -153,25 +156,17 @@ async def file_content(
 
 
 @app.get("/service_health")
-async def service_health_check():
-    return {"status": "healthy", "timestamp": datetime.now(datetime.UTC).isoformat()}
+async def service_health_check(credentials: HTTPAuthorizationCredentials = Security(security)):
+    return ServiceHealth(status="healthy", timestamp=datetime.now().astimezone().isoformat())
 
 
 @app.get("/api_health")
-async def is_short_term_updated():
+async def is_short_term_updated(credentials: HTTPAuthorizationCredentials = Security(security)):
     last_update = access_layer.is_short_term_updated()
-    if not last_update:
-        return {"is_updated": False, "last_update": None}
-
-    is_recent = datetime.now(datetime.UTC) - last_update <= timedelta(hours=1)
-    return {"is_updated": is_recent, "last_update": last_update.isoformat()}
+    return ShortTermDatabaseHealth(is_updated=last_update, last_update=datetime.now().astimezone().isoformat())
 
 
 @app.get("/long_term_health")
-async def is_long_term_updated():
+async def is_long_term_updated(credentials: HTTPAuthorizationCredentials = Security(security)):
     last_update = access_layer.is_long_term_updated()
-    if not last_update:
-        return {"is_updated": False, "last_update": None}
-
-    is_recent = datetime.now(datetime.UTC) - last_update <= timedelta(hours=1)
-    return {"is_updated": is_recent, "last_update": last_update.isoformat()}
+    return LongTermDatabaseHealth(is_updated=last_update, last_update=datetime.now().astimezone().isoformat())

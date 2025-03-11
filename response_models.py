@@ -43,3 +43,18 @@ class FileContent(BaseModel):
             for row in rows
         ]
         super().__init__(rows=processed_rows)
+
+
+class ServiceHealth(BaseModel):
+    status: str
+    timestamp: str
+
+
+class LongTermDatabaseHealth(BaseModel):
+    is_updated: bool
+    last_update: Union[str, None]
+
+
+class ShortTermDatabaseHealth(BaseModel):
+    is_updated: bool
+    last_update: Union[str, None]
