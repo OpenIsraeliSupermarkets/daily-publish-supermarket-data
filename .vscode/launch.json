@@ -48,7 +48,7 @@
             "envFile": "${workspaceFolder}/.env.test",
         },
         {
-            "name": "FastAPI",
+            "name": "FastAPI Test",
             "type": "debugpy",
             "request": "launch",
             "module": "uvicorn",
@@ -61,6 +61,21 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "envFile": "${workspaceFolder}/.env.test"
+        },
+        {
+            "name": "FastAPI prod",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "uvicorn",
+            "args": [
+                "api:app",
+                "--reload",
+                "--port",
+                "8000"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env.prod"
         }
     ]
 }

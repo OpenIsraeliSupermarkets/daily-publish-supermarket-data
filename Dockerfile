@@ -31,5 +31,6 @@ COPY api.py .
 COPY access_layer.py .
 COPY token_validator.py .
 COPY response_models.py .
+COPY utils.py .
 CMD uvicorn api:app --host 0.0.0.0 --port 8000 --proxy-headers
 # RUN pip install -r requirements-dev.txt
