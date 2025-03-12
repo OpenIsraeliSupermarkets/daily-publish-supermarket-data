@@ -14,9 +14,11 @@ class LongTermDatasetManager:
         app_folder=".",
         enabled_scrapers=None,
         enabled_file_types=None,
+        dataset="israeli-supermarkets-2024",
     ):
 
         self.when = self._now()
+        self.dataset = dataset
         self.enabled_scrapers = (
             "ALL" if not enabled_scrapers else ",".join(enabled_scrapers)
         )
