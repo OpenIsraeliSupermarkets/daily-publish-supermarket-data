@@ -163,7 +163,7 @@ async def service_health_check(credentials: HTTPAuthorizationCredentials = Secur
     return ServiceHealth(status="healthy", timestamp=datetime.now().astimezone().isoformat())
 
 
-@app.get("/api_health", tags=["Health"])
+@app.get("/short_term_health", tags=["Health"])
 async def is_short_term_updated(credentials: HTTPAuthorizationCredentials = Security(security)):
     last_update = access_layer.is_short_term_updated()
     return ShortTermDatabaseHealth(is_updated=last_update, last_update=datetime.now().astimezone().isoformat())
