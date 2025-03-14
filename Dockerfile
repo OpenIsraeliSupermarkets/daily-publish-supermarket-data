@@ -26,7 +26,7 @@ CMD python daily_raw_dump.py
 
 # Serving
 FROM base as serving
-COPY remotes.py .
+COPY remotes .
 COPY api.py .
 COPY access_layer.py .
 COPY token_validator.py .

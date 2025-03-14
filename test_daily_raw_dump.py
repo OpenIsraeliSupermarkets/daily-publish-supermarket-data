@@ -25,7 +25,7 @@ def test_daliy_raw_dump():
         short_term_db_target=DummyDocumentDbUploader,
         app_folder=app_folder,
         data_folder=data_folder,
-        enabled_scrapers=[ScraperFactory.KING_STORE.name],
+        enabled_scrapers=ScraperFactory.sample(n=1),
         enabled_file_types=None,
         limit=file_per_run,
         start_at=datetime.datetime.now(),
@@ -39,6 +39,11 @@ def test_daliy_raw_dump():
         itreative_operations="scraping,converting,api_update,clean_dump_files",
         final_operations="publishing,clean_all_source_data",
     )
+    
+    
+    assert DummyFileStorge().was_updated_in_last_24h()
+    assert DummyDocumentDbUploader().is_parser_updated()
+    assert DummyDocumentDbUploader().get_number_of_updated() == num_of_occasions + 1
 
 
 if __name__ == "__main__":
