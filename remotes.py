@@ -174,6 +174,16 @@ class APIDatabaseUploader:
 
     def __init__(self, *_):
         pass
+    
+    def pre_process(self, item):
+        """Convert large integers to strings to avoid MongoDB limitations"""
+        if isinstance(item, list):
+            return [self.pre_process(i) for i in item]
+        elif isinstance(item, dict):
+            return {k: self.pre_process(v) for k, v in item.items()}
+        elif isinstance(item, int) and (item > 2**63 - 1 or item < -(2**63)):
+            return str(item)
+        return item
 
     def _insert_to_database(self, table_target_name, items):
         pass
@@ -301,7 +311,7 @@ class DynamoDbUploader(APIDatabaseUploader):
             return False
 
 
-class DummyDocumentDbUploader:
+class DummyDocumentDbUploader(APIDatabaseUploader):
     def __init__(self, db_path="us-east-1"):
         self.db_path = os.path.join("./document_db", db_path)
         os.makedirs(self.db_path, exist_ok=True)
@@ -329,7 +339,8 @@ class DummyDocumentDbUploader:
         os.makedirs(table_path, exist_ok=True)
 
         id_name = self.tables_ids[table_target_name]
-        for item in items:
+        processed_items = map(self.pre_process, items)
+        for item in processed_items:
             item_id = item.get(id_name, None)
             if not item_id:
                 logging.error(f"Item must have an '{item_id}' field.")
@@ -418,21 +429,13 @@ class DummyDocumentDbUploader:
 
 class MongoDbUploader(APIDatabaseUploader):
 
-    def __init__(self, mongodb_uri):
+    def __init__(self, mongodb_uri="mongodb://host.docker.internal:27017"):
         self.client = pymongo.MongoClient(
-            os.getenv("MONGODB_URI", "mongodb://host.docker.internal:27017")
+            os.getenv("MONGODB_URI",mongodb_uri)
         )
         self.db = self.client.supermarket_data
 
-    def pre_process(self, item):
-        """Convert large integers to strings to avoid MongoDB limitations"""
-        if isinstance(item, list):
-            return [self.pre_process(i) for i in item]
-        elif isinstance(item, dict):
-            return {k: self.pre_process(v) for k, v in item.items()}
-        elif isinstance(item, int) and (item > 2**63 - 1 or item < -(2**63)):
-            return str(item)
-        return item
+
 
     def _insert_to_database(self, table_target_name, items):
         logging.info(f"Pushing to table {table_target_name}, {len(items)} items")

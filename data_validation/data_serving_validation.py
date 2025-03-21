@@ -5,9 +5,11 @@ from dataclasses import dataclass
 from enum import Enum
 import asyncio
 import aiohttp
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import os
 import json
+import multiprocessing
+from functools import partial
 
 @dataclass
 class ValidationResult:
@@ -64,126 +66,107 @@ class ApiCallValidator:
                 return (await response.json()).get("rows", [])
 
     async def validate_all_data(self) -> Dict[str, Dict[str, Any]]:
-        """Fetch and validate all chains, files, and their content"""
+        """Fetch and validate all chains, files, and their content using multiprocessing"""
         try:
-            self.set_loading(True)
-            self.set_error(None)
             
             # Fetch all chains
-            chains = await self.fetch_chains()
-            self.set_chains(chains)
-            
-            results = {}
-            
-            # Process each chain
-            for chain in chains:
-                print(f"Processing chain {chain}")
-                results[chain] = {
-                    "files": [],
-                    "validation_results": []
-                }
+            chains = await self.fetch_chains()            
+            # Create a process pool
+            num_processes = 3
+            with ProcessPoolExecutor(max_workers=num_processes) as executor:
+                # Process chains in parallel
+                chain_tasks = []
+                for chain in chains:
+                    chain_tasks.append(
+                        asyncio.create_task(self._process_chain(chain, executor))
+                    )
                 
-                # Fetch files for the chain
-                files = await self.fetch_files_for_chain(chain)
-                results[chain]["files"] = files
+                # Wait for all chain processing to complete
+                chain_results = await asyncio.gather(*chain_tasks)
                 
-                # Process each file
-                for file in files:
-                    print(f"Processing file {file}")
-                    try:
-                        # Fetch file content
-                        content = await self.fetch_file_content(chain, file)
-                        
-                        # Validate the content                        
-                        results[chain]["validation_results"].append({
-                            "file": file,
-                            "validation": {
-                                 "num_of_rows": len(content),
-                                 "api_call_status": "success"
-                            }
-                        })
-                        
-                    except Exception as e:
-                        logging.error(f"Error processing file {file} for chain {chain}: {str(e)}")
-                        results[chain]["validation_results"].append({
-                            "file": file,
-                            "validation":{
-                                "api_call_status": "error",
-                                "error": str(e)
-                            }
-                            
-                        })
-                    
+                # Combine results
+                results = {chain: result for chain, result in zip(chains, chain_results)}
+            
             return results
             
         except Exception as e:
-            self.set_error(str(e))
             logging.error(f"Error in validate_all_data: {str(e)}")
             raise
-        finally:
-            self.set_loading(False)
 
-    def set_loading(self, loading: bool) -> None:
-        self.loading = loading
 
-    def set_error(self, error: Optional[str]) -> None:
-        self.error = error
-
-    def set_chains(self, chains: List[str]) -> None:
-        self.chains = chains
-
-    def set_selected_chain(self, chain: Optional[str]) -> None:
-        self.selected_chain = chain
-        self.files = []
-        self.selected_file = None
-        self.file_content = None
-
-    def set_files(self, files: List[str]) -> None:
-        self.files = files
-
-    def set_selected_file(self, file: Optional[str]) -> None:
-        self.selected_file = file
-        self.file_content = None
-
-    def set_file_content(self, content: Optional[Dict[str, Any]]) -> None:
-        self.file_content = content
-
-    def request_sort(self, key: str) -> None:
-        self.sort_config = {
-            "key": key,
-            "direction": "descending" if self.sort_config["key"] == key and self.sort_config["direction"] == "ascending" else "ascending"
+    async def _process_chain(self, chain: str, executor: ProcessPoolExecutor) -> Dict[str, Any]:
+        """Process a single chain and its files"""
+        print(f"Processing chain {chain}")
+        result = {
+            "files": [],
+            "validation_results": []
         }
-
-    def get_sorted_and_filtered_data(self) -> List[Dict[str, Any]]:
-        if not self.file_content or "rows" not in self.file_content:
-            return []
-
-        filtered_data = self.file_content["rows"]
-
-        if self.sort_config["key"]:
-            filtered_data.sort(
-                key=lambda x: x["row_content"][self.sort_config["key"]],
-                reverse=self.sort_config["direction"] == "descending"
-            )
-
-        return filtered_data
-
-
-
-    def get_validation_summary(self) -> Dict[str, Any]:
-        if not self.file_content:
-            return {}
-
-        total_rows = len(self.file_content.get("rows", []))
-        successful_rows = sum(1 for row in self.file_content.get("rows", []) 
-                            if row.get("row_content", {}).get("status") == "success")
         
+        try:
+            # Fetch files for the chain
+            files = await self.fetch_files_for_chain(chain)
+            result["files"] = files
+            
+            # Process files in parallel using the process pool
+            file_tasks = []
+            for file in files:
+                file_tasks.append(
+                    asyncio.create_task(self._process_file(chain, file, executor))
+                )
+            
+            # Wait for all file processing to complete
+            file_results = await asyncio.gather(*file_tasks)
+            result["validation_results"] = file_results
+            
+        except Exception as e:
+            logging.error(f"Error processing chain {chain}: {str(e)}")
+            result["validation_results"] = [{
+                "file": "chain_error",
+                "validation": {
+                    "api_call_status": "error",
+                    "error": str(e)
+                }
+            }]
+        
+        return result
+
+    async def _process_file(self, chain: str, file: str, executor: ProcessPoolExecutor) -> Dict[str, Any]:
+        """Process a single file"""
+        print(f"Processing file {file}")
+        try:
+            # Fetch file content
+            content = await self.fetch_file_content(chain, file)
+            
+            # Validate the content in a separate process
+            loop = asyncio.get_event_loop()
+            validation_result = await loop.run_in_executor(
+                executor,
+                self._validate_content,
+                content
+            )
+            
+            return {
+                "file": file,
+                "validation": validation_result
+            }
+            
+        except Exception as e:
+            logging.error(f"Error processing file {file} for chain {chain}: {str(e)}")
+            return {
+                "file": file,
+                "validation": {
+                    "api_call_status": "error",
+                    "error": str(e)
+                }
+            }
+
+    def _validate_content(self, content: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Validate content in a separate process"""
         return {
-            "total_rows": total_rows,
-            "successful_rows": successful_rows,
-            "failed_rows": total_rows - successful_rows,
-            "success_rate": (successful_rows / total_rows * 100) if total_rows > 0 else 0
+            "num_of_rows": len(content),
+            "api_call_status": "success"
         }
+
 
 async def main():
     # Configure logging
