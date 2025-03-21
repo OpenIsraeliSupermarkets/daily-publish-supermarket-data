@@ -192,7 +192,15 @@ class ShortTermDBDatasetManager:
         with open(self.cache_file, "w") as file:
             json.dump(new_content, file)
 
-    def upload(self, outputs_folder, status_folder):
+    def _reset_cache(self):
+        if os.path.exists(self.cache_file):
+            os.remove(self.cache_file)
+
+
+    def upload(self, outputs_folder, status_folder, reset_cache=False):
+        if reset_cache:
+            self._reset_cache()
+
         local_cahce = self._load_cache()
         if not local_cahce:
             self.uploader._clean_all_tables()
