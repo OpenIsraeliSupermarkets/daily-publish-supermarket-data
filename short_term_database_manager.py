@@ -131,7 +131,9 @@ class ShortTermDBDatasetManager:
 
             if not file.endswith(".csv"):
                 continue
-
+            # the path to process
+            file_path = os.path.join(outputs_folder, file)
+            
             logging.info(f"Pushing {file}")
             # select the correct table
             table_target_name = self._file_name_to_table(file)
@@ -141,11 +143,14 @@ class ShortTermDBDatasetManager:
             last_row = local_cahce.get("last_pushed", {}).get(file, -1)
             logging.info(f"Last row: {last_row}")
             # Process the CSV file in chunks to reduce memory usage
-            chunk_size = 10000
+            chunk_size = 10
             previous_row = None
+            header = pd.read_csv(file_path, nrows=0)
+
             for chunk in pd.read_csv(
-                os.path.join(outputs_folder, file),
+                file_path,
                 skiprows=lambda x: x < last_row + 1,
+                names=header.columns,
                 chunksize=chunk_size,
             ):
 
