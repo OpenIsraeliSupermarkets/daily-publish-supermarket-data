@@ -429,7 +429,8 @@ class DummyDocumentDbUploader(APIDatabaseUploader):
 
 class MongoDbUploader(APIDatabaseUploader):
 
-    def __init__(self, mongodb_uri="mongodb://host.docker.internal:27017"):
+
+    def __init__(self, mongodb_uri=None):
         self.client = pymongo.MongoClient(
             os.getenv("MONGODB_URI",mongodb_uri)
         )
