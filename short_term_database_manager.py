@@ -143,7 +143,7 @@ class ShortTermDBDatasetManager:
             last_row = local_cahce.get("last_pushed", {}).get(file, -1)
             logging.info(f"Last row: {last_row}")
             # Process the CSV file in chunks to reduce memory usage
-            chunk_size = 10
+            chunk_size = 10000
             previous_row = None
             header = pd.read_csv(file_path, nrows=0)
 
