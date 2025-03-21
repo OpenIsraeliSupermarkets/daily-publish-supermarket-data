@@ -9,10 +9,11 @@ import logging
 import shutil
 from datetime import datetime
 from ..utils import was_updated_within_hours
-from .base import RemoteDatabaseUploader
+from .base import LongTermDatabaseUploader
+import json
 
 
-class DummyFileStorage(RemoteDatabaseUploader):
+class DummyFileStorage(LongTermDatabaseUploader):
     """A dummy implementation of remote storage using local file system.
 
     This class implements the RemoteDatabaseUploader interface but stores data
@@ -37,9 +38,25 @@ class DummyFileStorage(RemoteDatabaseUploader):
         self.dataset_path = dataset_path
         self.when = when
 
+    def get_current_index(self):
+        """Get the current index of the dataset.
+
+        Returns:
+            int: The current index of the dataset
+        """
+        if os.path.exists(os.path.join(self.dataset_remote_name, "index.json")):
+            with open(os.path.join(self.dataset_remote_name, "index.json"), "r") as f:
+                index = json.load(f)
+            return index["index"]
+        else:
+            return 0
+
     def increase_index(self):
-        """Placeholder for index increase operation."""
-        return None
+        """Write an index file with value 1."""
+        index_path = os.path.join(self.dataset_remote_name, "index.json")
+        os.makedirs(self.dataset_remote_name, exist_ok=True)
+        with open(index_path, "w") as f:
+            json.dump({"index": 1}, f)
 
     def upload_to_dataset(self, message):
         """Copy files to the local storage directory.
@@ -52,18 +69,17 @@ class DummyFileStorage(RemoteDatabaseUploader):
             self.dataset_remote_name,
             message,
         )
-        server_path = f"remote_{self.dataset_remote_name}"
-        os.makedirs(server_path, exist_ok=True)
+        os.makedirs(self.dataset_remote_name, exist_ok=True)
         for filename in os.listdir(self.dataset_path):
             file_path = os.path.join(self.dataset_path, filename)
             if os.path.isfile(file_path):
-                shutil.copy(file_path, server_path)
+                shutil.copy(file_path, self.dataset_remote_name)
 
     def clean(self):
         """Clean up any temporary files."""
         return None
 
-    def was_updated_in_last_24h(self, hours: int = 24) -> bool:
+    def was_updated_in_last(self, hours: int = 24) -> bool:
         """Check if any files in the storage were updated within specified hours.
 
         Args:
@@ -72,5 +88,4 @@ class DummyFileStorage(RemoteDatabaseUploader):
         Returns:
             bool: True if any file was updated within specified hours, False otherwise
         """
-        server_path = f"remote_{self.dataset_remote_name}"
-        return was_updated_within_hours(server_path, hours)
+        return was_updated_within_hours(self.dataset_remote_name, hours)

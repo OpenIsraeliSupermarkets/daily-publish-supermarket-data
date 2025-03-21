@@ -7,13 +7,14 @@ ensuring consistent interface across different implementations.
 from abc import ABC, abstractmethod
 
 
-class RemoteDatabaseUploader(ABC):
+class LongTermDatabaseUploader(ABC):
     """Abstract base class for uploading data to remote databases.
 
     This class defines the interface that all remote database uploaders must implement.
     It provides methods for managing dataset versions, uploading data, and checking
     update status.
     """
+    NO_INDEX = -1
 
     @abstractmethod
     def increase_index(self):
@@ -21,6 +22,14 @@ class RemoteDatabaseUploader(ABC):
 
         This method should handle the logic for managing dataset versions
         and incrementing the version index as needed.
+        """
+
+    @abstractmethod
+    def get_current_index(self):
+        """Get the current index of the dataset.
+
+        Returns:
+            int: The current index of the dataset
         """
 
     @abstractmethod
@@ -35,12 +44,12 @@ class RemoteDatabaseUploader(ABC):
     def clean(self):
         """Clean up any temporary files or resources.
 
-        This method should handle cleanup of any temporary files or resources
-        created during the upload process.
+        This method should handle cleanup of any temporary files, resources
+        created during the upload process and the data that was uploaded.
         """
 
     @abstractmethod
-    def was_updated_in_last_24h(self, hours: int = 24) -> bool:
+    def was_updated_in_last(self, hours: int = 24) -> bool:
         """Check if the remote dataset was updated within specified hours.
 
         Args:

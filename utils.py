@@ -2,7 +2,7 @@ import os
 from remotes import (
     KaggleUploader,
     MongoDbUploader,
-    DummyFileStorge,
+    DummyFileStorage,
     DummyDocumentDbUploader,
 )
 
@@ -10,7 +10,7 @@ from remotes import (
 storage_classes = {
     "KaggleUploader": KaggleUploader,
     "MongoDbUploader": MongoDbUploader,
-    "DummyFileStorge": DummyFileStorge,
+    "DummyFileStorage": DummyFileStorage,
     "DummyDocumentDbUploader": DummyDocumentDbUploader,
 }
 

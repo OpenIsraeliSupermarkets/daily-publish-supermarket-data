@@ -8,18 +8,18 @@ import os
 import logging
 import json
 from datetime import datetime, timedelta
-from .base import RemoteDatabaseUploader
+from .base import LongTermDatabaseUploader
 
 KAGGLE_API_AVAILABLE = False
 try:
     from kaggle.api.kaggle_api_extended import KaggleApi
-
+    from kaggle.rest import ApiException
     KAGGLE_API_AVAILABLE = True
-except ImportError:
+except IOError:
     pass
 
 
-class KaggleUploader(RemoteDatabaseUploader):
+class KaggleUploader(LongTermDatabaseUploader):
     """Handles uploading and managing datasets on Kaggle.
 
     This class provides methods to upload data to Kaggle, manage dataset versions,
@@ -28,7 +28,7 @@ class KaggleUploader(RemoteDatabaseUploader):
 
     def __init__(
         self,
-        dataset_path="/",
+        dataset_path="",
         when=datetime.now(),
         dataset_remote_name="israeli-supermarkets-2024",
     ):
@@ -52,17 +52,46 @@ class KaggleUploader(RemoteDatabaseUploader):
         self.api = KaggleApi()
         self.api.authenticate()
 
+    def _sync_n_load_index(self):
+        """Sync the index of the dataset.
+        """
+        try:
+            if not os.path.exists(os.path.join(self.dataset_path, "index.json")):
+                self.api.dataset_download_cli(
+                    f"erlichsefi/{self.dataset_remote_name}", file_name="index.json", force=True,
+                    path=self.dataset_path
+                )
+            else:
+                logging.warn("Index file already exists")
+                
+            with open(os.path.join(self.dataset_path, "index.json"), "r", encoding="utf-8") as file:
+                index = json.load(file)
+            return index
+        except ApiException as e: 
+            if e.reason == "Not Found":
+                return None
+            raise Exception("Error connection to kaggle")
+
+    def get_current_index(self):
+        """Get the current index of the dataset.
+
+        Returns:
+            int: The current index of the dataset
+        """
+        
+        index = self._sync_n_load_index()
+        if index is None:
+            return self.NO_INDEX
+        return index[max(map(int, index.keys()))]
+           
+
     def increase_index(self):
         """Download and update the dataset index from Kaggle."""
-        self.api.dataset_download_cli(
-            f"erlichsefi/{self.dataset_remote_name}", file_name="index.json", force=True
-        )
-        logging.info("Dataset '%s' downloaded successfully", self.dataset_remote_name)
-
-        with open("index.json", "r", encoding="utf-8") as file:
-            index = json.load(file)
-
-        index[max(map(int, index.keys())) + 1] = self.when
+        index = self._sync_n_load_index()
+        if index is None:
+            index = {self.NO_INDEX + 1: self.when.strftime("%Y-%m-%d %H:%M:%S")}
+        else:
+            index[max(map(int, index.keys())) + 1] = self.when.strftime("%Y-%m-%d %H:%M:%S")
 
         with open(
             os.path.join(self.dataset_path, "index.json"), "w+", encoding="utf-8"
@@ -86,7 +115,7 @@ class KaggleUploader(RemoteDatabaseUploader):
         if os.path.exists("index.json"):
             os.remove("index.json")
 
-    def was_updated_in_last_24h(self, hours: int = 24) -> bool:
+    def was_updated_in_last(self, hours: int = 24) -> bool:
         """Check if the dataset was updated within specified hours.
 
         Args:

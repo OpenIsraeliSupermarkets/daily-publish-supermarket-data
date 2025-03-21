@@ -11,10 +11,10 @@ from datetime import datetime, timedelta
 
 import pymongo
 
-from .api_base import APIDatabaseUploader
+from .api_base import ShortTermDatabaseUploader
 
 
-class MongoDbUploader(APIDatabaseUploader):
+class MongoDbUploader(ShortTermDatabaseUploader):
     """MongoDB implementation for storing and managing supermarket data.
 
     This class handles all MongoDB-specific operations including data preprocessing,
@@ -106,57 +106,41 @@ class MongoDbUploader(APIDatabaseUploader):
             self.db[collection].drop()
         logging.info("All collections deleted successfully!")
 
-    def _get_all_files_by_chain(self, chain: str, file_type=None):
-        """Get all files associated with a specific chain.
+    # def get_all_files_by_chain(self, chain: str, file_type=None):
+    #     """Get all files associated with a specific chain.
 
-        Args:
-            chain (str): Chain identifier
-            file_type (str, optional): Type of files to filter by
+    #     Args:
+    #         chain (str): Chain identifier
+    #         file_type (str, optional): Type of files to filter by
 
-        Returns:
-            list: List of files matching the criteria
-        """
-        collection = self.db["ParserStatus"]
-        files = []
+    #     Returns:
+    #         list: List of files matching the criteria
+    #     """
+    #     collection = self.db["ParserStatus"]
+    #     files = []
 
-        filter_condition = f".*{re.escape(chain)}.*"
-        if file_type is not None:
-            filter_condition = f".*{re.escape(file_type)}.*{re.escape(chain)}.*"
+    #     filter_condition = f".*{re.escape(chain)}.*"
+    #     if file_type is not None:
+    #         filter_condition = f".*{re.escape(file_type)}.*{re.escape(chain)}.*"
 
-        for doc in collection.find({"index": {"$regex": filter_condition}}):
-            if "response" in doc and "files_to_process" in doc["response"]:
-                files.extend(doc["response"]["files_to_process"])
-        return files
+    #     for doc in collection.find({"index": {"$regex": filter_condition}}):
+    #         if "response" in doc and "files_to_process" in doc["response"]:
+    #             files.extend(doc["response"]["files_to_process"])
+    #     return files
 
-    def _get_content_of_file(self, table_name, file):
-        """Retrieve content of a specific file from a collection.
-
-        Args:
-            table_name (str): Name of the collection
-            file (str): File identifier
-
-        Returns:
-            list: List of documents matching the file
-        """
-        collection = self.db[table_name]
-        results = []
-        for obj in collection.find({"file_name": file}):
-            # Convert ObjectId to dict manually
-            obj_dict = {k: v for k, v in obj.items() if k != "_id"}
-            results.append(obj_dict)
-        return results
-
-    def is_parser_updated(self, hours: int = 3) -> bool:
+    def _is_collection_updated(
+        self, collection_name: str, seconds: int = 10800
+    ) -> bool:
         """Check if the parser status was updated recently.
 
         Args:
-            hours (int, optional): Number of hours to look back. Defaults to 3.
+            seconds (int, optional): Number of seconds to look back. Defaults to 10800 (3 hours).
 
         Returns:
-            bool: True if parser was updated within specified hours, False otherwise
+            bool: True if parser was updated within specified time window, False otherwise
         """
         try:
-            collection = self.db["ParserStatus"]
+            collection = self.db[collection_name]
             latest_doc = collection.find_one(sort=[("_id", pymongo.DESCENDING)])
 
             if not latest_doc:
@@ -164,9 +148,40 @@ class MongoDbUploader(APIDatabaseUploader):
 
             last_modified = latest_doc["_id"].generation_time
             return (datetime.now(last_modified.tzinfo) - last_modified) < timedelta(
-                hours=hours
+                seconds=seconds
             )
 
         except pymongo.errors.PyMongoError as e:
             logging.error("Error checking MongoDB ParserStatus update time: %s", str(e))
             return False
+
+    def _list_tables(self):
+        """List all tables/collections in the database.
+
+        Returns:
+            list[str]: List of table/collection names in the database
+        """
+        return self.db.list_collection_names()
+
+    def _get_table_content(self, table_name, filter=None):
+        """Get all content of a specific table.
+
+        Args:
+            table_name (str): Name of the table/collection
+
+        Returns:
+            list: List of all documents in the collection
+        """
+        try:
+            collection = self.db[table_name]
+            results = []
+            for doc in collection.find(filter):
+                # Convert ObjectId to dict manually
+                doc_dict = {k: v for k, v in doc.items() if k != "_id"}
+                results.append(doc_dict)
+            return results
+        except pymongo.errors.PyMongoError as e:
+            logging.error(
+                "Error retrieving documents from collection %s: %s", table_name, str(e)
+            )
+            return []

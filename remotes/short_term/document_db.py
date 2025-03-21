@@ -8,10 +8,10 @@ import os
 import json
 import logging
 from datetime import datetime, timedelta
-from .api_base import APIDatabaseUploader
+from .api_base import ShortTermDatabaseUploader
 
 
-class DummyDocumentDbUploader(APIDatabaseUploader):
+class DummyDocumentDbUploader(ShortTermDatabaseUploader):
     """File-system based implementation of a document database.
 
     This class implements a simple document database using the file system,
@@ -64,8 +64,7 @@ class DummyDocumentDbUploader(APIDatabaseUploader):
         for item in items:
             item_id = item.get(id_name)
             if not item_id:
-                logging.error("Item must have a '%s' field", id_name)
-                continue
+                raise ValueError(f"Item {item} does not have an ID")
 
             file_path = os.path.join(table_path, f"{item_id}.json")
             with open(file_path, "w", encoding="utf-8") as f:
@@ -95,88 +94,79 @@ class DummyDocumentDbUploader(APIDatabaseUploader):
                 os.rmdir(table_path)
         logging.info("All tables deleted successfully!")
 
-    def _get_all_files_by_chain(self, chain: str, file_type: str = None):
-        """Get all files associated with a specific chain.
+    # def get_all_files_by_chain(self, chain: str, file_type: str = None):
+    #     """Get all files associated with a specific chain.
+
+    #     Args:
+    #         chain (str): Chain identifier
+    #         file_type (str, optional): Type of files to filter by
+
+    #     Returns:
+    #         list: List of files matching the criteria
+    #     """
+    #     chain_path = os.path.join(self.db_path, "ParserStatus")
+    #     if not os.path.exists(chain_path):
+    #         return []
+
+    #     file_found = []
+    #     for filename in os.listdir(chain_path):
+    #         if chain in filename and (file_type is None or file_type in filename):
+    #             file_path = os.path.join(chain_path, filename)
+    #             if not os.path.isfile(file_path):
+    #                 logging.error("Path %s is not a file", file_path)
+    #                 continue
+    #             try:
+    #                 with open(file_path, "r", encoding="utf-8") as f:
+    #                     data = json.load(f)
+    #                     if (
+    #                         "response" in data
+    #                         and "files_to_process" in data["response"]
+    #                     ):
+    #                         file_found.extend(data["response"]["files_to_process"])
+    #             except Exception as e:  # pylint: disable=W0718
+    #                 logging.error("Error reading file %s: %s", file_path, str(e))
+    #     return file_found
+
+    # def get_content_of_file(self, table_name, file):
+    #     """Retrieve content of a specific file.
+
+    #     Args:
+    #         table_name (str): Name of the table
+    #         content_of_file (str): File identifier
+
+    #     Returns:
+    #         list: List of documents matching the file
+    #     """
+    #     folder_path = os.path.join(self.db_path, table_name)
+    #     if not os.path.exists(folder_path):
+    #         logging.error("Table '%s' does not exist", table_name)
+    #         return []
+
+    #     file_found = []
+    #     for filename in os.listdir(folder_path):
+    #         file_path = os.path.join(folder_path, filename)
+    #         try:
+    #             with open(file_path, "r", encoding="utf-8") as f:
+    #                 data = json.load(f)
+    #                 if data.get("file_name") == file:
+    #                     file_found.append(data)
+    #         except Exception as e:  # pylint: disable=W0718
+    #             logging.error("Error reading file %s: %s", file_path, str(e))
+    #     return file_found
+
+    def _is_collection_updated(
+        self, collection_name: str, seconds: int = 10800
+    ) -> bool:
+        """Check if the parser was updated within the specified time window.
 
         Args:
-            chain (str): Chain identifier
-            file_type (str, optional): Type of files to filter by
+            seconds (int): Time window in seconds (default: 10800 seconds = 3 hours)
 
         Returns:
-            list: List of files matching the criteria
-        """
-        chain_path = os.path.join(self.db_path, "ParserStatus")
-        if not os.path.exists(chain_path):
-            return []
-
-        file_found = []
-        for filename in os.listdir(chain_path):
-            if chain in filename and (file_type is None or file_type in filename):
-                file_path = os.path.join(chain_path, filename)
-                if not os.path.isfile(file_path):
-                    logging.error("Path %s is not a file", file_path)
-                    continue
-                try:
-                    with open(file_path, "r", encoding="utf-8") as f:
-                        data = json.load(f)
-                        if (
-                            "response" in data
-                            and "files_to_process" in data["response"]
-                        ):
-                            file_found.extend(data["response"]["files_to_process"])
-                except Exception as e:  # pylint: disable=W0718
-                    logging.error("Error reading file %s: %s", file_path, str(e))
-        return file_found
-
-    def _get_content_of_file(self, table_name, file):
-        """Retrieve content of a specific file.
-
-        Args:
-            table_name (str): Name of the table
-            content_of_file (str): File identifier
-
-        Returns:
-            list: List of documents matching the file
-        """
-        folder_path = os.path.join(self.db_path, table_name)
-        if not os.path.exists(folder_path):
-            logging.error("Table '%s' does not exist", table_name)
-            return []
-
-        file_found = []
-        for filename in os.listdir(folder_path):
-            file_path = os.path.join(folder_path, filename)
-            try:
-                with open(file_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    if data.get("file_name") == file:
-                        file_found.append(data)
-            except Exception as e:  # pylint: disable=W0718
-                logging.error("Error reading file %s: %s", file_path, str(e))
-        return file_found
-
-    def count_updated_cycles(self):
-        """Count the number of parser status updates.
-
-        Returns:
-            int: Number of parser status files
-        """
-        parser_path = os.path.join(self.db_path, "ParserStatus")
-        if not os.path.exists(parser_path):
-            return 0
-        return len(os.listdir(parser_path))
-
-    def is_parser_updated(self, hours: int = 3) -> bool:
-        """Check if the parser was updated recently.
-
-        Args:
-            hours (int, optional): Number of hours to look back. Defaults to 3.
-
-        Returns:
-            bool: True if parser was updated within specified hours, False otherwise
+            bool: True if parser was updated within the time window
         """
         try:
-            parser_path = os.path.join(self.db_path, "ParserStatus")
+            parser_path = os.path.join(self.db_path, collection_name)
             if not os.path.exists(parser_path):
                 return False
 
@@ -193,10 +183,53 @@ class DummyDocumentDbUploader(APIDatabaseUploader):
             if last_modified is None:
                 return False
 
-            return (now - last_modified) < timedelta(hours=hours)
+            return (now - last_modified) < timedelta(seconds=seconds)
 
         except Exception as e:  # pylint: disable=W0718
             logging.error(
                 "Error checking DummyDocumentDb ParserStatus update time: %s", str(e)
             )
             return False
+
+    def _list_tables(self):
+        """List all tables/collections in the database.
+
+        Returns:
+            list[str]: List of table/collection names in the database
+        """
+        tables = []
+        for item in os.listdir(self.db_path):
+            path = os.path.join(self.db_path, item)
+            if os.path.isdir(path) and item != "__pycache__":
+                tables.append(item)
+        return tables
+
+    def _get_table_content(self, table_name, filter=None):
+        """Get all content of a specific table.
+
+        Args:
+            table_name (str): Name of the table
+
+        Returns:
+            list: List of all documents in the table
+        """
+        table_path = os.path.join(self.db_path, table_name)
+        if not os.path.exists(table_path):
+            logging.error("Table '%s' does not exist", table_name)
+            return []
+
+        content = []
+        for filename in os.listdir(table_path):
+            file_path = os.path.join(table_path, filename)
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+
+                    if filter is not None:
+                        if all(data.get(key) == value for key, value in filter.items()):
+                            content.append(data)
+                    else:
+                        content.append(data)
+            except Exception as e:  # pylint: disable=W0718
+                logging.error("Error reading file %s: %s", file_path, str(e))
+        return content

@@ -44,9 +44,7 @@ class AccessLayer:
 
         return map(
             lambda file: ScrapedFile(file_name=file),
-            self.short_term_database_connector._get_all_files_by_chain(
-                chain, file_type
-            ),
+            self.short_term_database_connector.is_collection_updated(chain, file_type),
         )
 
     def get_file_content(self, chain: str, file: str):
@@ -68,7 +66,7 @@ class AccessLayer:
             )
 
         table_name = f"{file_type.name.lower()}_{chain.lower()}"
-        return self.short_term_database_connector._get_content_of_file(table_name, file)
+        return self.short_term_database_connector.get_content_of_file(table_name, file)
 
 
 if __name__ == "__main__":

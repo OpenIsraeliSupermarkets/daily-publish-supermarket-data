@@ -12,7 +12,7 @@ from short_term_database_manager import ShortTermDBDatasetManager
 from remotes import (
     KaggleUploader,
     MongoDbUploader,
-    DummyFileStorge,
+    DummyFileStorage,
     DummyDocumentDbUploader,
 )
 from utils import get_long_term_database_connector, get_short_term_database_connector

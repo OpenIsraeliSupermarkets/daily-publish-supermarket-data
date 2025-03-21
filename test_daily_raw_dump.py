@@ -7,7 +7,7 @@ import datetime
 from daily_raw_dump import SupermarketDataPublisher
 from il_supermarket_scarper.scrappers_factory import ScraperFactory
 from il_supermarket_scarper import FileTypesFilters
-from remotes import DummyFileStorge, MongoDbUploader, DummyDocumentDbUploader
+from remotes import DummyFileStorage, DummyDocumentDbUploader
 
 
 def test_daliy_raw_dump():
@@ -21,7 +21,7 @@ def test_daliy_raw_dump():
 
     # run the process for couple of times
     publisher = SupermarketDataPublisher(
-        long_term_db_target=DummyFileStorge,
+        long_term_db_target=DummyFileStorage,
         short_term_db_target=DummyDocumentDbUploader,
         app_folder=app_folder,
         data_folder=data_folder,
@@ -39,9 +39,8 @@ def test_daliy_raw_dump():
         itreative_operations="scraping,converting,api_update,clean_dump_files",
         final_operations="publishing,clean_all_source_data",
     )
-    
-    
-    assert DummyFileStorge().was_updated_in_last_24h()
+
+    assert DummyFileStorage().was_updated_in_last_24h()
     assert DummyDocumentDbUploader().is_parser_updated()
     assert DummyDocumentDbUploader().get_number_of_updated() == num_of_occasions + 1
 

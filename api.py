@@ -103,7 +103,7 @@ app = FastAPI(
     version="1.0.0",
     openapi_tags=[
         {"name": "API", "description": "Main API endpoints"},
-        {"name": "Health", "description": "Health check endpoints"}
+        {"name": "Health", "description": "Health check endpoints"},
     ],
 )
 app.add_middleware(AuthMiddleware)
@@ -159,17 +159,29 @@ async def file_content(
 
 
 @app.get("/service_health", tags=["Health"])
-async def service_health_check(credentials: HTTPAuthorizationCredentials = Security(security)):
-    return ServiceHealth(status="healthy", timestamp=datetime.now().astimezone().isoformat())
+async def service_health_check(
+    credentials: HTTPAuthorizationCredentials = Security(security),
+):
+    return ServiceHealth(
+        status="healthy", timestamp=datetime.now().astimezone().isoformat()
+    )
 
 
 @app.get("/short_term_health", tags=["Health"])
-async def is_short_term_updated(credentials: HTTPAuthorizationCredentials = Security(security)):
+async def is_short_term_updated(
+    credentials: HTTPAuthorizationCredentials = Security(security),
+):
     last_update = access_layer.is_short_term_updated()
-    return ShortTermDatabaseHealth(is_updated=last_update, last_update=datetime.now().astimezone().isoformat())
+    return ShortTermDatabaseHealth(
+        is_updated=last_update, last_update=datetime.now().astimezone().isoformat()
+    )
 
 
 @app.get("/long_term_health", tags=["Health"])
-async def is_long_term_updated(credentials: HTTPAuthorizationCredentials = Security(security)):
+async def is_long_term_updated(
+    credentials: HTTPAuthorizationCredentials = Security(security),
+):
     last_update = access_layer.is_long_term_updated()
-    return LongTermDatabaseHealth(is_updated=last_update, last_update=datetime.now().astimezone().isoformat())
+    return LongTermDatabaseHealth(
+        is_updated=last_update, last_update=datetime.now().astimezone().isoformat()
+    )

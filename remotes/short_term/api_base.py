@@ -4,9 +4,11 @@ This module defines the base class for database uploaders that interact with API
 providing a consistent interface for different implementations.
 """
 
+import re
+
 
 # pylint: disable=too-few-public-methods
-class APIDatabaseUploader:
+class ShortTermDatabaseUploader:
     """Base class for API-based database uploaders.
 
     This class defines the interface that all API database uploaders must implement.
@@ -40,31 +42,35 @@ class APIDatabaseUploader:
     def _clean_all_tables(self):
         """Delete all tables/collections in the database."""
 
-    def _get_all_files_by_chain(self, chain: str, file_type=None):
-        """Get all files associated with a specific chain.
-
-        Args:
-            chain (str): Chain identifier
-            file_type (str, optional): Type of files to filter by
-
-        Returns:
-            list: List of files matching the criteria
-        """
-
-    def _get_content_of_file(self, table_name, file):
-        """Retrieve content of a specific file.
+    def _get_table_content(self, table_name, filter=None):
+        """Get all content of all tables/collections in the database.
 
         Args:
             table_name (str): Name of the table/collection
-            file (str): File identifier
+            filter (dict, optional): Filter to apply to the content
 
         Returns:
-            list: List of items matching the file
+            list: List of all items in the table/collection
         """
 
-    def is_parser_updated(self) -> bool:
+    def _is_collection_updated(self, seconds: int = 10800) -> bool:
         """Check if the parser was updated recently.
 
+        Args:
+            seconds (int, optional): Time window in seconds to check for updates.
+                                   Defaults to 10800 (3 hours).
+
         Returns:
-            bool: True if parser was updated within last hour, False otherwise
+            bool: True if parser was updated within specified time window, False otherwise
         """
+
+    def _list_tables(self):
+        """List all tables/collections in the database.
+
+        Returns:
+            list[str]: List of table/collection names in the database
+
+        Raises:
+            NotImplementedError: This is an abstract method that must be implemented by subclasses
+        """
+        raise NotImplementedError("Subclasses must implement _list_tables()")
