@@ -90,7 +90,7 @@ if __name__ == "__main__":
     import os
     os.environ["MONGODB_URI"] = "mongodb://192.168.1.129:27017"
     token_validator = TokenValidator()
-    assert token_validator.validate_token("d91eea02-b977-4ee6-810b-cd777235085f")
+    assert token_validator.validate_token(os.getenv("TOKEN"))
 
     api = AccessLayer(
         short_term_database_connector=MongoDbUploader,
@@ -101,4 +101,5 @@ if __name__ == "__main__":
         content = api.get_file_content(
             chain="CITY_MARKET_SHOPS", file=file.file_name
         )
-        print(len(content.rows))
+        if len(content.rows) == 0:
+            print(f"file {file.file_name} is empty")
