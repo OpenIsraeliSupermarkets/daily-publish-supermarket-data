@@ -108,8 +108,8 @@ class ApiCallValidator:
                 )
             
             # Wait for all file processing to complete
-            file_results = await asyncio.gather(*file_tasks)
-            result["validation_results"] = file_results
+            # file_results = await asyncio.gather(*file_tasks)
+            result["validation_results"] = file_tasks
             
         except Exception as e:
             logging.error(f"Error processing chain {chain}: {str(e)}")
