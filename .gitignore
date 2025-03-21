@@ -16,3 +16,4 @@ mongo_data/
 app_data/
 .env.prod
 .env.test
+.env.unittest
