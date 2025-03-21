@@ -1,20 +1,33 @@
 import os
 from il_supermarket_scarper import ScraperFactory, FileTypesFilters
-from remotes import DummyDocumentDbUploader, MongoDbUploader
+from remotes import DummyDocumentDbUploader, MongoDbUploader, KaggleUploader
 from token_validator import TokenValidator
 from response_models import ScrapedFile, TypeOfFileScraped, ScrapedFiles
 
 
 class AccessLayer:
 
-    def __init__(self, database_connector: MongoDbUploader):
-        self.database_connector = database_connector("il-central-1")
+    def __init__(
+        self,
+        short_term_database_connector: MongoDbUploader,
+        long_term_database_connector: KaggleUploader,
+    ):
+        self.short_term_database_connector = short_term_database_connector(
+            "il-central-1"
+        )
+        self.long_term_database_connector = long_term_database_connector()
 
     def list_all_available_chains(self) -> list[str]:
         return ScraperFactory.all_scrapers_name()
 
     def list_all_available_file_types(self) -> list[str]:
         return FileTypesFilters.__members__.keys()
+
+    def is_short_term_updated(self) -> bool:
+        return self.short_term_database_connector.is_parser_updated()
+
+    def is_long_term_updated(self) -> bool:
+        return self.long_term_database_connector.was_updated_in_last_24h()
 
     def list_files(self, chain: str, file_type: str = None) -> ScrapedFiles:
         if not chain:
@@ -31,7 +44,9 @@ class AccessLayer:
 
         return map(
             lambda file: ScrapedFile(file_name=file),
-            self.database_connector._get_all_files_by_chain(chain, file_type),
+            self.short_term_database_connector._get_all_files_by_chain(
+                chain, file_type
+            ),
         )
 
     def get_file_content(self, chain: str, file: str):
@@ -53,7 +68,7 @@ class AccessLayer:
             )
 
         table_name = f"{file_type.name.lower()}_{chain.lower()}"
-        return self.database_connector._get_content_of_file(table_name, file)
+        return self.short_term_database_connector._get_content_of_file(table_name, file)
 
 
 if __name__ == "__main__":
@@ -64,5 +79,7 @@ if __name__ == "__main__":
     api = AccessLayer(MongoDbUploader)
     files = api.list_files(chain="FRESH_MARKET_AND_SUPER_DOSH")
     for file in files:
-        content = api.get_file_content(chain="FRESH_MARKET_AND_SUPER_DOSH", file=file.file_name)
+        content = api.get_file_content(
+            chain="FRESH_MARKET_AND_SUPER_DOSH", file=file.file_name
+        )
         print(len(content))

@@ -3,6 +3,7 @@
 
 name: Scrape Itreation 
 
+# if you update 3 hour update the health too
 on: 
   schedule:
     - cron: '0 */3 * * *'

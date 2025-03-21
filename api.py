@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Header, Request, Security
 from starlette.middleware.base import BaseHTTPMiddleware
 from access_layer import AccessLayer
-from remotes import MongoDbUploader
+from remotes import MongoDbUploader, KaggleUploader
 from typing import Optional
 from token_validator import TokenValidator, SupabaseTelemetry
 from response_models import (
@@ -9,12 +9,16 @@ from response_models import (
     TypeOfFileScraped,
     AvailableChains,
     FileContent,
+    ServiceHealth,
+    LongTermDatabaseHealth,
+    ShortTermDatabaseHealth,
 )
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import JSONResponse, Response
 import time
-from datetime import datetime
-from flask import jsonify
+
+from datetime import datetime, timedelta
+from utils import get_long_term_database_connector, get_short_term_database_connector
 
 
 class TelemetryMiddleware(BaseHTTPMiddleware):
@@ -43,7 +47,9 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
             "response_size_bytes": len(response_body),
             "client_ip": request.client.host if request.client else None,
             "user_agent": request.headers.get("user-agent"),
-            "authorization_method": str(request.headers.get("Authorization", "").replace("Bearer ", "")),
+            "authorization_method": str(
+                request.headers.get("Authorization", "").replace("Bearer ", "")
+            ),
         }
 
         # שליחת הנתונים ל-Supabase
@@ -96,23 +102,29 @@ app = FastAPI(
     title="Supermarket API",
     description="API Documentation",
     version="1.0.0",
-    openapi_tags=[{"name": "API", "description": "API endpoints"}],
+    openapi_tags=[
+        {"name": "API", "description": "Main API endpoints"},
+        {"name": "Health", "description": "Health check endpoints"}
+    ],
 )
 app.add_middleware(AuthMiddleware)
 app.add_middleware(TelemetryMiddleware)
 
 # Initialize the access layer and token validator
-access_layer = AccessLayer(MongoDbUploader)
+access_layer = AccessLayer(
+    short_term_database_connector=get_short_term_database_connector(),
+    long_term_database_connector=get_long_term_database_connector(),
+)
 
 
-@app.get("/list_chains")
+@app.get("/list_chains", tags=["API"])
 async def list_chains(
     credentials: HTTPAuthorizationCredentials = Security(security),
 ) -> AvailableChains:
     return AvailableChains(list_of_chains=access_layer.list_all_available_chains())
 
 
-@app.get("/list_file_types")
+@app.get("/list_file_types", tags=["API"])
 async def list_file_types(
     credentials: HTTPAuthorizationCredentials = Security(security),
 ) -> TypeOfFileScraped:
@@ -121,7 +133,7 @@ async def list_file_types(
     )
 
 
-@app.get("/list_scraped_files")
+@app.get("/list_scraped_files", tags=["API"])
 async def read_files(
     chain: str,
     file_type: Optional[str] = None,
@@ -135,7 +147,7 @@ async def read_files(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/raw/file_content")
+@app.get("/raw/file_content", tags=["API"])
 async def file_content(
     chain: str,
     file: str,
@@ -147,9 +159,19 @@ async def file_content(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.route('/health')
-def health_check():
-    return jsonify({
-        'status': 'healthy',
-        'timestamp': datetime.datetime.utcnow().isoformat()
-    }), 200
+@app.get("/service_health", tags=["Health"])
+async def service_health_check(credentials: HTTPAuthorizationCredentials = Security(security)):
+    return ServiceHealth(status="healthy", timestamp=datetime.now().astimezone().isoformat())
+
+
+@app.get("/short_term_health", tags=["Health"])
+async def is_short_term_updated(credentials: HTTPAuthorizationCredentials = Security(security)):
+    last_update = access_layer.is_short_term_updated()
+    return ShortTermDatabaseHealth(is_updated=last_update, last_update=datetime.now().astimezone().isoformat())
+
+
+@app.get("/long_term_health", tags=["Health"])
+async def is_long_term_updated(credentials: HTTPAuthorizationCredentials = Security(security)):
+    last_update = access_layer.is_long_term_updated()
+    return LongTermDatabaseHealth(is_updated=last_update, last_update=datetime.now().astimezone().isoformat())
+
