@@ -3,7 +3,16 @@ from il_supermarket_scarper import ScraperFactory, FileTypesFilters
 from remotes import DummyDocumentDbUploader, MongoDbUploader, KaggleUploader
 from token_validator import TokenValidator
 from response_models import ScrapedFile, TypeOfFileScraped, ScrapedFiles
-
+from response_models import (
+    ScrapedFiles,
+    TypeOfFileScraped,
+    AvailableChains,
+    FileContent,
+    ServiceHealth,
+    LongTermDatabaseHealth,
+    ShortTermDatabaseHealth,
+)
+from datetime import datetime, timedelta
 
 class AccessLayer:
 
@@ -17,17 +26,22 @@ class AccessLayer:
         )
         self.long_term_database_connector = long_term_database_connector()
 
-    def list_all_available_chains(self) -> list[str]:
-        return ScraperFactory.all_scrapers_name()
+    def list_all_available_chains(self) -> AvailableChains:
+        return AvailableChains(list_of_chains=ScraperFactory.all_scrapers_name())
 
-    def list_all_available_file_types(self) -> list[str]:
-        return FileTypesFilters.__members__.keys()
+    def list_all_available_file_types(self) -> TypeOfFileScraped:
+        return TypeOfFileScraped(
+        list_of_file_types=FileTypesFilters.__members__.keys()
+        )
 
     def is_short_term_updated(self) -> bool:
-        return self.short_term_database_connector.is_parser_updated()
+        is_updated = self.short_term_database_connector.is_parser_updated()
+        return ShortTermDatabaseHealth(is_updated=is_updated, last_update=datetime.now().astimezone().isoformat())
+
 
     def is_long_term_updated(self) -> bool:
-        return self.long_term_database_connector.was_updated_in_last_24h()
+        is_updated = self.long_term_database_connector.was_updated_in_last_24h()
+        return LongTermDatabaseHealth(is_updated=is_updated, last_update=datetime.now().astimezone().isoformat())
 
     def list_files(self, chain: str, file_type: str = None) -> ScrapedFiles:
         if not chain:
@@ -42,12 +56,13 @@ class AccessLayer:
                 f"file_type '{file_type}' is not a valid file type, valid file types are: {','.join(FileTypesFilters.__members__.keys())}",
             )
 
-        return map(
+        return ScrapedFiles(
+            processed_files=list(map(
             lambda file: ScrapedFile(file_name=file),
             self.short_term_database_connector._get_all_files_by_chain(
                 chain, file_type
             ),
-        )
+        )))
 
     def get_file_content(self, chain: str, file: str):
         if not chain:
@@ -68,18 +83,22 @@ class AccessLayer:
             )
 
         table_name = f"{file_type.name.lower()}_{chain.lower()}"
-        return self.short_term_database_connector._get_content_of_file(table_name, file)
+        return FileContent(rows=self.short_term_database_connector._get_content_of_file(table_name, file))
 
 
 if __name__ == "__main__":
-
+    import os
+    os.environ["MONGODB_URI"] = "mongodb://192.168.1.129:27017"
     token_validator = TokenValidator()
-    assert token_validator.validate_token(os.getenv("SUPABASE_TOKEN"))
+    assert token_validator.validate_token("d91eea02-b977-4ee6-810b-cd777235085f")
 
-    api = AccessLayer(MongoDbUploader)
-    files = api.list_files(chain="FRESH_MARKET_AND_SUPER_DOSH")
-    for file in files:
+    api = AccessLayer(
+        short_term_database_connector=MongoDbUploader,
+        long_term_database_connector=KaggleUploader
+    )
+    files = api.list_files(chain="CITY_MARKET_SHOPS")
+    for file in files.processed_files:
         content = api.get_file_content(
-            chain="FRESH_MARKET_AND_SUPER_DOSH", file=file.file_name
+            chain="CITY_MARKET_SHOPS", file=file.file_name
         )
-        print(len(content))
+        print(len(content.rows))

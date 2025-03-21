@@ -35,7 +35,8 @@ class FileContent(BaseModel):
                 file_name=row["file_name"],
                 row_index=row["row_index"],
                 row_content={
-                    k: v
+                    k: str(v) if isinstance(v, float) and (v in [float('inf'), float('-inf')] or v != v)  # v != v checks for NaN
+                    else v
                     for k, v in row.items()
                     if k not in ["found_folder", "file_name", "row_index"]
                 },
