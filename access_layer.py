@@ -27,7 +27,7 @@ class AccessLayer:
         self.long_term_database_connector = long_term_database_connector()
 
     def list_all_available_chains(self) -> AvailableChains:
-        return AvailableChains(list_of_chains=ScraperFactory.all_scrapers_name())
+        return AvailableChains(list_of_chains=ScraperFactory.all_listed_scrappers())
 
     def list_all_available_file_types(self) -> TypeOfFileScraped:
         return TypeOfFileScraped(
@@ -47,7 +47,7 @@ class AccessLayer:
         if not chain:
             raise Exception("'chain' parameter is required")
 
-        if chain not in ScraperFactory.all_scrapers_name():
+        if chain not in ScraperFactory.all_listed_scrappers():
             raise Exception(
                 f"chain '{chain}' is not a valid chain, valid chains are: {','.join(ScraperFactory.all_scrapers_name())}",
             )
@@ -96,9 +96,9 @@ if __name__ == "__main__":
         short_term_database_connector=MongoDbUploader,
         long_term_database_connector=KaggleUploader
     )
-    files = api.list_files(chain="CITY_MARKET_SHOPS")
+    files = api.list_files(chain="NETIV_HASED")
     for file in files.processed_files:
         content = api.get_file_content(
-            chain="CITY_MARKET_SHOPS", file=file.file_name
+            chain="NETIV_HASED", file=file.file_name
         )
         print(len(content.rows))
