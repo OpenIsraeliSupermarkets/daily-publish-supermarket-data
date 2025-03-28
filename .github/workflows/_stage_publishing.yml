@@ -10,7 +10,7 @@ on:
     
 jobs:
   call-workflow:
-    uses: OpenIsraeliSupermarkets/daily-publish-supermarket-data/.github/workflows/template.yml@{{ github.ref_name }}
+    uses: OpenIsraeliSupermarkets/daily-publish-supermarket-data/.github/workflows/template.yml@${{github.ref_name}}
     with:
       operation: "publishing,clean_all_source_data"
       branch: "stage"
