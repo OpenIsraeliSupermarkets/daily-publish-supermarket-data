@@ -52,11 +52,11 @@ def get_scraper_status(scraper_status_collection, chain_name, timestamp):
         for f in downloaded["results"]
         if f["downloaded"] == True and f["extract_succefully"] == True
     ]
-    downloaded_files_failed = [
-        f["file_name"].replace(".gz", "").replace(".xml", "")
+    downloaded_files_failed = {
+        f["file_name"].replace(".gz", "").replace(".xml", ""): f['error']
         for f in downloaded["results"]
         if not (f["downloaded"] == True and f["extract_succefully"] == True)
-    ]
+    }
 
     return files_saw, downloaded_files_success, downloaded_files_failed
 
@@ -131,23 +131,23 @@ def get_parsing_status(parser_status_collection, matched_chain_name, matched_tim
                     .replace(".xml", "")
                     .replace(".gz", "")
                     for log in x["response"]["execution_log"]
-                    if log.get("status") == True
+                    if log.get("succusfull",False) == True
                 ],
                 parsing_results,
             )
         )
     )
 
-    parsing_results_failed = list(
+    parsing_results_failed = dict(
         chain.from_iterable(
             map(
                 lambda x: [
-                    log["file_name"]
+                    (log["file_name"]
                     .replace(".aspx", "")
                     .replace(".xml", "")
-                    .replace(".gz", "")
+                    .replace(".gz", ""),log.get("error","empty file" if not log.get("loaded") else "unknown"))
                     for log in x["response"]["execution_log"]
-                    if log.get("status") != True
+                    if log.get("succusfull",False) != True
                 ],
                 parsing_results,
             )
@@ -164,6 +164,10 @@ def collect_validation_results():
     # קבלת חותמות זמן לכל קובץ
     file_name_dict = get_file_timestamps(scraper_status_collection)
     validation_results = dict()
+    aggregated_errors = {
+        "downloaded": defaultdict(int),
+        "parsed": defaultdict(int),
+    }
 
     for chain in DumpFolderNames:
 
@@ -214,13 +218,14 @@ def collect_validation_results():
                 # failed at download
                 if file in downloaded_files_failed:
                     pipeline["fail_downloaded"] += 1
-
+                    aggregated_errors["downloaded"][downloaded_files_failed[file]] += 1
                 # not failed
                 elif file in downloaded_files_success:
 
                     if file not in files_to_parse:
                         pipeline["not_collected_by_parser"] += 1
                     elif file in parsing_results_failed:
+                        aggregated_errors["parsed"][parsing_results_failed[file]] += 1
                         pipeline["fail_parsed"] += 1
                     elif file in parsing_results_success:
                         pipeline["succesful_processed"] += 1
@@ -230,12 +235,14 @@ def collect_validation_results():
                     raise ValueError(f"file {file} is not in any of the lists")
             saw = set(files_saw) | set(saw)
             validation_results[chain_name][itreation_timestamp] = pipeline
-    return validation_results
+    return validation_results, aggregated_errors
 
 
 if __name__ == "__main__":
     import json
 
-    validation_results = collect_validation_results()
+    validation_results, aggregated_errors = collect_validation_results()
     with open("validation_results.json", "w") as f:
         json.dump(validation_results, f, indent=4)
+    with open("aggregated_errors.json", "w") as f:
+        json.dump(aggregated_errors, f, indent=4)
