@@ -21,7 +21,9 @@ on:
 jobs:
   build:
 
-    runs-on: [self-hosted, ${{inputs.environment}}]
+    runs-on: 
+      - self-hosted
+      - ${{ inputs.environment }}
     strategy:
       fail-fast: false
       matrix:
