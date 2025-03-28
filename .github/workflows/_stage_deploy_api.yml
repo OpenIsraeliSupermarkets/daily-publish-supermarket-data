@@ -3,11 +3,11 @@ name: Deploy to Runner Machine
 on:
   workflow_dispatch:
   push:
-    branches: [main,stage]
+    branches: [stage]
 
 jobs:
   deploy:
-    runs-on: [self-hosted, ${{ github.ref_name == 'main' && 'production' || 'staging' }}]
+    runs-on: [self-hosted, "staging"]
 
     steps:
       - uses: actions/checkout@v3
