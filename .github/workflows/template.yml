@@ -9,11 +9,19 @@ on:
       operation:
         required: true
         type: string
-
+      branch:
+        type: string
+        default: 'main'
+      environment:
+        type: string
+        default: 'production'
+        
 jobs:
   build:
 
-    runs-on: self-hosted
+    runs-on: 
+      - self-hosted
+      - ${{ inputs.environment }}
     strategy:
       fail-fast: false
       matrix:
@@ -26,6 +34,8 @@ jobs:
 
     - name: Checkout
       uses: actions/checkout@v3
+      with:
+        ref: ${{ inputs.branch }}
 
     - name: Adding env variables
       run: |
