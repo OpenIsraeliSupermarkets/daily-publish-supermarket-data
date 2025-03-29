@@ -8,7 +8,7 @@ on:
     
 jobs:
   call-workflow:
-    uses: OpenIsraeliSupermarkets/daily-publish-supermarket-data/.github/workflows/template.yml@${{github.ref_name}}
+    uses: OpenIsraeliSupermarkets/daily-publish-supermarket-data/.github/workflows/template.yml@main
     with:
       operation: "reload_complete_api"
     secrets: inherit
