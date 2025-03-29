@@ -10,11 +10,9 @@ on:
         required: true
         type: string
       branch:
-        required: true
         type: string
         default: 'main'
       environment:
-        required: true
         type: string
         default: 'production'
         
