@@ -1,4 +1,4 @@
-name: Deploy to Runner Machine | Production
+name: Production | Deploy to Runner Machine 
 
 on:
   workflow_dispatch:

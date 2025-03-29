@@ -1,4 +1,4 @@
-name: Deploy to Runner Machine | Staging
+name: Staging | Deploy to Runner Machine 
 
 on:
   workflow_dispatch:

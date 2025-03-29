@@ -1,4 +1,4 @@
-name: Clean Docker
+name: Production | Clean Docker
 
 on:
   workflow_dispatch:
