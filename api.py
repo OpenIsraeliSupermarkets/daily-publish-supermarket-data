@@ -4,6 +4,12 @@ from access_layer import AccessLayer
 from remotes import MongoDbUploader, KaggleUploader
 from typing import Optional
 from token_validator import TokenValidator, SupabaseTelemetry
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.responses import JSONResponse, Response
+import time
+
+from datetime import datetime, timedelta
+from utils import get_long_term_database_connector, get_short_term_database_connector
 from response_models import (
     ScrapedFiles,
     TypeOfFileScraped,
@@ -18,6 +24,7 @@ from fastapi.responses import JSONResponse, Response
 import time
 from datetime import datetime, timedelta
 from utils import get_long_term_database_connector, get_short_term_database_connector
+
 
 
 class TelemetryMiddleware(BaseHTTPMiddleware):
@@ -120,16 +127,14 @@ access_layer = AccessLayer(
 async def list_chains(
     credentials: HTTPAuthorizationCredentials = Security(security),
 ) -> AvailableChains:
-    return AvailableChains(list_of_chains=access_layer.list_all_available_chains())
+    return access_layer.list_all_available_chains()
 
 
 @app.get("/list_file_types", tags=["API"])
 async def list_file_types(
     credentials: HTTPAuthorizationCredentials = Security(security),
 ) -> TypeOfFileScraped:
-    return TypeOfFileScraped(
-        list_of_file_types=access_layer.list_all_available_file_types()
-    )
+    return access_layer.list_all_available_file_types()
 
 
 @app.get("/list_scraped_files", tags=["API"])
@@ -139,9 +144,7 @@ async def read_files(
     credentials: HTTPAuthorizationCredentials = Security(security),
 ) -> ScrapedFiles:
     try:
-        return ScrapedFiles(
-            processed_files=access_layer.list_files(chain=chain, file_type=file_type)
-        )
+        return access_layer.list_files(chain=chain, file_type=file_type)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -153,35 +156,23 @@ async def file_content(
     credentials: HTTPAuthorizationCredentials = Security(security),
 ) -> FileContent:
     try:
-        return FileContent(rows=access_layer.get_file_content(chain=chain, file=file))
+        return access_layer.get_file_content(chain=chain, file=file)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/service_health", tags=["Health"])
-async def service_health_check(
-    credentials: HTTPAuthorizationCredentials = Security(security),
-):
-    return ServiceHealth(
-        status="healthy", timestamp=datetime.now().astimezone().isoformat()
-    )
+async def service_health_check(credentials: HTTPAuthorizationCredentials = Security(security)) -> ServiceHealth:
+    return ServiceHealth(status="healthy", timestamp=datetime.now().astimezone().isoformat())
 
 
 @app.get("/short_term_health", tags=["Health"])
-async def is_short_term_updated(
-    credentials: HTTPAuthorizationCredentials = Security(security),
-):
-    last_update = access_layer.is_short_term_updated()
-    return ShortTermDatabaseHealth(
-        is_updated=last_update, last_update=datetime.now().astimezone().isoformat()
-    )
+async def is_short_term_updated(credentials: HTTPAuthorizationCredentials = Security(security)) -> ShortTermDatabaseHealth:
+    return access_layer.is_short_term_updated()
+     
 
 
 @app.get("/long_term_health", tags=["Health"])
-async def is_long_term_updated(
-    credentials: HTTPAuthorizationCredentials = Security(security),
-):
-    last_update = access_layer.is_long_term_updated()
-    return LongTermDatabaseHealth(
-        is_updated=last_update, last_update=datetime.now().astimezone().isoformat()
-    )
+async def is_long_term_updated(credentials: HTTPAuthorizationCredentials = Security(security)) -> LongTermDatabaseHealth:
+    return access_layer.is_long_term_updated()
+

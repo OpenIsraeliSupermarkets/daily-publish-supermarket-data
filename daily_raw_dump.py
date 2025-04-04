@@ -101,14 +101,14 @@ class BaseSupermarketDataPublisher:
 
         logging.info("Converting task is done")
 
-    def _update_api_database(self):
+    def _update_api_database(self,reset_cache=False):
         logging.info("Starting the short term database task")
         database = ShortTermDBDatasetManager(
             short_term_db_target=self.short_term_db_target,
             app_folder=self.app_folder,
         )
         database.upload(
-            outputs_folder=self.outputs_folder, status_folder=self.status_folder
+            outputs_folder=self.outputs_folder, status_folder=self.status_folder, reset_cache=reset_cache
         )
 
     def _upload_to_kaggle(self, compose=True):
@@ -180,7 +180,9 @@ class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
             elif operation == "publishing":
                 self._upload_and_clean()
             elif operation == "api_update":
-                self._update_api_database()
+                self._update_api_database()    
+            elif operation == "reload_complete_api":
+                self._update_api_database(reset_cache=True)
             elif operation == "upload_compose":
                 self._upload_and_clean(compose=True)
             elif operation == "upload_no_compose":

@@ -1,13 +1,15 @@
-name: Deploy to Runner Machine
+name: Staging | Deploy to Runner Machine 
 
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [stage]
 
 jobs:
   deploy:
-    runs-on: self-hosted  # Important: Use a self-hosted runner
+    runs-on: 
+      - self-hosted
+      - staging
 
     steps:
       - uses: actions/checkout@v3

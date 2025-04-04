@@ -1,14 +1,18 @@
 # This workflow will install Python dependencies, run tests and lint with a variety of Python versions
 # For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
 
-name: Production | Publishing Retry (only next day)
+name: Staging | Publishing 
 
 on: 
+  schedule:
+    - cron: '00 21 * * *'
   workflow_dispatch:
     
 jobs:
   call-workflow:
-    uses: OpenIsraeliSupermarkets/daily-publish-supermarket-data/.github/workflows/template.yml@main
+    uses: OpenIsraeliSupermarkets/daily-publish-supermarket-data/.github/workflows/template.yml@stage
     with:
-      operation: "upload_no_compose,clean_all_source_data"
+      operation: "clean_all_source_data"
+      branch: "stage"
+      environment: "staging"
     secrets: inherit
