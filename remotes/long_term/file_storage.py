@@ -8,7 +8,7 @@ import os
 import logging
 import shutil
 from datetime import datetime
-from ..utils import was_updated_within_hours
+from ..utils import was_updated_within_seconds
 from .base import LongTermDatabaseUploader
 import json
 
@@ -23,9 +23,9 @@ class DummyFileStorage(LongTermDatabaseUploader):
 
     def __init__(
         self,
-        dataset_path="/",
+        dataset_path,
+        dataset_remote_name,
         when=datetime.now(),
-        dataset_remote_name="israeli-supermarkets-2024",
     ):
         """Initialize the dummy file storage.
 
@@ -44,21 +44,22 @@ class DummyFileStorage(LongTermDatabaseUploader):
         Returns:
             int: The current index of the dataset
         """
-        if os.path.exists(os.path.join(self.dataset_remote_name, "index.json")):
-            with open(os.path.join(self.dataset_remote_name, "index.json"), "r") as f:
+        index = None
+        if os.path.exists(os.path.join(self.dataset_path, "index.json")):
+            with open(os.path.join(self.dataset_path, "index.json"), "r") as f:
                 index = json.load(f)
-            return index["index"]
-        else:
-            return 0
+        return self._read_index(index)
 
     def increase_index(self):
         """Write an index file with value 1."""
-        index_path = os.path.join(self.dataset_remote_name, "index.json")
-        os.makedirs(self.dataset_remote_name, exist_ok=True)
-        with open(index_path, "w") as f:
-            json.dump({"index": 1}, f)
+        index = self.get_current_index()
+        index = self._increase_index(index)
+        
+        os.makedirs(self.dataset_path, exist_ok=True)
+        with open(os.path.join(self.dataset_path, "index.json"), "w") as f:
+            json.dump(index, f)
 
-    def upload_to_dataset(self, message):
+    def upload_to_dataset(self, message, **additional_metadata):
         """Copy files to the local storage directory.
 
         Args:
@@ -79,13 +80,13 @@ class DummyFileStorage(LongTermDatabaseUploader):
         """Clean up any temporary files."""
         return None
 
-    def was_updated_in_last(self, hours: int = 24) -> bool:
+    def was_updated_in_last(self, seconds: int = 24*60*60) -> bool:
         """Check if any files in the storage were updated within specified hours.
 
         Args:
-            hours (int, optional): Number of hours to look back. Defaults to 24.
+            seconds (int, optional): Number of seconds to look back. Defaults to 24*60*60.
 
         Returns:
             bool: True if any file was updated within specified hours, False otherwise
         """
-        return was_updated_within_hours(self.dataset_remote_name, hours)
+        return was_updated_within_seconds(self.dataset_remote_name, seconds)

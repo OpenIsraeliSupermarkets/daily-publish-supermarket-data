@@ -5,6 +5,7 @@ specifically designed for supermarket data management.
 """
 
 import os
+import pytz
 import logging
 import json
 from datetime import datetime, timedelta
@@ -27,9 +28,9 @@ class KaggleUploader(LongTermDatabaseUploader):
 
     def __init__(
         self,
-        dataset_path="",
-        when=datetime.now(),
-        dataset_remote_name="israeli-supermarkets-2024",
+        dataset_path,
+        dataset_remote_name,
+        when=datetime.now()
     ):
         """Initialize the Kaggle uploader.
 
@@ -79,31 +80,32 @@ class KaggleUploader(LongTermDatabaseUploader):
         """
         
         index = self._sync_n_load_index()
-        print(index)
-        if index is None:
-            return self.NO_INDEX
-        return index[max(map(int, index.keys()))]
-           
+        return self._read_index(index)
+
 
     def increase_index(self):
         """Download and update the dataset index from Kaggle."""
         index = self._sync_n_load_index()
-        if index is None:
-            index = {self.NO_INDEX + 1: self.when.strftime("%Y-%m-%d %H:%M:%S")}
-        else:
-            index[max(map(int, index.keys())) + 1] = self.when.strftime("%Y-%m-%d %H:%M:%S")
+        index = self._increase_index(index)
 
+        os.makedirs(self.dataset_path, exist_ok=True)
         with open(
             os.path.join(self.dataset_path, "index.json"), "w+", encoding="utf-8"
         ) as file:
             json.dump(index, file)
 
-    def upload_to_dataset(self, message):
+    def upload_to_dataset(self, message, **additional_metadata):
         """Upload a new version of the dataset.
 
         Args:
             message (str): Version notes for the upload
         """
+        with open(os.path.join(self.dataset_path, "dataset-metadata.json"), "w") as file:
+            json.dump(
+                {
+                    "id": f"erlichsefi/{self.dataset_remote_name}",
+                    **additional_metadata
+                },file)
         self.api.dataset_create_version(
             folder=self.dataset_path,
             version_notes=message,
@@ -115,20 +117,21 @@ class KaggleUploader(LongTermDatabaseUploader):
         if os.path.exists("index.json"):
             os.remove("index.json")
 
-    def was_updated_in_last(self, hours: int = 24) -> bool:
+    def was_updated_in_last(self, seconds: int = 24*60*60) -> bool:
         """Check if the dataset was updated within specified hours.
 
         Args:
-            hours (int, optional): Number of hours to look back. Defaults to 24.
+            seconds (int, optional): Number of seconds to look back. Defaults to 24*60*60.
 
         Returns:
             bool: True if updated within specified hours, False otherwise
         """
         try:
             dataset_info = self.api.dataset_list(
-                search=f"erlichsefi/{self.dataset_remote_name}"
+                user="erlichsefi",
+                search=self.dataset_remote_name
             )[0]
-            return (datetime.now() - dataset_info.lastUpdated) < timedelta(hours=hours)
+            return (datetime.now(tz=pytz.utc) - dataset_info.lastUpdated.replace(tzinfo=pytz.utc)) < timedelta(seconds=seconds)
         except Exception as e:  # pylint: disable=W0718
             logging.error("Error checking Kaggle dataset update time: %s", str(e))
             return False

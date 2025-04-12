@@ -36,8 +36,8 @@ def get_latest_file_modification_time(directory_path: str) -> datetime | None:
     return last_modified
 
 
-def was_updated_within_hours(directory_path: str, hours: int = 24) -> bool:
-    """Check if any file in a directory was updated within specified hours.
+def was_updated_within_seconds(directory_path: str, seconds: int = 24*60*60) -> bool:
+    """Check if any file in a directory was updated within specified seconds.
 
     Args:
         directory_path (str): Path to the directory to check
@@ -51,4 +51,4 @@ def was_updated_within_hours(directory_path: str, hours: int = 24) -> bool:
     if last_modified is None:
         return False
 
-    return (datetime.now() - last_modified) < timedelta(hours=hours)
+    return (datetime.now() - last_modified) < timedelta(seconds=seconds)

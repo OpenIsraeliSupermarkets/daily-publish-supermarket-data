@@ -49,13 +49,27 @@ class LongTermDatabaseUploader(ABC):
         """
 
     @abstractmethod
-    def was_updated_in_last(self, hours: int = 24) -> bool:
+    def was_updated_in_last(self, seconds: int = 24*60*60) -> bool:
         """Check if the remote dataset was updated within specified hours.
 
         Args:
-            hours (int, optional): Number of hours to look back. Defaults to 24.
+            seconds (int, optional): Number of seconds to look back. Defaults to 24*60*60.
 
         Returns:
             bool: True if the dataset was updated within specified hours,
                  False otherwise
         """
+            
+    def _read_index(self,index):
+        if index is None:
+            return self.NO_INDEX
+        return max(map(int, index.keys()))
+           
+    def _increase_index(self,index):
+        """Increase the index of the dataset.
+        """
+        if index is None or index == -1:
+            index = {self.NO_INDEX + 1: self.when.strftime("%Y-%m-%d %H:%M:%S")}
+        else:   
+            index[str(max(map(int, index.keys())) + 1)] = self.when.strftime("%Y-%m-%d %H:%M:%S")
+        return index
