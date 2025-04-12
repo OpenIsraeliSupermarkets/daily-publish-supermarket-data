@@ -10,13 +10,12 @@ import json
 from datetime import datetime, timedelta
 from .base import LongTermDatabaseUploader
 
-KAGGLE_API_AVAILABLE = False
+KAGGLE_API_AVAILABLE = None
 try:
     from kaggle.api.kaggle_api_extended import KaggleApi
     from kaggle.rest import ApiException
-    KAGGLE_API_AVAILABLE = True
-except IOError:
-    pass
+except IOError as e:
+    KAGGLE_API_AVAILABLE = e
 
 
 class KaggleUploader(LongTermDatabaseUploader):
@@ -44,9 +43,9 @@ class KaggleUploader(LongTermDatabaseUploader):
         self.dataset_path = dataset_path
         self.when = when
 
-        if not KAGGLE_API_AVAILABLE:
+        if KAGGLE_API_AVAILABLE is not None:
             raise ImportError(
-                "kaggle-api is not installed. Please install it using 'pip install kaggle-api'."
+                "Fail to use kaggle api, message: \n%s" % KAGGLE_API_AVAILABLE
             )
 
         self.api = KaggleApi()
@@ -80,6 +79,7 @@ class KaggleUploader(LongTermDatabaseUploader):
         """
         
         index = self._sync_n_load_index()
+        print(index)
         if index is None:
             return self.NO_INDEX
         return index[max(map(int, index.keys()))]
