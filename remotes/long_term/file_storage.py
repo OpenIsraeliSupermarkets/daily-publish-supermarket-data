@@ -38,21 +38,25 @@ class DummyFileStorage(LongTermDatabaseUploader):
         self.dataset_path = dataset_path
         self.when = when
 
+    def _load_index(self):
+        index = None
+        if os.path.exists(os.path.join(self.dataset_path, "index.json")):
+            with open(os.path.join(self.dataset_path, "index.json"), "r") as f:
+                index = json.load(f)
+        return index
+        
     def get_current_index(self):
         """Get the current index of the dataset.
 
         Returns:
             int: The current index of the dataset
         """
-        index = None
-        if os.path.exists(os.path.join(self.dataset_path, "index.json")):
-            with open(os.path.join(self.dataset_path, "index.json"), "r") as f:
-                index = json.load(f)
+        index = self._load_index()
         return self._read_index(index)
 
     def increase_index(self):
         """Write an index file with value 1."""
-        index = self.get_current_index()
+        index = self._load_index()
         index = self._increase_index(index)
         
         os.makedirs(self.dataset_path, exist_ok=True)
