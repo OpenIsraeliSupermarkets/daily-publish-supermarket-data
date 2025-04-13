@@ -79,7 +79,9 @@ def test_compose(sample_manager):
 
 @patch('long_term_database_manager.logging')
 def test_upload_success(mock_logging, sample_manager):
-    sample_manager.upload()
+    with patch.object(sample_manager, 'read_parser_status', return_value=[]) as mock_parser_status, \
+         patch.object(sample_manager, 'read_scraper_status_files', return_value=[]) as mock_scraper_status:
+        sample_manager.upload()
     sample_manager.remote_database_manager.upload_to_dataset.assert_called_once()
 
 @patch('long_term_database_manager.logging')
@@ -87,7 +89,9 @@ def test_upload_failure(mock_logging, sample_manager):
     sample_manager.remote_database_manager.upload_to_dataset.side_effect = Exception("Upload failed")
     
     with pytest.raises(ValueError) as exc_info:
-        sample_manager.upload()
+        with patch.object(sample_manager, 'read_parser_status', return_value=[]) as mock_parser_status, \
+            patch.object(sample_manager, 'read_scraper_status_files', return_value=[]) as mock_scraper_status:
+            sample_manager.upload()
     
     assert "Error uploading file: Upload failed" in str(exc_info.value)
     mock_logging.critical.assert_called_once()
