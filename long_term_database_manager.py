@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import shutil
 from remotes import LongTermDatabaseUploader
 from utils import now
 
@@ -138,8 +139,8 @@ class LongTermDatasetManager:
                         "description": "Parser status file",
                     },
                 ]
-                + self.read_parser_status()
-                + self.read_scraper_status_files(),
+                + self._read_parser_status()
+                + self._read_scraper_status_files(),
         }
         try:
             self.remote_database_manager.upload_to_dataset(
@@ -154,4 +155,6 @@ class LongTermDatasetManager:
         """
         Clean up temporary files and resources used during the upload process.
         """
+        shutil.rmtree(self.outputs_folder,ignore_errors=True)
+        shutil.rmtree(self.status_folder,ignore_errors=True)
         self.remote_database_manager.clean()

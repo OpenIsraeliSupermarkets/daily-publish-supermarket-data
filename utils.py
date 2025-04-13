@@ -34,6 +34,4 @@ def _get_class_from_env(env_var_name, default_class):
 
 
 def now():
-    return datetime.datetime.now(pytz.timezone("Asia/Jerusalem")).strftime(
-        "%d/%m/%Y, %H:%M:%S"
-    )
+    return datetime.datetime.now(pytz.timezone("Asia/Jerusalem"))

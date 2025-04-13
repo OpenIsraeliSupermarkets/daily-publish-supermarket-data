@@ -6,6 +6,19 @@ import tempfile
 from remotes import DummyFileStorage
 from long_term_database_manager import LongTermDatasetManager
 
+
+def mock_single_file_data(store,file_path,file_types,files_to_process):
+    return {
+        "store_enum": store,
+        "response":{
+            "file_was_created": True,
+            "file_created_path": file_path,
+            "files_to_process": files_to_process,
+            "files_types": file_types,
+            
+            }
+        }
+    
 @pytest.fixture
 def mock_db_uploader():
     return Mock()
@@ -32,6 +45,11 @@ def expected_app_folder_stracture(folder_path):
         f.write("scraper2_logs")
     
     os.makedirs(os.path.join(folder_path, "outputs"), exist_ok=True)
+    with open(os.path.join(folder_path, "outputs", "parser-status.json"), "w") as f:
+        json.dump([
+            mock_single_file_data("store1","/test/outputs/file1.csv","type1",["file1.xml", "file2.xml"]),
+            mock_single_file_data("store2","/test/outputs/file2.csv","type2",["file3.xml", "file4.xml"])
+            ], f)
     with open(os.path.join(folder_path, "outputs", "file1.csv"), "w") as f:
         f.write("file1_content")
     with open(os.path.join(folder_path, "outputs", "file2.csv"), "w") as f:
@@ -51,16 +69,7 @@ def test_read_scraper_status_files(mock_listdir, sample_manager):
 
 @patch('builtins.open')
 def test_read_parser_status(mock_open, sample_manager):
-    single_file_data = {
-        "store_enum": "store1",
-        "response":{
-            "file_was_created": True,
-            "file_created_path": "/test/outputs/file1.csv",
-            "files_to_process": ["file1.xml", "file2.xml"],
-            "files_types": "type1",
-            
-            }
-        }
+    single_file_data = mock_single_file_data("store1","/test/outputs/file1.csv","type1",["file1.xml", "file2.xml"])
     
     
     mock_file = Mock()
@@ -106,12 +115,13 @@ def test_clean(sample_manager):
 def test_integration():
     with tempfile.TemporaryDirectory() as temp_dir:
         expected_app_folder_stracture(temp_dir)
+        remote_name = "test_dataset"
         
         manager = LongTermDatasetManager(
             app_folder=temp_dir,
             outputs_folder=os.path.join(temp_dir, "outputs"),
             status_folder=os.path.join(temp_dir, "status"),
-            dataset_remote_name="test_dataset",
+            dataset_remote_name=remote_name,
             long_term_db_target=DummyFileStorage,
             enabled_scrapers=["scraper1", "scraper2"],
             enabled_file_types=["type1", "type2"]
@@ -120,6 +130,9 @@ def test_integration():
         manager.compose()
         manager.upload()
         manager.clean()
+        
+        assert len(os.listdir(temp_dir)) == 0
+        assert len(os.listdir(remote_name)) == 6
         
     
     

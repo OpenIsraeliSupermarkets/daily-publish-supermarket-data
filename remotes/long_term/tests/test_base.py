@@ -8,12 +8,12 @@ from remotes.long_term.kaggle import KaggleUploader
 from unittest.mock import MagicMock
 
 
-def long_term_test_case(long_term_db_target, dataset_path="test-path" ,dataset_remote_name="test-super-dataset", **kwargs):
+def long_term_test_case(long_term_db_target, dataset_path="test-path" ,dataset_remote_name="test-super-dataset", when=datetime.now(), **kwargs):
 
     class TestLongTermDatabaseUploader(unittest.TestCase):
         
         def setUp(self):
-            self.uploader = long_term_db_target(dataset_path, dataset_remote_name, **kwargs)
+            self.uploader = long_term_db_target(dataset_path, dataset_remote_name, when, **kwargs)
             self.dataset_path = dataset_path
             self.dataset_remote_name = dataset_remote_name
 

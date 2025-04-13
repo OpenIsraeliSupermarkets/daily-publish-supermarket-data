@@ -6,7 +6,8 @@ ensuring consistent interface across different implementations.
 
 from abc import ABC, abstractmethod
 import shutil
-from datetime import datetime
+import datetime
+
 class LongTermDatabaseUploader(ABC):
     """Abstract base class for uploading data to remote databases.
 
@@ -15,7 +16,7 @@ class LongTermDatabaseUploader(ABC):
     update status.
     """
     NO_INDEX = -1
-    def __init__(self, dataset_path, when=datetime.now()):
+    def __init__(self, dataset_path:str, when:datetime.datetime):
         self.dataset_path = dataset_path
         self.when = when
         
@@ -43,7 +44,6 @@ class LongTermDatabaseUploader(ABC):
             message (str): A message describing the upload/version
         """
 
-    @abstractmethod
     def clean(self):
         """Clean up any temporary files or resources.
 

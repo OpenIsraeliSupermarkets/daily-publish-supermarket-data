@@ -31,7 +31,7 @@ class KaggleUploader(LongTermDatabaseUploader):
         self,
         dataset_path,
         dataset_remote_name,
-        when=datetime.now()
+        when
     ):
         """Initialize the Kaggle uploader.
 
@@ -114,8 +114,7 @@ class KaggleUploader(LongTermDatabaseUploader):
 
     def clean(self):
         """Clean up temporary files."""
-        if os.path.exists("index.json"):
-            os.remove("index.json")
+        shutil.rmtree(self.dataset_path)
         super().clean()
 
     def was_updated_in_last(self, seconds: int = 24*60*60) -> bool:

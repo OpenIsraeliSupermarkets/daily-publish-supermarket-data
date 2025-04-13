@@ -25,7 +25,7 @@ class DummyFileStorage(LongTermDatabaseUploader):
         self,
         dataset_path,
         dataset_remote_name,
-        when=datetime.now(),
+        when,
     ):
         """Initialize the dummy file storage.
 
@@ -80,9 +80,6 @@ class DummyFileStorage(LongTermDatabaseUploader):
             if os.path.isfile(file_path):
                 shutil.copy(file_path, self.dataset_remote_name)
 
-    def clean(self):
-        """Clean up any temporary files."""
-        return None
 
     def was_updated_in_last(self, seconds: int = 24*60*60) -> bool:
         """Check if any files in the storage were updated within specified hours.
