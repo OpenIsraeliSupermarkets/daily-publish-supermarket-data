@@ -60,7 +60,7 @@ class LongTermDatasetManager:
         self.status_folder = status_folder
 
 
-    def read_parser_status(self):
+    def _read_parser_status(self):
         """
         Read and parse the parser status file.
         
@@ -86,7 +86,7 @@ class LongTermDatasetManager:
 
         return descriptions
 
-    def read_scraper_status_files(self):
+    def _read_scraper_status_files(self):
         """
         Read all scraper status files from the status directory.
         

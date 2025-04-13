@@ -2,6 +2,8 @@ import os
 import json
 from unittest.mock import Mock, patch
 import pytest
+import tempfile
+from remotes import DummyFileStorage
 from long_term_database_manager import LongTermDatasetManager
 
 @pytest.fixture
@@ -39,7 +41,7 @@ def expected_app_folder_stracture(folder_path):
 @patch('os.listdir')
 def test_read_scraper_status_files(mock_listdir, sample_manager):
     mock_listdir.return_value = ["scraper1.json", "scraper2.json"]
-    result = sample_manager.read_scraper_status_files()
+    result = sample_manager._read_scraper_status_files()
     
     assert len(result) == 2
     assert result[0]["path"] == "scraper1.json"
@@ -65,7 +67,7 @@ def test_read_parser_status(mock_open, sample_manager):
     mock_file.read.return_value = json.dumps([single_file_data])
     mock_open.return_value.__enter__.return_value = mock_file
 
-    result = sample_manager.read_parser_status()
+    result = sample_manager._read_parser_status()
     
     assert len(result) == 1
     assert result[0]["path"] == "file1.csv"
@@ -79,8 +81,8 @@ def test_compose(sample_manager):
 
 @patch('long_term_database_manager.logging')
 def test_upload_success(mock_logging, sample_manager):
-    with patch.object(sample_manager, 'read_parser_status', return_value=[]) as mock_parser_status, \
-         patch.object(sample_manager, 'read_scraper_status_files', return_value=[]) as mock_scraper_status:
+    with patch.object(sample_manager, '_read_parser_status', return_value=[]) as mock_parser_status, \
+         patch.object(sample_manager, '_read_scraper_status_files', return_value=[]) as mock_scraper_status:
         sample_manager.upload()
     sample_manager.remote_database_manager.upload_to_dataset.assert_called_once()
 
@@ -89,8 +91,8 @@ def test_upload_failure(mock_logging, sample_manager):
     sample_manager.remote_database_manager.upload_to_dataset.side_effect = Exception("Upload failed")
     
     with pytest.raises(ValueError) as exc_info:
-        with patch.object(sample_manager, 'read_parser_status', return_value=[]) as mock_parser_status, \
-            patch.object(sample_manager, 'read_scraper_status_files', return_value=[]) as mock_scraper_status:
+        with patch.object(sample_manager, '_read_parser_status', return_value=[]) as mock_parser_status, \
+            patch.object(sample_manager, '_read_scraper_status_files', return_value=[]) as mock_scraper_status:
             sample_manager.upload()
     
     assert "Error uploading file: Upload failed" in str(exc_info.value)
@@ -99,3 +101,25 @@ def test_upload_failure(mock_logging, sample_manager):
 def test_clean(sample_manager):
     sample_manager.clean()
     sample_manager.remote_database_manager.clean.assert_called_once() 
+    
+    
+def test_integration():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        expected_app_folder_stracture(temp_dir)
+        
+        manager = LongTermDatasetManager(
+            app_folder=temp_dir,
+            outputs_folder=os.path.join(temp_dir, "outputs"),
+            status_folder=os.path.join(temp_dir, "status"),
+            dataset_remote_name="test_dataset",
+            long_term_db_target=DummyFileStorage,
+            enabled_scrapers=["scraper1", "scraper2"],
+            enabled_file_types=["type1", "type2"]
+        )
+        
+        manager.compose()
+        manager.upload()
+        manager.clean()
+        
+    
+    
