@@ -7,8 +7,19 @@ from utils import now
 
 class LongTermDatasetManager:
     """
-    This class is used to manage the long term database for the supermarket data.
-    WHich mean abstracting the remote database uploader and the local folder structure.
+    Manages the long-term storage and organization of supermarket data.
+    
+    This class provides an abstraction layer for handling both local and remote storage
+    of supermarket data, including parser outputs and scraper status files. It manages
+    the staging, uploading, and versioning of datasets to remote storage platforms.
+    
+    Attributes:
+        when (datetime): Timestamp of the current operation
+        enabled_scrapers (str): Comma-separated list of enabled scrapers or "ALL"
+        enabled_file_types (str): Comma-separated list of enabled file types or "ALL"
+        remote_database_manager: Instance of the remote database uploader
+        outputs_folder (str): Path to the outputs directory
+        status_folder (str): Path to the status directory
     """
     def __init__(
         self,
@@ -21,6 +32,18 @@ class LongTermDatasetManager:
         enabled_file_types=None
         
     ):
+        """
+        Initialize the LongTermDatasetManager.
+        
+        Args:
+            app_folder (str): Path to the application folder
+            outputs_folder (str): Path to the outputs directory
+            status_folder (str): Path to the status directory
+            dataset_remote_name (str): Name of the remote dataset
+            long_term_db_target (class): Class to use for remote database management
+            enabled_scrapers (list, optional): List of enabled scrapers
+            enabled_file_types (list, optional): List of enabled file types
+        """
         self.when = now()
         self.enabled_scrapers = (
             "ALL" if not enabled_scrapers else ",".join(enabled_scrapers)
@@ -39,7 +62,11 @@ class LongTermDatasetManager:
 
     def read_parser_status(self):
         """
-        Read the parser status file and return a list of descriptions.
+        Read and parse the parser status file.
+        
+        Returns:
+            list: List of dictionaries containing file paths and descriptions
+                  for successfully created files
         """
         with open(f"{self.outputs_folder}/parser-status.json", "r") as file:
             data = json.load(file)
@@ -61,7 +88,11 @@ class LongTermDatasetManager:
 
     def read_scraper_status_files(self):
         """
-        Read the scraper status files and return a list of descriptions.
+        Read all scraper status files from the status directory.
+        
+        Returns:
+            list: List of dictionaries containing file paths and descriptions
+                  for each scraper status file
         """
         descriptions = []
         for file in os.listdir(self.status_folder):
@@ -76,7 +107,10 @@ class LongTermDatasetManager:
 
     def compose(self):
         """
-        load the data we would like to upload to the local stagee database.
+        Stage data for upload to the remote database.
+        
+        This method stages both the outputs folder and status folder,
+        and increments the dataset version index.
         """
         self.remote_database_manager.stage(self.outputs_folder)
         self.remote_database_manager.stage(self.status_folder)        
@@ -84,11 +118,13 @@ class LongTermDatasetManager:
 
     def upload(self):
         """
-        Upload a new file to an existing Kaggle dataset.
-
-        :param dataset: str, the dataset to upload to in the format 'owner/dataset-name'
-        :param file_path: str, the path to the file to upload
-        :param new_file_name: str, optional new name for the file in the dataset
+        Upload staged data to the remote dataset.
+        
+        Creates a new version of the dataset with updated files and metadata.
+        Includes parser status, scraper status, and processed files.
+        
+        Raises:
+            ValueError: If the upload fails
         """
         resources  = {
                 "title": "Israeli Supermarkets 2024",
@@ -115,4 +151,7 @@ class LongTermDatasetManager:
             raise ValueError(f"Error uploading file: {e}")
 
     def clean(self):
+        """
+        Clean up temporary files and resources used during the upload process.
+        """
         self.remote_database_manager.clean()
