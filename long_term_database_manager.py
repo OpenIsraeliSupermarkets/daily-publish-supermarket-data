@@ -80,7 +80,7 @@ class LongTermDatasetManager:
                         "path": os.path.split(entry["response"]["file_created_path"])[
                             -1
                         ],
-                        "description": f"{len(entry['response']['files_to_process'])} XML files from type {entry['response']['files_types']} published by '{entry['store_enum']}' ",
+                        "description": f"{len(entry['response']['files_to_process'])} XML files from type {entry['response']['files_types']} published by '{entry['store_enum']}'",
                     }
                 )
 
