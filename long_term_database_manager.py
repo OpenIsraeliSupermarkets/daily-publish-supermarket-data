@@ -1,7 +1,7 @@
 import os
 import json
 import logging
-from remotes import KaggleUploader
+from remotes import LongTermDatabaseUploader
 from utils import now
 
 
@@ -27,7 +27,7 @@ class LongTermDatasetManager:
         outputs_folder, 
         status_folder,
         dataset_remote_name,
-        long_term_db_target=KaggleUploader,
+        long_term_db_target:LongTermDatabaseUploader,
         enabled_scrapers=None,
         enabled_file_types=None
         
