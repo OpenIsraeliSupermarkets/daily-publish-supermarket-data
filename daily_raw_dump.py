@@ -118,10 +118,10 @@ class BaseSupermarketDataPublisher:
             enabled_scrapers=self.enabled_scrapers,
             enabled_file_types=self.enabled_file_types,
             app_folder=self.app_folder,
+            outputs_folder=self.outputs_folder, 
+            status_folder=self.status_folder
         )
-        database.compose(
-            outputs_folder=self.outputs_folder, status_folder=self.status_folder
-        )
+        database.compose()
         database.upload()
         # clean the dataset only if the data was uploaded successfully (upload_to_dataset raise an exception)
         # if not, "compose" will clean it next time

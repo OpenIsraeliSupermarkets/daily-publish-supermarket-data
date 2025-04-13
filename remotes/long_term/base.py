@@ -5,8 +5,8 @@ ensuring consistent interface across different implementations.
 """
 
 from abc import ABC, abstractmethod
-
-
+import shutil
+from datetime import datetime
 class LongTermDatabaseUploader(ABC):
     """Abstract base class for uploading data to remote databases.
 
@@ -15,7 +15,10 @@ class LongTermDatabaseUploader(ABC):
     update status.
     """
     NO_INDEX = -1
-
+    def __init__(self, dataset_path, when=datetime.now()):
+        self.dataset_path = dataset_path
+        self.when = when
+        
     @abstractmethod
     def increase_index(self):
         """Increment the dataset version index.
@@ -47,6 +50,7 @@ class LongTermDatabaseUploader(ABC):
         This method should handle cleanup of any temporary files, resources
         created during the upload process and the data that was uploaded.
         """
+        shutil.rmtree(self.dataset_path)
 
     @abstractmethod
     def was_updated_in_last(self, seconds: int = 24*60*60) -> bool:
@@ -59,7 +63,16 @@ class LongTermDatabaseUploader(ABC):
             bool: True if the dataset was updated within specified hours,
                  False otherwise
         """
-            
+         
+
+    def stage(self, folder):
+        """Stage a folder for upload to Kaggle.
+
+        Args:
+            folder (str): Path to the folder to stage
+        """
+        shutil.copytree(folder, self.dataset_path, dirs_exist_ok=True)  
+           
     def _read_index(self,index):
         if index is None:
             return self.NO_INDEX

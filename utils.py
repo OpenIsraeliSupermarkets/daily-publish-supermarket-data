@@ -5,6 +5,8 @@ from remotes import (
     DummyFileStorage,
     DummyDocumentDbUploader,
 )
+from datetime import datetime
+import pytz
 
 
 storage_classes = {
@@ -29,3 +31,9 @@ def _get_class_from_env(env_var_name, default_class):
         return storage_classes[class_name]
     else:
         return default_class
+
+
+def now():
+    return datetime.datetime.now(pytz.timezone("Asia/Jerusalem")).strftime(
+        "%d/%m/%Y, %H:%M:%S"
+    )

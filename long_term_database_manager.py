@@ -1,43 +1,47 @@
 import os
-import shutil
 import json
-import datetime
-import pytz
 import logging
 from remotes import KaggleUploader
+from utils import now
 
 
 class LongTermDatasetManager:
+    """
+    This class is used to manage the long term database for the supermarket data.
+    WHich mean abstracting the remote database uploader and the local folder structure.
+    """
     def __init__(
         self,
+        app_folder,
+        outputs_folder, 
+        status_folder,
+        dataset_remote_name,
         long_term_db_target=KaggleUploader,
-        app_folder=".",
         enabled_scrapers=None,
-        enabled_file_types=None,
-        dataset="israeli-supermarkets-2024",
+        enabled_file_types=None
+        
     ):
-
-        self.when = self._now()
-        self.dataset = dataset
+        self.when = now()
         self.enabled_scrapers = (
             "ALL" if not enabled_scrapers else ",".join(enabled_scrapers)
         )
         self.enabled_file_types = (
             "ALL" if not enabled_file_types else ",".join(enabled_file_types)
         )
-        self.dataset_path = os.path.join(app_folder, self.dataset)
-        self.remote_database = long_term_db_target(
-            dataset_path=self.dataset_path, when=self.when
+        self.remote_database_manager = long_term_db_target(
+            dataset_remote_name=dataset_remote_name,
+            dataset_path=os.path.join(app_folder, "dataset"), 
+            when=self.when
         )
-        logging.info(f"Dataset path: {self.dataset_path}")
+        self.outputs_folder = outputs_folder
+        self.status_folder = status_folder
 
-    def _now(self):
-        return datetime.datetime.now(pytz.timezone("Asia/Jerusalem")).strftime(
-            "%d/%m/%Y, %H:%M:%S"
-        )
 
-    def read_parser_status(self, outputs_folder):
-        with open(f"{outputs_folder}/parser-status.json", "r") as file:
+    def read_parser_status(self):
+        """
+        Read the parser status file and return a list of descriptions.
+        """
+        with open(f"{self.outputs_folder}/parser-status.json", "r") as file:
             data = json.load(file)
 
         descriptions = []
@@ -55,9 +59,12 @@ class LongTermDatasetManager:
 
         return descriptions
 
-    def read_scraper_status_files(self, status_folder):
+    def read_scraper_status_files(self):
+        """
+        Read the scraper status files and return a list of descriptions.
+        """
         descriptions = []
-        for file in os.listdir(status_folder):
+        for file in os.listdir(self.status_folder):
             if file.endswith(".json"):
                 descriptions.append(
                     {
@@ -67,33 +74,13 @@ class LongTermDatasetManager:
                 )
         return descriptions
 
-    def compose(self, outputs_folder, status_folder):
-        if not os.path.exists(self.dataset_path):
-            os.makedirs(self.dataset_path, exist_ok=True)
-            with open(f"{self.dataset_path}/dataset-metadata.json", "w") as file:
-                json.dump(
-                    {
-                        "title": "Israeli Supermarkets 2024",
-                        "id": f"erlichsefi/{self.dataset}",
-                        "resources": [
-                            {
-                                "path": "index.json",
-                                "description": "Index mapping between Kaggle versions and dataset creation times",
-                            },
-                            {
-                                "path": "parser-status.json",
-                                "description": "Parser status file",
-                            },
-                        ]
-                        + self.read_parser_status(outputs_folder)
-                        + self.read_scraper_status_files(status_folder),
-                    },
-                    file,
-                )
-            shutil.copytree(outputs_folder, self.dataset_path, dirs_exist_ok=True)
-            shutil.copytree(status_folder, self.dataset_path, dirs_exist_ok=True)
-
-            self.remote_database.increase_index()
+    def compose(self):
+        """
+        load the data we would like to upload to the local stagee database.
+        """
+        self.remote_database_manager.stage(self.outputs_folder)
+        self.remote_database_manager.stage(self.status_folder)        
+        self.remote_database_manager.increase_index()
 
     def upload(self):
         """
@@ -103,14 +90,29 @@ class LongTermDatasetManager:
         :param file_path: str, the path to the file to upload
         :param new_file_name: str, optional new name for the file in the dataset
         """
+        resources  = {
+                "title": "Israeli Supermarkets 2024",
+                "resources": [
+                    {
+                        "path": "index.json",
+                        "description": "Index mapping between Kaggle versions and dataset creation times",
+                    },
+                    {
+                        "path": "parser-status.json",
+                        "description": "Parser status file",
+                    },
+                ]
+                + self.read_parser_status()
+                + self.read_scraper_status_files(),
+        }
         try:
-            self.remote_database.upload_to_dataset(
-                message=f"Update-Time: {self.when}, Scrapers:{self.enabled_scrapers}, Files:{self.enabled_file_types}"
+            self.remote_database_manager.upload_to_dataset(
+                message=f"Update-Time: {self.when}, Scrapers:{self.enabled_scrapers}, Files:{self.enabled_file_types}",
+                **resources
             )
         except Exception as e:
             logging.critical(f"Error uploading file: {e}")
             raise ValueError(f"Error uploading file: {e}")
 
     def clean(self):
-        shutil.rmtree(self.dataset_path)
-        self.remote_database.clean()
+        self.remote_database_manager.clean()

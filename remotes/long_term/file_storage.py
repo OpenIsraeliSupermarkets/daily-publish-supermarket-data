@@ -34,8 +34,8 @@ class DummyFileStorage(LongTermDatabaseUploader):
             when (datetime): Timestamp for the dataset
             dataset_remote_name (str): Name to use for the local storage directory
         """
+        super().__init__(dataset_path, when)
         self.dataset_remote_name = dataset_remote_name
-        self.dataset_path = dataset_path
         self.when = when
 
     def _load_index(self):

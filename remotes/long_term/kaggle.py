@@ -7,6 +7,7 @@ specifically designed for supermarket data management.
 import os
 import pytz
 import logging
+import shutil
 import json
 from datetime import datetime, timedelta
 from .base import LongTermDatabaseUploader
@@ -39,9 +40,8 @@ class KaggleUploader(LongTermDatabaseUploader):
             when (datetime): Timestamp for the dataset
             dataset_remote_name (str): Name of the remote Kaggle dataset
         """
-
+        super().__init__(dataset_path, when)
         self.dataset_remote_name = dataset_remote_name
-        self.dataset_path = dataset_path
         self.when = when
 
         if KAGGLE_API_AVAILABLE is not None:
@@ -116,6 +116,7 @@ class KaggleUploader(LongTermDatabaseUploader):
         """Clean up temporary files."""
         if os.path.exists("index.json"):
             os.remove("index.json")
+        super().clean()
 
     def was_updated_in_last(self, seconds: int = 24*60*60) -> bool:
         """Check if the dataset was updated within specified hours.
