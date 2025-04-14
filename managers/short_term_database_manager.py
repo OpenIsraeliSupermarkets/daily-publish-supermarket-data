@@ -1,24 +1,21 @@
 import os
 import pandas as pd
 import json
-import re
 import logging
-import datetime
-import pytz
 from remotes import ShortTermDatabaseUploader
-from cache_manager import CacheManager
-
+from managers.cache_manager import CacheManager
+from utils import now
+from models import init_dynamic_tables_from_parser_status
 
 class ShortTermDBDatasetManager:
     def __init__(
         self,
         app_folder,
-        short_term_db_target,
+        short_term_db_target:ShortTermDatabaseUploader,
         parser_table_name="ParserStatus",
         scraper_table_name="ScraperStatus",
     ):
-        self.uploader: ShortTermDatabaseUploader = short_term_db_target()
-        self.cache_manager = CacheManager(app_folder)
+        self.uploader = short_term_db_target()
         self.parser_table_name = parser_table_name
         self.scraper_table_name = scraper_table_name
 
@@ -26,65 +23,10 @@ class ShortTermDBDatasetManager:
         return filename.split(".")[0]
 
     def _create_data_folders(self, outputs_folder):
-        with open(f"{outputs_folder}/parser-status.json", "r") as file:
-            data = json.load(file)
-
-        for entry in data:
-            if "response" in entry and entry["response"]["file_was_created"]:
-
-                data_file_path = entry["response"]["file_created_path"]
-                if os.path.exists(data_file_path):
-                    filename = os.path.basename(entry["response"]["file_created_path"])
-                    table_name = self._file_name_to_table(filename)
-
-                    self._create_data_table(table_name)
-
-    def get_content_of_file(self, table_name, file):
-        """Retrieve content of a specific file.
-
-        Args:
-            table_name (str): Name of the table/collection
-            file (str): File identifier
-
-        Returns:
-            list: List of items matching the file
-        """
-        return self.uploader._get_table_content(table_name, {"file_name": file})
-
-    def is_parser_updated(self, seconds: int = 10800) -> bool:
-        """Check if the parser was updated recently.
-
-        Args:
-            seconds (int, optional): Time window in seconds to check for updates.
-                                   Defaults to 10800 (3 hours).
-
-        Returns:
-            bool: True if parser was updated within specified time window, False otherwise
-        """
-        return self.uploader._is_collection_updated("ParserStatus", seconds)
-
-    def get_all_files_by_chain(self, chain: str, file_type=None):
-        """Get all files associated with a specific chain.
-
-        Args:
-            chain (str): Chain identifier
-            file_type (str, optional): Type of files to filter by
-
-        Returns:
-            list: List of files matching the criteria
-        """
-        filter_condition = f".*{re.escape(chain)}.*"
-        if file_type is not None:
-            filter_condition = f".*{re.escape(file_type)}.*{re.escape(chain)}.*"
-
-        docs = self.uploader._get_table_content(
-            "ParserStatus", {"index": {"$regex": filter_condition}}
+        init_dynamic_tables_from_parser_status(
+            f"{outputs_folder}/parser-status.json",
+            self.uploader.engine
         )
-        files = []
-        for doc in docs:
-            if "response" in doc and "files_to_process" in doc["response"]:
-                files.extend(doc["response"]["files_to_process"])
-        return files
 
     def _create_data_table(self, table_name):
         try:
@@ -96,25 +38,12 @@ class ShortTermDBDatasetManager:
         self._create_data_folders(outputs_folder)
         self._create_status_tables()
 
-    def _create_status_tables(self):
-        self.uploader._create_table(
-            "index",
-            self.parser_table_name,
-        )
-        self.uploader._create_table(
-            "index",
-            self.scraper_table_name,
-        )
-
-    def _now(self):
-        return datetime.datetime.now(pytz.timezone("Asia/Jerusalem")).strftime(
-            "%d%m%Y%H%M%S"
-        )
-
     def push_parser_status(self, outputs_folder):
         with open(f"{outputs_folder}/parser-status.json", "r") as file:
             records = json.load(file)
-        exection_time = self._now()
+        exection_time = now().strftime(
+            "%d%m%Y%H%M%S"
+        )
 
         records = [
             {
@@ -230,15 +159,14 @@ class ShortTermDBDatasetManager:
         logging.info("Files data pushed in DynamoDB successfully.")
 
     def upload(self, outputs_folder, status_folder):
-        local_cache = self.cache_manager.load()
-        if not local_cache:
-            self.uploader._clean_all_tables()
-            self._create_all_tables(outputs_folder)
+        with CacheManager(self.app_folder) as local_cache:
+            if not local_cache:
+                self.uploader._clean_all_tables()
+                self._create_all_tables(outputs_folder)
 
-        # push
-        self.push_parser_status(outputs_folder)
-        self.push_scraper_status_files(status_folder, local_cache)
-        self.push_files_data(outputs_folder, local_cache)
-        self.cache_manager.save(local_cache)
+            # push
+            self.push_parser_status(outputs_folder)
+            self.push_scraper_status_files(status_folder, local_cache)
+            self.push_files_data(outputs_folder, local_cache)
 
         logging.info("Upload completed successfully.")

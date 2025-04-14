@@ -4,7 +4,7 @@ from unittest.mock import Mock, patch
 import pytest
 import tempfile
 from remotes import DummyFileStorage
-from long_term_database_manager import LongTermDatasetManager
+from managers.long_term_database_manager import LongTermDatasetManager
 
 
 def mock_single_file_data(store,file_path,file_types,files_to_process):

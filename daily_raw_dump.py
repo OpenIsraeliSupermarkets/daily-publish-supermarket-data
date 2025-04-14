@@ -7,13 +7,11 @@ import datetime
 import os
 from il_supermarket_scarper import ScarpingTask
 from il_supermarket_parsers import ConvertingTask
-from long_term_database_manager import LongTermDatasetManager
-from short_term_database_manager import ShortTermDBDatasetManager
+from managers.long_term_database_manager import LongTermDatasetManager
+from managers.short_term_database_manager import ShortTermDBDatasetManager
 from remotes import (
     KaggleUploader,
-    MongoDbUploader,
-    DummyFileStorage,
-    DummyDocumentDbUploader,
+    MongoDbUploader
 )
 from utils import get_long_term_database_connector, get_short_term_database_connector
 

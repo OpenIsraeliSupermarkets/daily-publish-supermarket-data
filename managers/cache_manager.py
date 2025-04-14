@@ -5,6 +5,15 @@ import json
 class CacheManager:
     def __init__(self, app_folder):
         self.cache_file = os.path.join(app_folder, ".push_cache")
+        self._data = None
+
+    def __enter__(self):
+        self._data = self.load()
+        return self._data
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self._data is not None:
+            self.save(self._data)
 
     def load(self):
         last_pushed = {}
@@ -16,3 +25,4 @@ class CacheManager:
     def save(self, new_content):
         with open(self.cache_file, "w") as file:
             json.dump(new_content, file)
+

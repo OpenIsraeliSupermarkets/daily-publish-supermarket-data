@@ -106,27 +106,6 @@ class MongoDbUploader(ShortTermDatabaseUploader):
             self.db[collection].drop()
         logging.info("All collections deleted successfully!")
 
-    # def get_all_files_by_chain(self, chain: str, file_type=None):
-    #     """Get all files associated with a specific chain.
-
-    #     Args:
-    #         chain (str): Chain identifier
-    #         file_type (str, optional): Type of files to filter by
-
-    #     Returns:
-    #         list: List of files matching the criteria
-    #     """
-    #     collection = self.db["ParserStatus"]
-    #     files = []
-
-    #     filter_condition = f".*{re.escape(chain)}.*"
-    #     if file_type is not None:
-    #         filter_condition = f".*{re.escape(file_type)}.*{re.escape(chain)}.*"
-
-    #     for doc in collection.find({"index": {"$regex": filter_condition}}):
-    #         if "response" in doc and "files_to_process" in doc["response"]:
-    #             files.extend(doc["response"]["files_to_process"])
-    #     return files
 
     def _is_collection_updated(
         self, collection_name: str, seconds: int = 10800
