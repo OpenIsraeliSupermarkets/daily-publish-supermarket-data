@@ -8,7 +8,7 @@ from managers.large_file_push_manager import LargeFilePushManager
 from managers.cache_manager import CacheState
 from data_models.raw import DataTable
 from remotes import ShortTermDatabaseUploader
-
+from pydantic import BaseModel
 
 class TestLargeFilePushManager:
     @pytest.fixture
@@ -195,4 +195,34 @@ class TestLargeFilePushManager:
         # Verify cache was updated with the final position
         # The final position should be the sum of the lengths of all chunks
         # 2 rows in chunk1 + 1 row in chunk2 + 1 (starting position) = 4
-        assert cache_state.get_last_processed_row("test_file.csv") == 4 
+        assert cache_state.get_last_processed_row("test_file.csv") == 4
+    
+    
+    def test_process_real_csv_with_custom_chunks(self, temp_dir, mock_database_manager, cache_state):
+        """Test processing an actual CSV file with 10 rows using chunks of 3."""
+        # Create a test file with 10 rows
+        test_file = "test_file.csv"
+        file_path = os.path.join(temp_dir, test_file)
+        
+        # Create test data with 10 rows
+        test_data = pd.DataFrame({
+            "found_folder": ["test_folder_" + str(i) for i in range(10)],
+            "file_name": ["test_file_" + str(i) + ".csv" for i in range(10)],
+            "more_data": ["test_data_" + str(i) for i in range(10)],
+            "some_more_data": ["test_data_" + str(i) for i in range(10)]
+        })
+        
+        # Write the DataFrame to a CSV file
+        test_data.to_csv(file_path, index=False)
+        
+        # Create manager with chunk size of 3
+        manager = LargeFilePushManager(temp_dir, mock_database_manager,3)
+        
+        # Process the file
+        manager.process_file(test_file, cache_state)
+        
+        # Verify database insertion was called 4 times (for chunks of size 3+3+3+1)
+        assert mock_database_manager._insert_to_database.call_count == 4
+        
+        # Verify cache was updated with the final row count
+        assert cache_state.get_last_processed_row(test_file) == 9 

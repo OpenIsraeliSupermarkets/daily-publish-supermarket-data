@@ -54,7 +54,7 @@ class ScraperStatus(BaseModel):
         return "index"
     
 class DataTable(BaseModel):
-    row_index: str
+    row_index: int
     found_folder: str
     file_name: str
     content: Dict[str, Any]

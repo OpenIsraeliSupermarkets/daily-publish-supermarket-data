@@ -8,17 +8,18 @@ from data_models.raw import DataTable, file_name_to_table
 
 class LargeFilePushManager:
     
-    def __init__(self, outputs_folder: str, database_manager: ShortTermDatabaseUploader):
+    def __init__(self, outputs_folder: str, database_manager: ShortTermDatabaseUploader,chunk_size:int=10000):
         """Initialize the LargeFilePushManager.
         The manager is responsible for pushing large files on a limited RAM machine.
         It does so by reading the file in chunks and uploading to the database.
         Args:
             outputs_folder (str): Path to the folder containing files to process
             database_manager (ShortTermDatabaseManager): Database manager for data insertion
+            chunk_size (int): Number of rows to process in each chunk
         """
         self.outputs_folder = outputs_folder
         self.database_manager = database_manager
-        self.chunk_size = 10000
+        self.chunk_size = chunk_size
 
     def _get_header(self, file:str):
         file_path = os.path.join(self.outputs_folder, file)
@@ -47,7 +48,7 @@ class LargeFilePushManager:
         # Process file in chunks
         for chunk in pd.read_csv(
             file_path,
-            skiprows=lambda x: x < last_row + 1,
+            skiprows=lambda x: x == 0 or x < last_row + 1, # skip header since we provide it and the current batch
             names=header,
             chunksize=self.chunk_size,
         ):
@@ -60,7 +61,7 @@ class LargeFilePushManager:
             stop_index = last_row + 1 + len(chunk)
             chunk.index = range(last_row + 1, stop_index)
             # update for next itreation
-            last_row = stop_index
+            last_row = stop_index - 1
             # log the batch
             logging.info(
                 f"Batch start: {chunk.iloc[0].name}, end: {chunk.iloc[-1].name}"
@@ -71,7 +72,16 @@ class LargeFilePushManager:
                 chunk = pd.concat([last_row_saw, chunk])
 
             # Process and upload chunk
-            items = [DataTable(**record).to_dict() for record in chunk.reset_index(names=["row_index"]).ffill().to_dict(orient="records")]
+            items = [
+                DataTable(
+                    row_index=record["row_index"],
+                    found_folder=record["found_folder"], 
+                    file_name=record["file_name"],
+                    content={k:v for k,v in record.items() if k not in ["row_index", "found_folder", "file_name"]}
+                ).to_dict()
+                for record in chunk.reset_index(names=["row_index"]).ffill().to_dict(orient="records")
+                     
+            ]
             
             self.database_manager._insert_to_database(target_table_name, items[1:])
 
