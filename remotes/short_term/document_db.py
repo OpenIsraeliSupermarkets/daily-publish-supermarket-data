@@ -94,65 +94,6 @@ class DummyDocumentDbUploader(ShortTermDatabaseUploader):
                 os.rmdir(table_path)
         logging.info("All tables deleted successfully!")
 
-    # def get_all_files_by_chain(self, chain: str, file_type: str = None):
-    #     """Get all files associated with a specific chain.
-
-    #     Args:
-    #         chain (str): Chain identifier
-    #         file_type (str, optional): Type of files to filter by
-
-    #     Returns:
-    #         list: List of files matching the criteria
-    #     """
-    #     chain_path = os.path.join(self.db_path, "ParserStatus")
-    #     if not os.path.exists(chain_path):
-    #         return []
-
-    #     file_found = []
-    #     for filename in os.listdir(chain_path):
-    #         if chain in filename and (file_type is None or file_type in filename):
-    #             file_path = os.path.join(chain_path, filename)
-    #             if not os.path.isfile(file_path):
-    #                 logging.error("Path %s is not a file", file_path)
-    #                 continue
-    #             try:
-    #                 with open(file_path, "r", encoding="utf-8") as f:
-    #                     data = json.load(f)
-    #                     if (
-    #                         "response" in data
-    #                         and "files_to_process" in data["response"]
-    #                     ):
-    #                         file_found.extend(data["response"]["files_to_process"])
-    #             except Exception as e:  # pylint: disable=W0718
-    #                 logging.error("Error reading file %s: %s", file_path, str(e))
-    #     return file_found
-
-    # def get_content_of_file(self, table_name, file):
-    #     """Retrieve content of a specific file.
-
-    #     Args:
-    #         table_name (str): Name of the table
-    #         content_of_file (str): File identifier
-
-    #     Returns:
-    #         list: List of documents matching the file
-    #     """
-    #     folder_path = os.path.join(self.db_path, table_name)
-    #     if not os.path.exists(folder_path):
-    #         logging.error("Table '%s' does not exist", table_name)
-    #         return []
-
-    #     file_found = []
-    #     for filename in os.listdir(folder_path):
-    #         file_path = os.path.join(folder_path, filename)
-    #         try:
-    #             with open(file_path, "r", encoding="utf-8") as f:
-    #                 data = json.load(f)
-    #                 if data.get("file_name") == file:
-    #                     file_found.append(data)
-    #         except Exception as e:  # pylint: disable=W0718
-    #             logging.error("Error reading file %s: %s", file_path, str(e))
-    #     return file_found
 
     def _is_collection_updated(
         self, collection_name: str, seconds: int = 10800

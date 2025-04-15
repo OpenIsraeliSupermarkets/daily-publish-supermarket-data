@@ -3,170 +3,126 @@ import pandas as pd
 import json
 import logging
 from remotes import ShortTermDatabaseUploader
-from managers.cache_manager import CacheManager
-from utils import now
-from models import init_dynamic_tables_from_parser_status
+from managers.cache_manager import CacheManager, CacheState
+from managers.large_file_push_manager import LargeFilePushManager
+from data_models.raw import ParserStatus, ScraperStatus
 
 class ShortTermDBDatasetManager:
     def __init__(
         self,
         app_folder,
-        short_term_db_target:ShortTermDatabaseUploader,
-        parser_table_name="ParserStatus",
-        scraper_table_name="ScraperStatus",
+        outputs_folder,
+        status_folder,
+        short_term_db_target:ShortTermDatabaseUploader
     ):
+        self.app_folder = app_folder
         self.uploader = short_term_db_target()
-        self.parser_table_name = parser_table_name
-        self.scraper_table_name = scraper_table_name
-
-    def _file_name_to_table(self, filename):
-        return filename.split(".")[0]
-
-    def _create_data_folders(self, outputs_folder):
-        init_dynamic_tables_from_parser_status(
-            f"{outputs_folder}/parser-status.json",
-            self.uploader.engine
-        )
-
-    def _create_data_table(self, table_name):
-        try:
-            self.uploader._create_table("row_index", table_name)
-        except Exception as e:
-            pass
-
-    def _create_all_tables(self, outputs_folder):
-        self._create_data_folders(outputs_folder)
-        self._create_status_tables()
-
-    def push_parser_status(self, outputs_folder):
-        with open(f"{outputs_folder}/parser-status.json", "r") as file:
+        self.outputs_folder = outputs_folder
+        self.status_folder = status_folder
+    
+    def _push_parser_status(self):
+        with open(f"{self.outputs_folder}/parser-status.json", "r") as file:
             records = json.load(file)
-        exection_time = now().strftime(
-            "%d%m%Y%H%M%S"
-        )
-
+        
         records = [
-            {
-                "index": record["file_type"]
+            ParserStatus(
+                index=record["file_type"]
                 + "@"
-                + record["store_enum"]
-                + "@"
-                + exection_time,
-                "ChainName": record["store_enum"],
-                "timestamp": exection_time,
-                **record,
-            }
+                + record["store_enum"],
+                chain_name=record["store_enum"],
+                requested_limit=record["limit"],
+                requested_store_enum=record["store_enum"],
+                requested_file_type=record["file_type"],
+                scaned_data_folder=record["data_folder"],
+                output_folder=record["output_folder"],
+                status=record["status"]
+            ).to_dict()
             for record in records
         ]
-        self.uploader._insert_to_database(self.parser_table_name, records)
+        self.uploader._insert_to_database(ParserStatus.get_table_name(), records)
         logging.info("Parser status stored in DynamoDB successfully.")
 
-    def push_scraper_status_files(self, status_folder, local_cahce):
-        records = []
-        for file in os.listdir(status_folder):
-            if file.endswith(".json") and file != "parser-status.json":
-                with open(os.path.join(status_folder, file), "r") as f:
-                    data = json.load(f)
-
-                pushed_timestamp = local_cahce.get(file, {}).get("timestamps", [])
-
-                for index, (timestamp, actions) in enumerate(data.items()):
-                    logging.info(f"Pushing {file}: {timestamp} vs {pushed_timestamp}")
-
-                    if timestamp == "verified_downloads":
-                        continue
-
-                    if timestamp in pushed_timestamp:
-                        continue
-
-                    for action in actions:
-                        records.append(
-                            {
-                                "index": file.split(".")[0]
-                                + "@"
-                                + action["status"]
-                                + "@"
-                                + timestamp
-                                + "@"
-                                + str(index),
-                                "file_name": file.split(".")[0],
-                                "timestamp": timestamp,
-                                **action,
-                            }
-                        )
-                    pushed_timestamp.append(timestamp)
-
-                if file not in local_cahce:
-                    local_cahce[file] = {}
-                local_cahce[file]["timestamps"] = pushed_timestamp
-
-        if records:
-            self.uploader._insert_to_database(self.scraper_table_name, records)
-
-    def push_files_data(self, outputs_folder, local_cahce):
-        #
-        for file in os.listdir(outputs_folder):
-
-            if not file.endswith(".csv"):
+    def _push_status_files(self, local_cahce:CacheState):
+        for file in os.listdir(self.status_folder):
+            if not file.endswith(".json"):
+                logging.warn(f"Skipping '{file}', should we store it?")
                 continue
-            # the path to process
-            file_path = os.path.join(outputs_folder, file)
             
-            logging.info(f"Pushing {file}")
-            # select the correct table
-            table_target_name = self._file_name_to_table(file)
-            self._create_data_table(table_target_name)
+            if file == "parser-status.json":
+                self._push_parser_status()
+            else:
+                self._push_scraper_status(local_cahce)
 
-            # Read the CSV file into a DataFrame
-            last_row = local_cahce.get("last_pushed", {}).get(file, -1)
-            logging.info(f"Last row: {last_row}")
-            # Process the CSV file in chunks to reduce memory usage
-            chunk_size = 10000
-            previous_row = None
-            header = pd.read_csv(file_path, nrows=0)
+               
+    def _push_scraper_status(self, file_name:str, local_cahce:CacheState):
+        
+        with open(os.path.join(self.status_folder, file_name), "r") as f:
+            data = json.load(f)
 
-            for chunk in pd.read_csv(
-                file_path,
-                skiprows=lambda x: x < last_row + 1,
-                names=header.columns,
-                chunksize=chunk_size,
-            ):
+        pushed_timestamp = local_cahce.get_pushed_timestamps(file_name)
+        logging.info(f"Pushing {file_name}: {timestamp} vs {pushed_timestamp}")
 
-                if not chunk.empty:
-                    chunk.index = range(last_row + 1, last_row + 1 + len(chunk))
-                    logging.info(
-                        f"Batch start: {chunk.iloc[0].name}, end: {chunk.iloc[-1].name}"
-                    )
+        records = []
+        for index, (timestamp, actions) in enumerate(data.items()):
+            
+            if timestamp == "verified_downloads":
+                continue
 
-                    if previous_row is not None:
-                        chunk = pd.concat([previous_row, chunk])
+            if timestamp in pushed_timestamp:
+                continue
 
-                    chunk = chunk.reset_index(names=["row_index"])
-                    last_row = max(last_row, int(chunk.row_index.max()))
-                    chunk["row_index"] = chunk["row_index"].astype(str)
-                    items = chunk.ffill().to_dict(orient="records")
-                    self.uploader._insert_to_database(table_target_name, items[1:])
+            for action in actions:
+                records.append(
+                    ScraperStatus(
+                        index=file_name.split(".")[0]
+                        + "@"
+                        + action["status"]
+                        + "@"
+                        + timestamp
+                        + "@"
+                        + str(index),
+                        file_name=file_name.split(".")[0],
+                        timestamp=timestamp,
+                        status=action["status"],
+                        when=action["when"],
+                        limit=action.get("limit"),
+                        files_requested=action.get("files_requested"),
+                        store_id=action.get("store_id"),
+                        files_names_to_scrape=action.get("files_names_to_scrape"),
+                        when_date=action["when_date"],
+                        filter_null=action["filter_null"],
+                        filter_zero=action["filter_zero"],
+                        suppress_exception=action["suppress_exception"],
+                    ).to_dict()
+                )
+            pushed_timestamp.append(timestamp)
 
-                    # Save last row for next iteration
-                    previous_row = chunk.drop(columns=["row_index"]).tail(1)
+        local_cahce.update_pushed_timestamps(file_name, pushed_timestamp)
 
-            if "last_pushed" not in local_cahce:
-                local_cahce["last_pushed"] = {}
-            local_cahce["last_pushed"][file] = last_row
+        self.uploader._insert_to_database(ScraperStatus.get_table_name(), records)
 
-            logging.info(f"Completed pushing {file}")
-
+    def _push_files_data(self, local_cahce:CacheState):
+        #
+        for file in os.listdir(self.outputs_folder):
+            if not file.endswith(".csv"):
+                logging.warn(f"Skipping '{file}', should we store it?")
+                continue
+            
+            large_file_pusher = LargeFilePushManager(self.outputs_folder, self.uploader)
+            large_file_pusher.process_file(file, local_cahce)
+            
         logging.info("Files data pushed in DynamoDB successfully.")
 
-    def upload(self, outputs_folder, status_folder):
+    def upload(self,force_restart=False):
+        """
+        Upload the data to the database.
+        """
         with CacheManager(self.app_folder) as local_cache:
-            if not local_cache:
-                self.uploader._clean_all_tables()
-                self._create_all_tables(outputs_folder)
-
+            if local_cache.is_empty() or force_restart:
+                self.uploader.restart_database()
+                
             # push
-            self.push_parser_status(outputs_folder)
-            self.push_scraper_status_files(status_folder, local_cache)
-            self.push_files_data(outputs_folder, local_cache)
+            self._push_status_files(local_cache)
+            self._push_files_data(local_cache)
 
         logging.info("Upload completed successfully.")

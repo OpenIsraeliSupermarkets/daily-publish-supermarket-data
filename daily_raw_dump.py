@@ -104,9 +104,11 @@ class BaseSupermarketDataPublisher:
         database = ShortTermDBDatasetManager(
             short_term_db_target=self.short_term_db_target,
             app_folder=self.app_folder,
+            outputs_folder=self.outputs_folder, 
+            status_folder=self.status_folder,
         )
         database.upload(
-            outputs_folder=self.outputs_folder, status_folder=self.status_folder, reset_cache=reset_cache
+            force_restart=reset_cache
         )
 
     def _upload_to_kaggle(self, compose=True):

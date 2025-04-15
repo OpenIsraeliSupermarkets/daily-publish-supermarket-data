@@ -4,7 +4,7 @@ This module defines the base class for database uploaders that interact with API
 providing a consistent interface for different implementations.
 """
 
-import re
+from data_models.raw import ParserStatus, ScraperStatus, list_all_dynamic_tables
 
 
 # pylint: disable=too-few-public-methods
@@ -74,3 +74,18 @@ class ShortTermDatabaseUploader:
             NotImplementedError: This is an abstract method that must be implemented by subclasses
         """
         raise NotImplementedError("Subclasses must implement _list_tables()")
+
+    def restart_database(self):
+        """Clean and recreate all tables in the database.
+        
+        This function drops all existing tables and recreates them with their original structure.
+        """
+        try:
+            self._clean_all_tables()
+            #
+            self._create_table(ParserStatus.get_index(), ParserStatus.get_table_name())
+            self._create_table(ScraperStatus.get_index(), ScraperStatus.get_table_name())
+            for table in list_all_dynamic_tables():
+                self._create_table(table.get_index(), table.get_table_name()) 
+        except Exception as e:
+            raise

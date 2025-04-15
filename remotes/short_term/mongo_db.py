@@ -35,22 +35,6 @@ class MongoDbUploader(ShortTermDatabaseUploader):
         self.client = pymongo.MongoClient(uri)
         self.db = self.client.supermarket_data
 
-    def pre_process(self, item):
-        """Convert large integers to strings to avoid MongoDB limitations.
-
-        Args:
-            item: The item to preprocess (can be dict, list, or primitive type)
-
-        Returns:
-            The preprocessed item with large integers converted to strings
-        """
-        if isinstance(item, list):
-            return [self.pre_process(i) for i in item]
-        if isinstance(item, dict):
-            return {k: self.pre_process(v) for k, v in item.items()}
-        if isinstance(item, int) and (item > 2**63 - 1 or item < -(2**63)):
-            return str(item)
-        return item
 
     def _insert_to_database(self, table_target_name, items):
         """Insert items into a MongoDB collection with error handling.
@@ -64,15 +48,14 @@ class MongoDbUploader(ShortTermDatabaseUploader):
 
         logging.info("Pushing to table %s, %d items", table_target_name, len(items))
         collection = self.db[table_target_name]
-        processed_items = list(map(self.pre_process, items))
 
         try:
-            collection.insert_many(processed_items, ordered=False)
+            collection.insert_many(items, ordered=False)
             logging.info("Successfully inserted %d records to MongoDB", len(items))
         except pymongo.errors.BulkWriteError as e:
             logging.warning("Bulk insert failed, trying individual inserts: %s", str(e))
             successful_records = 0
-            for record in processed_items:
+            for record in items:
                 try:
                     collection.insert_one(record)
                     successful_records += 1
