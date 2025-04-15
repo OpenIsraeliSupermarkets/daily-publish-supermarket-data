@@ -1,5 +1,7 @@
 import os
 import json
+from filelock import FileLock, Timeout
+from typing import Optional
 
 
 class CacheState:
@@ -94,6 +96,7 @@ class CacheManager:
         """
         self.cache_file = os.path.join(app_folder, ".push_cache")
         self._data = None
+        self._lock = FileLock(f"{self.cache_file}.lock", timeout=1)
 
     def __enter__(self):
         """
@@ -102,11 +105,19 @@ class CacheManager:
         Returns:
             CacheState: A CacheState object containing the loaded cache data
         """
-        self._data = {}
-        if os.path.exists(self.cache_file):
-            with open(self.cache_file, "r") as file:
-                self._data = json.load(file)
-        return CacheState(self._data)
+        try:
+            self._lock.acquire()
+            self._data = {}
+            if os.path.exists(self.cache_file):
+                try:
+                    with open(self.cache_file, "r") as file:
+                        self._data = json.load(file)
+                except json.JSONDecodeError:
+                    # If the file is corrupted, start with empty data
+                    self._data = {}
+            return CacheState(self._data)
+        except Timeout:
+            raise RuntimeError("Could not acquire lock on cache file")
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """
@@ -117,8 +128,15 @@ class CacheManager:
             exc_val: Exception value if any occurred
             exc_tb: Exception traceback if any occurred
         """
-        if self._data is not None:
-            with open(self.cache_file, "w") as file:
-                json.dump(self._data, file)
+        try:
+            if self._data is not None:
+                # Write to a temporary file first
+                temp_file = f"{self.cache_file}.tmp"
+                with open(temp_file, "w") as file:
+                    json.dump(self._data, file)
+                # Atomic rename
+                os.replace(temp_file, self.cache_file)
+        finally:
+            self._lock.release()
 
 
