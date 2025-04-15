@@ -1,7 +1,7 @@
 import os
 import logging
 import pandas as pd
-from managers.short_term_database_manager import ShortTermDatabaseUploader
+from remotes import ShortTermDatabaseUploader
 from managers.cache_manager import CacheState
 from data_models.raw import DataTable, file_name_to_table
 
@@ -10,7 +10,8 @@ class LargeFilePushManager:
     
     def __init__(self, outputs_folder: str, database_manager: ShortTermDatabaseUploader):
         """Initialize the LargeFilePushManager.
-        
+        The manager is responsible for pushing large files on a limited RAM machine.
+        It does so by reading the file in chunks and uploading to the database.
         Args:
             outputs_folder (str): Path to the folder containing files to process
             database_manager (ShortTermDatabaseManager): Database manager for data insertion
@@ -70,12 +71,12 @@ class LargeFilePushManager:
                 chunk = pd.concat([last_row_saw, chunk])
 
             # Process and upload chunk
-            items = chunk.reset_index(names=["row_index"]).ffill().to_dict(orient="records").apply(lambda x: DataTable(**x).to_dict())
+            items = [DataTable(**record).to_dict() for record in chunk.reset_index(names=["row_index"]).ffill().to_dict(orient="records")]
             
-            self.database_manager.uploader._insert_to_database(target_table_name, items[1:])
+            self.database_manager._insert_to_database(target_table_name, items[1:])
 
             # Save last row for next iteration
-            last_row_saw = chunk.drop(columns=["row_index"]).tail(1)
+            last_row_saw = chunk.tail(1)
 
         # Update cache with last processed row
         local_cache.update_last_processed_row(file, last_row)

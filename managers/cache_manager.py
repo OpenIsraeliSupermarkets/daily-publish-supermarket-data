@@ -1,7 +1,6 @@
 import os
 import json
 from filelock import FileLock, Timeout
-from typing import Optional
 
 
 class CacheState:
