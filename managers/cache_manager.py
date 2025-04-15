@@ -62,7 +62,7 @@ class CacheState:
         Returns:
             int: The last processed row number or default value
         """
-        return self._data.get("last_processed_row", {}).get(file_name, default)
+        return self._data.get("last_pushed", {}).get(file_name, default)
 
     def update_last_processed_row(self, file_name, last_processed_row):
         """
