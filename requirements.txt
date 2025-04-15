@@ -12,3 +12,4 @@ pymongo==4.6.3
 starlette==0.36.3
 supabase
 sqlalchemy==2.0.27
+filelock==3.18.0
