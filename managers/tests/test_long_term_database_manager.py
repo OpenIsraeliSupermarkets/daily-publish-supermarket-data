@@ -88,15 +88,8 @@ def test_compose(sample_manager):
     sample_manager.remote_database_manager.stage.assert_any_call("/test/status")
     sample_manager.remote_database_manager.increase_index.assert_called_once()
 
-@patch('long_term_database_manager.logging')
-def test_upload_success(mock_logging, sample_manager):
-    with patch.object(sample_manager, '_read_parser_status', return_value=[]) as mock_parser_status, \
-         patch.object(sample_manager, '_read_scraper_status_files', return_value=[]) as mock_scraper_status:
-        sample_manager.upload()
-    sample_manager.remote_database_manager.upload_to_dataset.assert_called_once()
-
-@patch('long_term_database_manager.logging')
-def test_upload_failure(mock_logging, sample_manager):
+@patch('logging.critical')
+def test_upload_failure(mock_critical, sample_manager):
     sample_manager.remote_database_manager.upload_to_dataset.side_effect = Exception("Upload failed")
     
     with pytest.raises(ValueError) as exc_info:
@@ -105,7 +98,14 @@ def test_upload_failure(mock_logging, sample_manager):
             sample_manager.upload()
     
     assert "Error uploading file: Upload failed" in str(exc_info.value)
-    mock_logging.critical.assert_called_once()
+    mock_critical.assert_called_once()
+
+@patch('logging.critical')
+def test_upload_success(mock_critical, sample_manager):
+    with patch.object(sample_manager, '_read_parser_status', return_value=[]) as mock_parser_status, \
+         patch.object(sample_manager, '_read_scraper_status_files', return_value=[]) as mock_scraper_status:
+        sample_manager.upload()
+    sample_manager.remote_database_manager.upload_to_dataset.assert_called_once()
 
 def test_clean(sample_manager):
     sample_manager.clean()
