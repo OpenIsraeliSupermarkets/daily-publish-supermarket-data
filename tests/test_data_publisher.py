@@ -1,12 +1,7 @@
-# test_daliy_raw_dump.py
-import unittest
-from unittest.mock import patch
-import shutil
-import os
+
 import datetime
-from daily_raw_dump import SupermarketDataPublisher
+from publishers.dag_simulator import SupermarketDataPublisher
 from il_supermarket_scarper.scrappers_factory import ScraperFactory
-from il_supermarket_scarper import FileTypesFilters
 from remotes import DummyFileStorage, DummyDocumentDbUploader
 
 
@@ -44,6 +39,3 @@ def test_daliy_raw_dump():
     assert DummyDocumentDbUploader().is_parser_updated()
     assert DummyDocumentDbUploader().get_number_of_updated() == num_of_occasions + 1
 
-
-if __name__ == "__main__":
-    test_daliy_raw_dump()
