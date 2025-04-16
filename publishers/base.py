@@ -1,4 +1,3 @@
-
 import shutil
 import pytz
 import logging
@@ -12,6 +11,7 @@ from remotes import (
     KaggleUploader,
     MongoDbUploader
 )
+from utils import now
 
 logging.getLogger("Logger").setLevel(logging.INFO)
 logging.basicConfig(
@@ -19,6 +19,10 @@ logging.basicConfig(
 )
 
 class BaseSupermarketDataPublisher:
+    """
+    Base class for publishing supermarket data to various destinations.
+    Handles scraping, converting, and uploading data to short-term and long-term databases.
+    """
 
     def __init__(
         self,
@@ -35,9 +39,26 @@ class BaseSupermarketDataPublisher:
         limit=None,
         when_date=None,
     ):
+        """
+        Initialize the BaseSupermarketDataPublisher.
+        
+        Args:
+            long_term_db_target: Target for long-term database storage (default: KaggleUploader)
+            short_term_db_target: Target for short-term database storage (default: MongoDbUploader)
+            number_of_scraping_processes: Number of concurrent scraping processes (default: 3)
+            number_of_parseing_processs: Number of concurrent parsing processes (default: scraping_processes - 2)
+            app_folder: Base folder for application data (default: "app_data")
+            data_folder: Subfolder for storing scraped data (default: "dumps")
+            outputs_folder: Subfolder for storing output data (default: "outputs")
+            status_folder: Subfolder for storing status information (default: "status")
+            enabled_scrapers: List of enabled scrapers (default: None, all scrapers)
+            enabled_file_types: List of enabled file types (default: None, all file types)
+            limit: Limit on the number of items to scrape (default: None)
+            when_date: Date for which to scrape data (default: today)
+        """
         self.short_term_db_target = short_term_db_target
         self.long_term_db_target = long_term_db_target
-        self.today = datetime.datetime.now()
+        self.today = now()
         self.when_date = when_date if when_date else self.today
         self.number_of_scraping_processes = number_of_scraping_processes
         self.number_of_parseing_processs = (
@@ -46,10 +67,10 @@ class BaseSupermarketDataPublisher:
             else number_of_scraping_processes - 2
         )
         self.app_folder = app_folder
-        self.data_folder = os.path.join(app_folder, self._dump_folder_name(data_folder))
+        self.data_folder = os.path.join(app_folder, data_folder)
         self.outputs_folder = os.path.join(app_folder, outputs_folder)
         self.status_folder = os.path.join(
-            app_folder, self._dump_folder_name(data_folder), status_folder
+            app_folder, data_folder, status_folder
         )
         self.enabled_scrapers = enabled_scrapers
         self.enabled_file_types = enabled_file_types
@@ -57,16 +78,26 @@ class BaseSupermarketDataPublisher:
 
         logging.info(f"app_folder={app_folder}")
 
-    def _dump_folder_name(self, data_folder):
-        return data_folder  # f"{data_folder}_{self.today.strftime('%Y%m%d')}" # TBD: if we want to add the date we need to make sure hte publisher will get the correct date
 
     def _check_tz(self):
+        """
+        Verify that the system timezone is set to Asia/Jerusalem.
+        
+        Raises:
+            AssertionError: If the timezone is not correctly set.
+        """
         assert (
             datetime.datetime.now().hour
-            == datetime.datetime.now(pytz.timezone("Asia/Jerusalem")).hour
+            == now().hour
         ), "The timezone should be set to Asia/Jerusalem"
 
     def _execute_scraping(self):
+        """
+        Execute the scraping task to collect supermarket data.
+        
+        Raises:
+            Exception: If an error occurs during scraping.
+        """
         try:
             logging.info("Starting the scraping task")
             ScarpingTask(
@@ -85,6 +116,9 @@ class BaseSupermarketDataPublisher:
             raise e
 
     def _execute_converting(self):
+        """
+        Execute the converting task to parse scraped data into structured format.
+        """
         logging.info("Starting the converting task")
         ConvertingTask(
             enabled_parsers=self.enabled_scrapers,
@@ -96,7 +130,13 @@ class BaseSupermarketDataPublisher:
 
         logging.info("Converting task is done")
 
-    def _update_api_database(self,reset_cache=False):
+    def _update_api_database(self, reset_cache=False):
+        """
+        Update the short-term database with the converted data.
+        
+        Args:
+            reset_cache: Whether to force a restart of the cache (default: False).
+        """
         logging.info("Starting the short term database task")
         database = ShortTermDBDatasetManager(
             short_term_db_target=self.short_term_db_target,
@@ -109,6 +149,12 @@ class BaseSupermarketDataPublisher:
         )
 
     def _upload_to_kaggle(self, compose=True):
+        """
+        Upload the data to the long-term database (Kaggle by default).
+        
+        Args:
+            compose: Whether to compose the dataset before uploading (default: True).
+        """
         logging.info("Starting the long term database task")
         database = LongTermDatasetManager(
             long_term_db_target=self.long_term_db_target,
@@ -125,6 +171,15 @@ class BaseSupermarketDataPublisher:
         database.clean()
 
     def _upload_and_clean(self, compose=True):
+        """
+        Upload data to Kaggle and clean up afterward, regardless of success.
+        
+        Args:
+            compose: Whether to compose the dataset before uploading (default: True).
+            
+        Raises:
+            ValueError: If uploading to Kaggle fails.
+        """
         try:
             self._upload_to_kaggle(compose=compose)
         except ValueError as e:
@@ -135,6 +190,9 @@ class BaseSupermarketDataPublisher:
             self._clean_all_source_data()
 
     def _clean_all_dump_files(self):
+        """
+        Clean all dump files in the data folder, preserving the status folder.
+        """
         # Clean the folders in case of an error
         for folder in [self.data_folder]:
             if os.path.exists(folder):
@@ -144,6 +202,9 @@ class BaseSupermarketDataPublisher:
                         shutil.rmtree(file_path)
 
     def _clean_all_source_data(self):
+        """
+        Clean all source data, including the data, outputs, and status folders.
+        """
         # Clean the folders in case of an error
         for folder in [self.data_folder, self.outputs_folder, self.status_folder]:
             if os.path.exists(folder):
