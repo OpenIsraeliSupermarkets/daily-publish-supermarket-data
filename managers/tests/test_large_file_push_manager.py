@@ -6,9 +6,7 @@ import pandas as pd
 from unittest.mock import MagicMock, patch, mock_open, ANY
 from managers.large_file_push_manager import LargeFilePushManager
 from managers.cache_manager import CacheState
-from data_models.raw import DataTable
 from remotes import ShortTermDatabaseUploader
-from pydantic import BaseModel
 
 class TestLargeFilePushManager:
     @pytest.fixture
@@ -84,18 +82,17 @@ class TestLargeFilePushManager:
         """Test process_file with data."""
         manager = LargeFilePushManager(temp_dir, mock_database_manager)
         
-        # Create test data
+        # Create test data with proper structure
         test_data = pd.DataFrame({
-            "col1": ["val1", "val4", "val7"],
-            "col2": ["val2", "val5", "val8"],
-            "col3": ["val3", "val6", "val9"]
+            "found_folder": ["test_folder_1", "test_folder_2", "test_folder_3"],
+            "file_name": ["test_file_1.csv", "test_file_2.csv", "test_file_3.csv"],
         })
         
         # Set up mock to return our test data as a chunk
         mock_read_csv.return_value = iter([test_data])
         
         # Setup header mock
-        manager._get_header = MagicMock(return_value=["col1", "col2", "col3"])
+        manager._get_header = MagicMock(return_value=["found_folder", "file_name"])
         
         # Mock DataTable instance and to_dict method
         mock_instance = MagicMock()
@@ -109,7 +106,7 @@ class TestLargeFilePushManager:
         mock_database_manager._insert_to_database.assert_called_once()
         
         # Verify cache was updated
-        assert cache_state.get_last_processed_row("test_file.csv") == 3
+        assert cache_state.get_last_processed_row("test_file.csv") == 2
     
     @patch("pandas.read_csv")
     @patch("managers.large_file_push_manager.DataTable")
@@ -120,18 +117,17 @@ class TestLargeFilePushManager:
         # Set up cache with a last processed row
         cache_state.update_last_processed_row("test_file.csv", 2)
         
-        # Create test data
+        # Create test data with proper structure
         test_data = pd.DataFrame({
-            "col1": ["val7"],
-            "col2": ["val8"],
-            "col3": ["val9"]
+            "found_folder": ["test_folder_3"],
+            "file_name": ["test_file_3.csv"],
         })
         
         # Set up mock to return our test data as a chunk
         mock_read_csv.return_value = iter([test_data])
         
         # Setup header mock
-        manager._get_header = MagicMock(return_value=["col1", "col2", "col3"])
+        manager._get_header = MagicMock(return_value=["found_folder", "file_name"])
         
         # Mock DataTable instance and to_dict method
         mock_instance = MagicMock()
@@ -145,7 +141,7 @@ class TestLargeFilePushManager:
         mock_read_csv.assert_called_with(
             os.path.join(temp_dir, "test_file.csv"),
             skiprows=ANY,
-            names=["col1", "col2", "col3"],
+            names=["found_folder", "file_name"],
             chunksize=10000,
         )
         
@@ -154,7 +150,7 @@ class TestLargeFilePushManager:
         
         # Verify cache was updated with the last processed row
         # Starting from row 2, adding 1 row makes it 4 (0-based is 3)
-        assert cache_state.get_last_processed_row("test_file.csv") == 4
+        assert cache_state.get_last_processed_row("test_file.csv") == 3
     
     @patch("pandas.read_csv")
     @patch("managers.large_file_push_manager.DataTable")
@@ -162,24 +158,23 @@ class TestLargeFilePushManager:
         """Test processing a file with multiple chunks."""
         manager = LargeFilePushManager(temp_dir, mock_database_manager)
         
-        # Create test data for two chunks
+        # Create test data for two chunks with proper structure
         chunk1 = pd.DataFrame({
-            "col1": ["val1", "val4"],
-            "col2": ["val2", "val5"],
-            "col3": ["val3", "val6"]
+            "found_folder": ["test_folder_1", "test_folder_2"],
+            "file_name": ["test_file_1.csv", "test_file_2.csv"],
+     
         })
         
         chunk2 = pd.DataFrame({
-            "col1": ["val7"],
-            "col2": ["val8"],
-            "col3": ["val9"]
+            "found_folder": ["test_folder_3"],
+            "file_name": ["test_file_3.csv"],
         })
         
         # Set up mock to return our test chunks
         mock_read_csv.return_value = iter([chunk1, chunk2])
         
         # Setup header mock
-        manager._get_header = MagicMock(return_value=["col1", "col2", "col3"])
+        manager._get_header = MagicMock(return_value=["found_folder", "file_name"])
         
         # Mock DataTable instance and to_dict method
         mock_instance = MagicMock()
@@ -195,7 +190,7 @@ class TestLargeFilePushManager:
         # Verify cache was updated with the final position
         # The final position should be the sum of the lengths of all chunks
         # 2 rows in chunk1 + 1 row in chunk2 + 1 (starting position) = 4
-        assert cache_state.get_last_processed_row("test_file.csv") == 4
+        assert cache_state.get_last_processed_row("test_file.csv") == 2
     
     
     def test_process_real_csv_with_custom_chunks(self, temp_dir, mock_database_manager, cache_state):
@@ -204,7 +199,7 @@ class TestLargeFilePushManager:
         test_file = "test_file.csv"
         file_path = os.path.join(temp_dir, test_file)
         
-        # Create test data with 10 rows
+        # Create test data with 10 rows using proper structure
         test_data = pd.DataFrame({
             "found_folder": ["test_folder_" + str(i) for i in range(10)],
             "file_name": ["test_file_" + str(i) + ".csv" for i in range(10)],

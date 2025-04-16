@@ -7,7 +7,7 @@ from unittest.mock import patch, MagicMock
 import mongomock
 import os
 import shutil
-
+import copy
 
 def short_term_test_case(short_term_db_target):
 
@@ -22,8 +22,8 @@ def short_term_test_case(short_term_db_target):
 
             # Test data insertion
             test_items = [{"id": 1, "data": "test1"}, {"id": 2, "data": "test2"}]
-            self.uploader._insert_to_database("test_table", test_items)
-            self.assertEqual(self.uploader._get_table_content("test_table"), test_items)
+            self.uploader._insert_to_database("test_table", copy.deepcopy(test_items))
+            self.assertEqual(list(self.uploader._get_table_content("test_table")), test_items)
 
         def test_clean_all_tables(self):
             # Create some test tables

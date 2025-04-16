@@ -56,11 +56,12 @@ class MongoDbUploader(ShortTermDatabaseUploader):
             logging.warning("Bulk insert failed, trying individual inserts: %s", str(e))
             successful_records = 0
             for record in items:
-                try:
-                    collection.insert_one(record)
-                    successful_records += 1
-                except pymongo.errors.PyMongoError as inner_e:
-                    logging.error("Failed to insert record: %s", str(inner_e))
+                if "_id" in record: #
+                    try:
+                        collection.insert_one(record)
+                        successful_records += 1
+                    except pymongo.errors.PyMongoError as inner_e:
+                        logging.error("Failed to insert record: %s", str(inner_e))
             logging.info(
                 "Successfully inserted %d/%d records individually",
                 successful_records,
@@ -135,13 +136,7 @@ class MongoDbUploader(ShortTermDatabaseUploader):
             list: List of all documents in the collection
         """
         try:
-            collection = self.db[table_name]
-            results = []
-            for doc in collection.find(filter):
-                # Convert ObjectId to dict manually
-                doc_dict = {k: v for k, v in doc.items() if k != "_id"}
-                results.append(doc_dict)
-            return results
+            return list(self.db[table_name].find(filter,{"_id": 0}))
         except pymongo.errors.PyMongoError as e:
             logging.error(
                 "Error retrieving documents from collection %s: %s", table_name, str(e)
