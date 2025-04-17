@@ -28,7 +28,7 @@ def long_term_test_case(long_term_db_target, dataset_path="test-path" ,dataset_r
                 f.write("test")
             self.assertFalse(self.uploader.was_updated_in_last(seconds=1))
             self.uploader.upload_to_dataset("test_message", **{"test": "test"})
-            time.sleep(1) # kaggle need a momnet
+            time.sleep(3) # kaggle need a momnet
             self.assertTrue(self.uploader.was_updated_in_last(seconds=120))
 
     return TestLongTermDatabaseUploader

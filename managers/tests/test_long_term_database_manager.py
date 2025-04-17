@@ -5,7 +5,7 @@ import pytest
 import tempfile
 from remotes import DummyFileStorage
 from managers.long_term_database_manager import LongTermDatasetManager
-
+from utils import now
 
 def mock_single_file_data(store,file_path,file_types,files_to_process):
     return {
@@ -26,10 +26,8 @@ def mock_db_uploader():
 @pytest.fixture
 def sample_manager(mock_db_uploader):
     return LongTermDatasetManager(
-        app_folder="/test/app",
         outputs_folder="/test/outputs",
         status_folder="/test/status",
-        dataset_remote_name="test_dataset",
         long_term_db_target=mock_db_uploader,
         enabled_scrapers=["scraper1", "scraper2"],
         enabled_file_types=["type1", "type2"]
@@ -121,8 +119,11 @@ def test_integration():
             app_folder=temp_dir,
             outputs_folder=os.path.join(temp_dir, "outputs"),
             status_folder=os.path.join(temp_dir, "status"),
-            dataset_remote_name=remote_name,
-            long_term_db_target=DummyFileStorage,
+            long_term_db_target=DummyFileStorage(
+                dataset_remote_name=remote_name,
+                dataset_path=os.path.join(temp_dir, "dataset"), 
+                when=now()
+             ),
             enabled_scrapers=["scraper1", "scraper2"],
             enabled_file_types=["type1", "type2"]
         )

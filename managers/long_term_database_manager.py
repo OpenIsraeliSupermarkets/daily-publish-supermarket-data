@@ -24,10 +24,8 @@ class LongTermDatasetManager:
     """
     def __init__(
         self,
-        app_folder,
         outputs_folder, 
         status_folder,
-        dataset_remote_name,
         long_term_db_target:LongTermDatabaseUploader,
         enabled_scrapers=None,
         enabled_file_types=None
@@ -37,10 +35,8 @@ class LongTermDatasetManager:
         Initialize the LongTermDatasetManager.
         
         Args:
-            app_folder (str): Path to the application folder
             outputs_folder (str): Path to the outputs directory
             status_folder (str): Path to the status directory
-            dataset_remote_name (str): Name of the remote dataset
             long_term_db_target (class): Class to use for remote database management
             enabled_scrapers (list, optional): List of enabled scrapers
             enabled_file_types (list, optional): List of enabled file types
@@ -52,11 +48,7 @@ class LongTermDatasetManager:
         self.enabled_file_types = (
             "ALL" if not enabled_file_types else ",".join(enabled_file_types)
         )
-        self.remote_database_manager = long_term_db_target(
-            dataset_remote_name=dataset_remote_name,
-            dataset_path=os.path.join(app_folder, "dataset"), 
-            when=self.when
-        )
+        self.remote_database_manager = long_term_db_target
         self.outputs_folder = outputs_folder
         self.status_folder = status_folder
 
