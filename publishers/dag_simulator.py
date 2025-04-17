@@ -7,7 +7,7 @@ from remotes import (
     KaggleUploader,
     MongoDbUploader
 )
-from publishers.dag import SupermarketDataPublisherInterface
+from publishers.dag_publisher import SupermarketDataPublisherInterface
 
 
 

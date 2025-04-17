@@ -1,5 +1,5 @@
 from utils import get_long_term_database_connector, get_short_term_database_connector
-from publishers.dag import SupermarketDataPublisherInterface
+from publishers.dag_publisher import SupermarketDataPublisherInterface
 import os
 
 if __name__ == "__main__":

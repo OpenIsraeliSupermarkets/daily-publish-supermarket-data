@@ -81,6 +81,11 @@ class CacheState:
             self._data["last_pushed"] = {}
         self._data["last_pushed"][self._get_file_name(file_name)] = last_processed_row
 
+    def clear(self):
+        """
+        Clear the cache data.
+        """
+        self._data = {}
 
 class CacheManager:
     """

@@ -1,5 +1,5 @@
 import logging
-from publishers.base import BaseSupermarketDataPublisher
+from publishers.base_publisher import BaseSupermarketDataPublisher
 
 
 logging.getLogger("Logger").setLevel(logging.INFO)

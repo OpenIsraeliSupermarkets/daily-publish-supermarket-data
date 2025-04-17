@@ -12,7 +12,7 @@ from remotes import (
     MongoDbUploader
 )
 from utils import now
-
+from managers.cache_manager import CacheManager
 logging.getLogger("Logger").setLevel(logging.INFO)
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -209,9 +209,5 @@ class BaseSupermarketDataPublisher:
             if os.path.exists(folder):
                 shutil.rmtree(folder)
 
-        for folder in [self.app_folder]:
-            for root, dirs, files in os.walk(folder):
-                for file in files:
-                    os.remove(os.path.join(root, file))
-                for dir in dirs:
-                    shutil.rmtree(os.path.join(root, dir))
+        with CacheManager(self.app_folder) as cache:
+            cache.clear()
