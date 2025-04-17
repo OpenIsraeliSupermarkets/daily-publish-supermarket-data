@@ -85,6 +85,7 @@ def validate_long_term_structure(remote_dataset_path,stage_folder,enabled_scrape
     assert not os.path.exists(stage_folder)
     
     assert f"{DumpFolderNames[enabled_scrapers[0]].value.lower()}.csv" in csv_file
+
 @pytest.mark.integration
 def test_execute_scraping_integration():
     """
