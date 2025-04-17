@@ -9,7 +9,7 @@ from remotes import DummyFileStorage, DummyDocumentDbUploader
 from il_supermarket_scarper import ScraperFactory,DumpFolderNames,FileTypesFilters
 from data_models.raw import ScraperStatus,ParserStatus,file_name_to_table
 from managers.cache_manager import CacheManager
-
+from utils import now
 
 def validate_scraper_output(data_folder,enabled_scrapers):
     assert os.path.exists(data_folder)
@@ -73,6 +73,18 @@ def validate_state_after_api_update(app_folder,data_folder,outputs_folder,enable
     with CacheManager(app_folder) as cache:
         assert cache.get_last_processed_row(csv_file) == df.shape[0] - 1 # last row index is size -1
    
+
+def validate_long_term_structure(remote_dataset_path,stage_folder,enabled_scrapers):
+    assert os.path.exists(remote_dataset_path)
+    assert len(os.listdir(remote_dataset_path)) == 4
+    assert os.path.exists(os.path.join(remote_dataset_path, "index.json"))
+    assert os.path.exists(os.path.join(remote_dataset_path, "parser-status.json"))
+    assert os.path.exists(os.path.join(remote_dataset_path, f"{DumpFolderNames[enabled_scrapers[0]].value.lower()}.json"))
+    csv_file = glob.glob(os.path.join(remote_dataset_path, "*.csv"))[0]
+    
+    assert not os.path.exists(stage_folder)
+    
+    assert f"{DumpFolderNames[enabled_scrapers[0]].value.lower()}.csv" in csv_file
 @pytest.mark.integration
 def test_execute_scraping_integration():
     """
@@ -241,19 +253,36 @@ def test_upload_to_kaggle_integration():
     
     try:
         # Create a publisher with minimum processing
+        enabled_scrapers = ScraperFactory.sample(n=1)
+        remote_dataset_path = os.path.join(temp_dir,"remote_test_dataset")
+        stage_folder = os.path.join(temp_dir,"stage")
         publisher = BaseSupermarketDataPublisher(
             app_folder=temp_dir,
             number_of_scraping_processes=1,
             number_of_parseing_processs=1,
-            limit=1
+            limit=1,
+            enabled_scrapers=enabled_scrapers,
+            long_term_db_target=DummyFileStorage(
+                dataset_remote_path=remote_dataset_path,
+                dataset_path=stage_folder, 
+                when=now()
+            )
         )
         
         # We need to run scraping and converting first
         publisher._execute_scraping()
         publisher._execute_converting()
         
+                # the csv file was created and the parser states
+        validate_converting_output(publisher.data_folder,publisher.outputs_folder,enabled_scrapers)
+    
+        # status didn't changed
+        validate_scraper_output(publisher.data_folder,enabled_scrapers)
         # Upload to Kaggle
         publisher._upload_to_kaggle()
+        
+        validate_long_term_structure(remote_dataset_path,stage_folder,enabled_scrapers)
+        
         
         # Check if the DummyFileStorage was updated
         # In a real implementation, we would need to check the actual Kaggle dataset

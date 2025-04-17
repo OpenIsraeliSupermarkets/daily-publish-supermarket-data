@@ -24,7 +24,7 @@ class DummyFileStorage(LongTermDatabaseUploader):
     def __init__(
         self,
         dataset_path,
-        dataset_remote_name,
+        dataset_remote_path,
         when,
     ):
         """Initialize the dummy file storage.
@@ -35,7 +35,7 @@ class DummyFileStorage(LongTermDatabaseUploader):
             dataset_remote_name (str): Name to use for the local storage directory
         """
         super().__init__(dataset_path, when)
-        self.dataset_remote_name = dataset_remote_name
+        self.dataset_remote_path = dataset_remote_path
         self.when = when
 
     def _load_index(self):
@@ -71,14 +71,14 @@ class DummyFileStorage(LongTermDatabaseUploader):
         """
         logging.info(
             "Uploading dataset '%s' to remote database, message %s",
-            self.dataset_remote_name,
+            self.dataset_remote_path,
             message,
         )
-        os.makedirs(self.dataset_remote_name, exist_ok=True)
+        os.makedirs(self.dataset_remote_path, exist_ok=True)
         for filename in os.listdir(self.dataset_path):
             file_path = os.path.join(self.dataset_path, filename)
             if os.path.isfile(file_path):
-                shutil.copy(file_path, self.dataset_remote_name)
+                shutil.copy(file_path, self.dataset_remote_path)
 
 
     def was_updated_in_last(self, seconds: int = 24*60*60) -> bool:
@@ -90,4 +90,4 @@ class DummyFileStorage(LongTermDatabaseUploader):
         Returns:
             bool: True if any file was updated within specified hours, False otherwise
         """
-        return was_updated_within_seconds(self.dataset_remote_name, seconds)
+        return was_updated_within_seconds(self.dataset_remote_path, seconds)

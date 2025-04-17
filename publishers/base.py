@@ -160,7 +160,6 @@ class BaseSupermarketDataPublisher:
             long_term_db_target=self.long_term_db_target,
             enabled_scrapers=self.enabled_scrapers,
             enabled_file_types=self.enabled_file_types,
-            app_folder=self.app_folder,
             outputs_folder=self.outputs_folder, 
             status_folder=self.status_folder
         )
