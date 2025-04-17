@@ -1,4 +1,5 @@
 import os
+import re
 from il_supermarket_scarper import ScraperFactory, FileTypesFilters
 from remotes import DummyDocumentDbUploader, MongoDbUploader, KaggleUploader
 from token_validator import TokenValidator
@@ -56,13 +57,23 @@ class AccessLayer:
                 f"file_type '{file_type}' is not a valid file type, valid file types are: {','.join(FileTypesFilters.__members__.keys())}",
             )
 
+        
+
+        filter_condition = f".*{re.escape(chain)}.*"
+        if file_type is not None:
+            filter_condition = f".*{re.escape(file_type)}.*{re.escape(chain)}.*"
+
+        files = []
+        for doc in self.short_term_database_connector._get_content_of_file("ParserStatus",{"index": {"$regex": filter_condition}}):
+            if "response" in doc and "files_to_process" in doc["response"]:
+                files.extend(doc["response"]["files_to_process"])
+
         return ScrapedFiles(
             processed_files=list(map(
             lambda file: ScrapedFile(file_name=file),
-            self.short_term_database_connector._get_all_files_by_chain(
-                chain, file_type
-            ),
+            files,
         )))
+        
 
     def get_file_content(self, chain: str, file: str):
         if not chain:
