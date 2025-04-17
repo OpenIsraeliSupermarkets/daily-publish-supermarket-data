@@ -295,7 +295,7 @@ def test_upload_to_kaggle_integration():
 
 
 @pytest.mark.integration
-def test_upload_and_clean_integration():
+def test_clean_all_source_data_integration():
     """
     Integration test for uploading to Kaggle and cleaning up.
     
@@ -307,11 +307,13 @@ def test_upload_and_clean_integration():
     
     try:
         # Create a publisher with minimum processing
+        enabled_scrapers = ScraperFactory.sample(n=1)
         publisher = BaseSupermarketDataPublisher(
             app_folder=temp_dir,
             number_of_scraping_processes=1,
             number_of_parseing_processs=1,
-            limit=1
+            limit=1,
+            enabled_scrapers=enabled_scrapers
         )
         
         # We need to run scraping and converting first
@@ -319,7 +321,7 @@ def test_upload_and_clean_integration():
         publisher._execute_converting()
         
         # Upload to Kaggle and clean
-        publisher._upload_and_clean()
+        publisher._clean_all_source_data()
         
         # Verify that directories are cleaned
         assert not os.path.exists(publisher.data_folder)
