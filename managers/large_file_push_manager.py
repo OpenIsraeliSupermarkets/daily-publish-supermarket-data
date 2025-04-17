@@ -58,10 +58,10 @@ class LargeFilePushManager:
                 break
                 
             # Set index releative to the 'last_row' 
-            stop_index = last_row + 1 + len(chunk)
-            chunk.index = range(last_row + 1, stop_index)
+            stop_index = last_row + 1 + chunk.shape[0]
+            chunk.index = range(last_row + 1 , stop_index)
             # update for next itreation
-            last_row = stop_index - 1
+            last_row = stop_index - 1 
             # log the batch
             logging.info(
                 f"Batch start: {chunk.iloc[0].name}, end: {chunk.iloc[-1].name}"
@@ -83,7 +83,11 @@ class LargeFilePushManager:
                      
             ]
             
-            self.database_manager._insert_to_database(target_table_name, items[1:])
+            # remove the first item since it was used of ffill
+            if last_row_saw is not None:
+                items = items[1:]
+                
+            self.database_manager._insert_to_database(target_table_name, items)
 
             # Save last row for next iteration
             last_row_saw = chunk.tail(1)

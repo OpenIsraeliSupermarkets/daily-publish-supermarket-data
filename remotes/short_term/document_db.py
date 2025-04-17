@@ -25,7 +25,7 @@ class DummyDocumentDbUploader(ShortTermDatabaseUploader):
         Args:
             db_path (str): Base path for storing the database files
         """
-        self.db_path = os.path.join("./document_db", db_path)
+        self.db_path = os.path.join(db_path, "document_db")
         os.makedirs(self.db_path, exist_ok=True)
         self._load_tables_ids()
 
@@ -62,8 +62,8 @@ class DummyDocumentDbUploader(ShortTermDatabaseUploader):
 
         id_name = self.tables_ids[table_target_name]
         for item in items:
-            item_id = item.get(id_name)
-            if not item_id:
+            item_id = item.get(id_name,None)
+            if item_id is None:
                 raise ValueError(f"Item {item} does not have an ID")
 
             file_path = os.path.join(table_path, f"{item_id}.json")

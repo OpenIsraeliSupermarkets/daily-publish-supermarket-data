@@ -6,6 +6,8 @@ from remotes import ShortTermDatabaseUploader
 from managers.cache_manager import CacheManager, CacheState
 from managers.large_file_push_manager import LargeFilePushManager
 from data_models.raw import ParserStatus, ScraperStatus
+from datetime import datetime
+
 
 class ShortTermDBDatasetManager:
     def __init__(
@@ -16,7 +18,7 @@ class ShortTermDBDatasetManager:
         short_term_db_target:ShortTermDatabaseUploader
     ):
         self.app_folder = app_folder
-        self.uploader = short_term_db_target()
+        self.uploader = short_term_db_target
         self.outputs_folder = outputs_folder
         self.status_folder = status_folder
     
@@ -48,10 +50,9 @@ class ShortTermDBDatasetManager:
                 logging.warn(f"Skipping '{file}', should we store it?")
                 continue
             
-            if file == "parser-status.json":
-                self._push_parser_status()
-            else:
-                self._push_scraper_status(local_cahce)
+            self._push_scraper_status(file, local_cahce)
+            
+        self._push_parser_status()
 
                
     def _push_scraper_status(self, file_name:str, local_cahce:CacheState):
@@ -60,7 +61,7 @@ class ShortTermDBDatasetManager:
             data = json.load(f)
 
         pushed_timestamp = local_cahce.get_pushed_timestamps(file_name)
-        logging.info(f"Pushing {file_name}: {timestamp} vs {pushed_timestamp}")
+        logging.info(f"Pushing {file_name}: already pushed {pushed_timestamp}")
 
         records = []
         for index, (timestamp, actions) in enumerate(data.items()):
@@ -71,7 +72,8 @@ class ShortTermDBDatasetManager:
             if timestamp in pushed_timestamp:
                 continue
 
-            for action in actions:
+            logging.info(f"Pushing {file_name}: {timestamp}")
+            for action in actions:     
                 records.append(
                     ScraperStatus(
                         index=file_name.split(".")[0]
@@ -82,19 +84,18 @@ class ShortTermDBDatasetManager:
                         + "@"
                         + str(index),
                         file_name=file_name.split(".")[0],
-                        timestamp=timestamp,
+                        timestamp=datetime.strptime(timestamp, "%Y%m%d%H%M%S").strftime("%Y-%m-%d %H:%M:%S.%f%z"),
                         status=action["status"],
                         when=action["when"],
-                        limit=action.get("limit"),
-                        files_requested=action.get("files_requested"),
-                        store_id=action.get("store_id"),
-                        files_names_to_scrape=action.get("files_names_to_scrape"),
-                        when_date=action["when_date"],
-                        filter_null=action["filter_null"],
-                        filter_zero=action["filter_zero"],
-                        suppress_exception=action["suppress_exception"],
+                        status_data={
+                            key: value 
+                            for key, value in action.items() 
+                            if key != "status" and key != "when"
+                        }
                     ).to_dict()
                 )
+      
+                
             pushed_timestamp.append(timestamp)
 
         local_cahce.update_pushed_timestamps(file_name, pushed_timestamp)

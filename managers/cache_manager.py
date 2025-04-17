@@ -48,6 +48,7 @@ class CacheState:
             file_name (str): Name of the file to update
             pushed_timestamps (list): List of timestamps to store
         """
+        file_name = self._get_file_name(file_name)
         if file_name not in self._data:
             self._data[file_name] = {}
         self._data[file_name]["timestamps"] = pushed_timestamps
@@ -63,8 +64,11 @@ class CacheState:
         Returns:
             int: The last processed row number or default value
         """
-        return self._data.get("last_pushed", {}).get(file_name, default)
+        return self._data.get("last_pushed", {}).get(self._get_file_name(file_name), default)
 
+    def _get_file_name(self, file_name):
+        return file_name.split(os.sep)[-1]
+    
     def update_last_processed_row(self, file_name, last_processed_row):
         """
         Update the last processed row number for a specific file.
@@ -75,7 +79,7 @@ class CacheState:
         """
         if "last_pushed" not in self._data:
             self._data["last_pushed"] = {}
-        self._data["last_pushed"][file_name] = last_processed_row
+        self._data["last_pushed"][self._get_file_name(file_name)] = last_processed_row
 
 
 class CacheManager:
