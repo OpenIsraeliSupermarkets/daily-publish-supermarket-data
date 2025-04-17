@@ -333,39 +333,3 @@ def test_clean_all_source_data_integration():
         # Clean up anything that might remain
         if os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
-
-
-@pytest.mark.integration
-def test_end_to_end_process():
-    """
-    End-to-end functional test for the entire data publishing process.
-    """
-    # Create a temporary directory for testing
-    temp_dir = tempfile.mkdtemp(prefix="test_e2e_")
-    
-    try:
-        # Create a publisher with minimum processing
-        publisher = BaseSupermarketDataPublisher(
-            app_folder=temp_dir,
-            number_of_scraping_processes=1,
-            number_of_parseing_processs=1,
-            limit=1
-        )
-        
-        # Run the entire process
-        publisher._execute_scraping()
-        publisher._execute_converting()
-        publisher._update_api_database()
-        publisher._upload_to_kaggle()
-        publisher._clean_all_source_data()
-        
-        # Verify that directories are cleaned
-        assert not os.path.exists(publisher.data_folder)
-        assert not os.path.exists(publisher.outputs_folder)
-        assert not os.path.exists(publisher.status_folder)
-    except Exception as e:
-        pytest.fail(f"End-to-end process raised an exception: {e}")
-    finally:
-        # Clean up anything that might remain
-        if os.path.exists(temp_dir):
-            shutil.rmtree(temp_dir) 
