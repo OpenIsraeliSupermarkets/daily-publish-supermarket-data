@@ -53,9 +53,7 @@ class LargeFilePushManager:
         # Process file in chunks
         for chunk in pd.read_csv(
             file_path,
-            skiprows=lambda x: x == 0
-            or x
-            < last_row + 1,  # skip header since we provide it and the current batch
+            skiprows=lambda x: x <= last_row + 1,  # skip header and rows up to last_row
             names=header,
             chunksize=self.chunk_size,
         ):
@@ -79,21 +77,26 @@ class LargeFilePushManager:
                 chunk = pd.concat([last_row_saw, chunk])
 
             # Process and upload chunk
-            items = [
-                DataTable(
-                    row_index=record["row_index"],
-                    found_folder=record["found_folder"],
-                    file_name=record["file_name"],
-                    content={
-                        k: v
-                        for k, v in record.items()
-                        if k not in ["row_index", "found_folder", "file_name"]
-                    },
-                ).to_dict()
-                for record in chunk.reset_index(names=["row_index"])
-                .ffill()
-                .to_dict(orient="records")
-            ]
+            try:
+                items = [
+                    DataTable(
+                        row_index=record["row_index"],
+                        found_folder=record["found_folder"],
+                        file_name=record["file_name"],
+                        content={
+                            k: v
+                            for k, v in record.items()
+                            if k not in ["row_index", "found_folder", "file_name"]
+                        },
+                    ).to_dict()
+                    for record in chunk.reset_index(names=["row_index"])
+                    .ffill()
+                    .to_dict(orient="records")
+                ]
+            except Exception as e:
+                logging.error(f"Error processing chunk: {e}")
+                logging.error(f"Chunk: {chunk}")
+                raise e
 
             # remove the first item since it was used of ffill
             if last_row_saw is not None:

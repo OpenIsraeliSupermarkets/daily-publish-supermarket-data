@@ -123,6 +123,7 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
         if now:
             self._execute_operations(itreative_operations)
             self.num_of_occasions = self.num_of_occasions - 1
+            self.executed_jobs = self.executed_jobs - 1
 
         if self.num_of_occasions > 0:   
             self._check_tz()

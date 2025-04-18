@@ -23,7 +23,7 @@ def test_full_dag_integration_from_disk():
     """
     # params
     expected_duration_in_minutes = 1
-    num_of_occasions = 1
+    num_of_occasions = 2
     file_per_run = 3
     app_folder = "app_data"
     data_folder = "dumps"
