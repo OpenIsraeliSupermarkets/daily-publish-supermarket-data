@@ -9,7 +9,7 @@ import tempfile
 from publishers.tests.validation_utils import validate_cleanup,validate_long_term_structure,validate_api_scan
 
 
-def test_full_dag():
+def test_full_dag_integration_from_disk():
     # params
     expected_duration_in_minutes = 1
     num_of_occasions = 1
@@ -18,7 +18,7 @@ def test_full_dag():
     data_folder = "dumps"
     outputs_folder = "outputs"
     status_folder = "status"
-    when_date = None  # datetime.datetime(2025,1,10,0,0,0)
+    when_date = None  
 
     with tempfile.TemporaryDirectory() as temp_dir:
 

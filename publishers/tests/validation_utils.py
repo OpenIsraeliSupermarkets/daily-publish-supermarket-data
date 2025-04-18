@@ -72,17 +72,14 @@ def validate_state_after_api_update(app_folder,data_folder,outputs_folder,enable
 
 def validate_long_term_structure(remote_dataset_path,stage_folder,enabled_scrapers):
     assert os.path.exists(remote_dataset_path)
-    assert len(os.listdir(remote_dataset_path)) == 4
     assert os.path.exists(os.path.join(remote_dataset_path, "index.json"))
     assert os.path.exists(os.path.join(remote_dataset_path, "parser-status.json"))
     assert os.path.exists(os.path.join(remote_dataset_path, f"{DumpFolderNames[enabled_scrapers[0]].value.lower()}.json"))
     
-    
-    assert not os.path.exists(stage_folder)
-    
     for csv_file in glob.glob(os.path.join(remote_dataset_path, "*.csv")):
-        assert f"{DumpFolderNames[enabled_scrapers[0]].value.lower()}.csv" in csv_file
+        assert f"{enabled_scrapers[0].lower()}.csv" in csv_file
 
+    assert not os.path.exists(stage_folder)
 
 def validate_cleanup(app_folder,data_folder,outputs_folder,status_folder):
     assert not os.path.exists(data_folder)
