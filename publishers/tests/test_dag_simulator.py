@@ -6,12 +6,14 @@ from remotes import DummyFileStorage, DummyDocumentDbUploader
 import os
 from utils import now
 import tempfile
-from tests.validation_utils import validate_cleanup,validate_long_term_structure
-def test_daliy_raw_dump():
+from publishers.tests.validation_utils import validate_cleanup,validate_long_term_structure,validate_api_scan
+
+
+def test_full_dag():
     # params
-    expected_duration_in_minutes = 2
-    num_of_occasions = 2
-    file_per_run = 10
+    expected_duration_in_minutes = 1
+    num_of_occasions = 1
+    file_per_run = 3
     app_folder = "app_data"
     data_folder = "dumps"
     outputs_folder = "outputs"
@@ -22,9 +24,11 @@ def test_daliy_raw_dump():
 
         remote_dataset_path = os.path.join(temp_dir,"remote_test_dataset")
         stage_folder = os.path.join(temp_dir,"stage")
-        outputs_folder = os.path.join(outputs_folder,"outputs")
-        status_folder = os.path.join(status_folder,"status")
-        data_folder = os.path.join(data_folder,"dumps")
+        
+        app_folder = os.path.join(temp_dir, app_folder)
+        outputs_folder = os.path.join(app_folder,outputs_folder)
+        status_folder = os.path.join(app_folder,status_folder)
+        data_folder = os.path.join(app_folder,data_folder)
         
         long_term_db_target = DummyFileStorage(
             dataset_remote_path=remote_dataset_path,
@@ -45,9 +49,8 @@ def test_daliy_raw_dump():
             enabled_scrapers=enabled_scrapers,
             enabled_file_types=None,
             limit=file_per_run,
-            start_at=datetime.datetime.now(),
-            completed_by=datetime.datetime.now()
-            + datetime.timedelta(minutes=num_of_occasions * expected_duration_in_minutes),
+            start_at=now(),
+            completed_by=now() + datetime.timedelta(minutes=num_of_occasions * expected_duration_in_minutes),
             num_of_occasions=num_of_occasions,
             when_date=when_date,
         )
@@ -57,7 +60,9 @@ def test_daliy_raw_dump():
             final_operations="publishing,clean_all_source_data",
         )
 
-        
+
+        validate_api_scan(enabled_scrapers,short_term_db_target,long_term_db_target,num_of_occasions * file_per_run)
+        #
         validate_long_term_structure(remote_dataset_path,stage_folder,enabled_scrapers)
         # validate the output
         validate_cleanup(app_folder,data_folder,outputs_folder,status_folder)

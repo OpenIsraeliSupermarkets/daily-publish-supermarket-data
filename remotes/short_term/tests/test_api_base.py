@@ -2,7 +2,7 @@ import unittest
 from datetime import datetime, timedelta
 from remotes.short_term.api_base import ShortTermDatabaseUploader
 from remotes.short_term.mongo_db import MongoDbUploader
-from remotes.short_term.document_db import DummyDocumentDbUploader
+from remotes.short_term.file_db import DummyDocumentDbUploader
 from unittest.mock import patch, MagicMock
 import mongomock
 import os

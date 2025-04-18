@@ -4,7 +4,7 @@ This module defines the base class for database uploaders that interact with API
 providing a consistent interface for different implementations.
 """
 
-from data_models.raw import ParserStatus, ScraperStatus, list_all_dynamic_tables
+from data_models.raw_schema import ParserStatus, ScraperStatus, list_all_dynamic_tables
 
 
 # pylint: disable=too-few-public-methods

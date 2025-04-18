@@ -3,7 +3,7 @@
 This module provides a file-system based implementation of a document database,
 primarily used for testing and development purposes.
 """
-
+import re
 import os
 import json
 import logging
@@ -167,7 +167,11 @@ class DummyDocumentDbUploader(ShortTermDatabaseUploader):
                     data = json.load(f)
 
                     if filter is not None:
-                        if all(data.get(key) == value for key, value in filter.items()):
+                        if all(
+                            (isinstance(value, dict) and '$regex' in value and re.match(value['$regex'], str(data.get(key)))) or
+                            (data.get(key) == value)
+                            for key, value in filter.items()
+                        ):
                             content.append(data)
                     else:
                         content.append(data)

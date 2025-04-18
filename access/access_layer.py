@@ -2,18 +2,18 @@ import os
 import re
 from il_supermarket_scarper import ScraperFactory, FileTypesFilters
 from remotes import DummyDocumentDbUploader, MongoDbUploader, KaggleUploader
-from token_validator import TokenValidator
-from response_models import ScrapedFile, TypeOfFileScraped, ScrapedFiles
-from response_models import (
+from data_models.raw_schema import ParserStatus
+from data_models.response import ScrapedFile, TypeOfFileScraped, ScrapedFiles
+from data_models.response import (
     ScrapedFiles,
     TypeOfFileScraped,
     AvailableChains,
     FileContent,
-    ServiceHealth,
     LongTermDatabaseHealth,
     ShortTermDatabaseHealth,
 )
 from datetime import datetime, timedelta
+from data_models.raw_schema import get_table_name
 
 class AccessLayer:
 
@@ -22,10 +22,8 @@ class AccessLayer:
         short_term_database_connector: MongoDbUploader,
         long_term_database_connector: KaggleUploader,
     ):
-        self.short_term_database_connector = short_term_database_connector(
-            "il-central-1"
-        )
-        self.long_term_database_connector = long_term_database_connector()
+        self.short_term_database_connector = short_term_database_connector
+        self.long_term_database_connector = long_term_database_connector
 
     def list_all_available_chains(self) -> AvailableChains:
         return AvailableChains(list_of_chains=ScraperFactory.all_scrapers_name())
@@ -64,7 +62,7 @@ class AccessLayer:
             filter_condition = f".*{re.escape(file_type)}.*{re.escape(chain)}.*"
 
         files = []
-        for doc in self.short_term_database_connector._get_content_of_file("ParserStatus",{"index": {"$regex": filter_condition}}):
+        for doc in self.short_term_database_connector._get_table_content(ParserStatus.get_table_name(),{"index": {"$regex": filter_condition}}):
             if "response" in doc and "files_to_process" in doc["response"]:
                 files.extend(doc["response"]["files_to_process"])
 
@@ -93,24 +91,6 @@ class AccessLayer:
                 f"file {file} doesn't follow the correct pattern.",
             )
 
-        table_name = f"{file_type.name.lower()}_{chain.lower()}"
-        return FileContent(rows=self.short_term_database_connector._get_content_of_file(table_name, file))
+        table_name = get_table_name(file_type.name, chain)
+        return FileContent(rows=self.short_term_database_connector._get_table_content(table_name, file))
 
-
-if __name__ == "__main__":
-    import os
-    os.environ["MONGODB_URI"] = "mongodb://192.168.1.129:27017"
-    token_validator = TokenValidator()
-    assert token_validator.validate_token(os.getenv("TOKEN"))
-
-    api = AccessLayer(
-        short_term_database_connector=MongoDbUploader,
-        long_term_database_connector=KaggleUploader
-    )
-    files = api.list_files(chain="CITY_MARKET_SHOPS")
-    for file in files.processed_files:
-        content = api.get_file_content(
-            chain="CITY_MARKET_SHOPS", file=file.file_name
-        )
-        if len(content.rows) == 0:
-            print(f"file {file.file_name} is empty")

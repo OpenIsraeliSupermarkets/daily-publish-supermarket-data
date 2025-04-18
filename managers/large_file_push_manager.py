@@ -3,7 +3,7 @@ import logging
 import pandas as pd
 from remotes import ShortTermDatabaseUploader
 from managers.cache_manager import CacheState
-from data_models.raw import DataTable, file_name_to_table
+from data_models.raw_schema import DataTable, file_name_to_table
 
 
 class LargeFilePushManager:

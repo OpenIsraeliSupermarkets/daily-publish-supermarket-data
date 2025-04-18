@@ -5,7 +5,7 @@ import logging
 from remotes import ShortTermDatabaseUploader
 from managers.cache_manager import CacheManager, CacheState
 from managers.large_file_push_manager import LargeFilePushManager
-from data_models.raw import ParserStatus, ScraperStatus
+from data_models.raw_schema import ParserStatus, ScraperStatus
 from datetime import datetime
 
 
@@ -26,7 +26,7 @@ class ShortTermDBDatasetManager:
         with open(f"{self.outputs_folder}/parser-status.json", "r") as file:
             records = json.load(file)
         
-        records = [
+        processed_records = [
             ParserStatus(
                 index=record["file_type"]
                 + "@"
@@ -37,11 +37,12 @@ class ShortTermDBDatasetManager:
                 requested_file_type=record["file_type"],
                 scaned_data_folder=record["data_folder"],
                 output_folder=record["output_folder"],
-                status=record["status"]
+                status=record["status"],
+                response=record["response"]
             ).to_dict()
             for record in records
         ]
-        self.uploader._insert_to_database(ParserStatus.get_table_name(), records)
+        self.uploader._insert_to_database(ParserStatus.get_table_name(), processed_records)
         logging.info("Parser status stored in DynamoDB successfully.")
 
     def _push_status_files(self, local_cahce:CacheState):

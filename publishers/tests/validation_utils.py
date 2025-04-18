@@ -1,6 +1,7 @@
 from il_supermarket_scarper import DumpFolderNames,FileTypesFilters
-from data_models.raw import ScraperStatus,ParserStatus,file_name_to_table
+from data_models.raw_schema import ScraperStatus,ParserStatus,file_name_to_table
 from managers.cache_manager import CacheManager
+from access.access_layer import AccessLayer
 import os
 import glob
 import pandas as pd
@@ -89,3 +90,19 @@ def validate_cleanup(app_folder,data_folder,outputs_folder,status_folder):
     
     with CacheManager(app_folder) as cache:
         assert cache.is_empty()
+
+
+def validate_api_scan(enabled_scrapers,short_term_database_connector,long_term_database_connector,num_of_expected_files):
+    #
+    access_layer = AccessLayer(
+        short_term_database_connector=short_term_database_connector,
+        long_term_database_connector=long_term_database_connector
+    )
+    #
+    files = access_layer.list_files(chain=enabled_scrapers[0])
+    assert len(files.processed_files) == num_of_expected_files
+    
+    for file in files.processed_files:
+        content = access_layer.get_file_content(chain=enabled_scrapers[0], file=file.file_name)
+        assert len(content.rows) > 0
+    

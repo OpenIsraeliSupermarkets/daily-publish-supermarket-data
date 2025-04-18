@@ -103,7 +103,6 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
     def run(self, itreative_operations, final_operations, now=False):
         if now:
             self._execute_operations(itreative_operations)
-            self.executed_jobs = 0
 
         self._check_tz()
         self._setup_schedule(itreative_operations)

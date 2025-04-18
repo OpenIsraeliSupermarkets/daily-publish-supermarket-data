@@ -11,7 +11,31 @@ class CommonModel(BaseModel):
         }
 
 
-
+class ExecutionLog(CommonModel):
+    loaded: bool
+    succusfull: bool
+    detected_num_rows: int
+    store_folder: str
+    file_name: str
+    prefix_file_name: str
+    extracted_store_number: str
+    extracted_chain_id: str
+    extracted_date: str
+    detected_filetype: str
+    size: str
+    is_expected_to_have_records: bool
+    
+class Response(CommonModel):
+    status: bool
+    store_name: str
+    files_types: str
+    processed_files: bool
+    execution_errors: bool
+    file_was_created: bool
+    file_created_path: str
+    files_to_process: List[str]
+    execution_log: List[ExecutionLog]
+    
 class ParserStatus(CommonModel):
     index: str
     requested_limit: Optional[str] = None
@@ -20,6 +44,7 @@ class ParserStatus(CommonModel):
     scaned_data_folder: str
     output_folder: str
     status: bool
+    response: Response 
 
     def to_dict(self) -> Dict[str, Any]:
         return self.model_dump()

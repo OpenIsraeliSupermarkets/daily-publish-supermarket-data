@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Header, Request, Security
 from starlette.middleware.base import BaseHTTPMiddleware
-from access_layer import AccessLayer
+from accass.access_layer import AccessLayer
 from remotes import MongoDbUploader, KaggleUploader
 from typing import Optional
 from token_validator import TokenValidator, SupabaseTelemetry
@@ -10,7 +10,7 @@ import time
 
 from datetime import datetime, timedelta
 from utils import get_long_term_database_connector, get_short_term_database_connector
-from response_models import (
+from data_models.response import (
     ScrapedFiles,
     TypeOfFileScraped,
     AvailableChains,
