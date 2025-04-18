@@ -1,10 +1,11 @@
+"""
+Integration tests for the BaseSupermarketDataPublisher class.
+Tests the various operations of the publisher including scraping, converting, and uploading data.
+"""
 import os
-import glob
-import pandas as pd
 import shutil
 import pytest
 import tempfile
-from publishers.base_publisher import BaseSupermarketDataPublisher
 from remotes import DummyFileStorage, DummyDocumentDbUploader
 from il_supermarket_scarper import ScraperFactory
 from utils import now
@@ -16,6 +17,8 @@ from publishers.tests.validation_utils import (
     validate_long_term_structure,
     validate_cleanup,
 )
+from publishers.base_publisher import BaseSupermarketDataPublisher
+
 
 
 @pytest.mark.integration

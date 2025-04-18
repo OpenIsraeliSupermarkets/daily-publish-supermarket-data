@@ -1,3 +1,7 @@
+"""
+Interface for executing DAG-like operations for supermarket data publishing.
+This module provides a class that supports running a sequence of operations.
+"""
 import logging
 from publishers.base_publisher import BaseSupermarketDataPublisher
 
@@ -9,16 +13,28 @@ logging.basicConfig(
 
 
 class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
+    """
+    Interface for executing DAG-like operations for supermarket data publishing.
+    
+    Extends BaseSupermarketDataPublisher to provide a method for running
+    a sequence of operations specified as a comma-separated string.
+    """
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
     def run(self, operations):
-        logging.info(f"Starting executing DAG = {operations}")
+        """
+        Run the specified operations in sequence.
+        
+        Args:
+            operations: Comma-separated string of operations to execute
+        """
+        logging.info("Starting executing DAG = %s", operations)
         self._check_tz()
         for operation in operations.split(","):
 
-            logging.info(f"Starting the operation={operation}")
+            logging.info("Starting the operation=%s", operation)
             if operation == "scraping":
                 self._execute_scraping()
             elif operation == "converting":

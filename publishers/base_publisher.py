@@ -1,15 +1,18 @@
-import shutil
-import pytz
+"""
+Base module for supermarket data publishing.
+Provides the core functionality for scraping, converting, and uploading supermarket data.
+"""
 import logging
 import datetime
 import os
+import shutil
 from il_supermarket_scarper import ScarpingTask
 from il_supermarket_parsers import ConvertingTask
 from managers.long_term_database_manager import LongTermDatasetManager
 from managers.short_term_database_manager import ShortTermDBDatasetManager
+from managers.cache_manager import CacheManager
 from remotes import KaggleUploader, MongoDbUploader
 from utils import now
-from managers.cache_manager import CacheManager
 
 logging.getLogger("Logger").setLevel(logging.INFO)
 logging.basicConfig(
@@ -42,18 +45,18 @@ class BaseSupermarketDataPublisher:
         Initialize the BaseSupermarketDataPublisher.
 
         Args:
-            long_term_db_target: Target for long-term database storage (default: KaggleUploader)
-            short_term_db_target: Target for short-term database storage (default: MongoDbUploader)
-            number_of_scraping_processes: Number of concurrent scraping processes (default: 3)
-            number_of_parseing_processs: Number of concurrent parsing processes (default: scraping_processes - 2)
-            app_folder: Base folder for application data (default: "app_data")
-            data_folder: Subfolder for storing scraped data (default: "dumps")
-            outputs_folder: Subfolder for storing output data (default: "outputs")
-            status_folder: Subfolder for storing status information (default: "status")
-            enabled_scrapers: List of enabled scrapers (default: None, all scrapers)
-            enabled_file_types: List of enabled file types (default: None, all file types)
-            limit: Limit on the number of items to scrape (default: None)
-            when_date: Date for which to scrape data (default: today)
+            long_term_db_target: Target for long-term database storage
+            short_term_db_target: Target for short-term database storage
+            number_of_scraping_processes: Number of concurrent scraping processes
+            number_of_parseing_processs: Number of parsing processes
+            app_folder: Base folder for application data
+            data_folder: Subfolder for storing scraped data
+            outputs_folder: Subfolder for storing output data
+            status_folder: Subfolder for storing status information
+            enabled_scrapers: List of enabled scrapers
+            enabled_file_types: List of enabled file types
+            limit: Limit on the number of items to scrape
+            when_date: Date for which to scrape data
         """
         self.short_term_db_target = short_term_db_target
         self.long_term_db_target = long_term_db_target
@@ -73,7 +76,7 @@ class BaseSupermarketDataPublisher:
         self.enabled_file_types = enabled_file_types
         self.limit = limit
 
-        logging.info(f"app_folder={app_folder}")
+        logging.info("app_folder=%s", app_folder)
 
     def _check_tz(self):
         """
@@ -107,7 +110,7 @@ class BaseSupermarketDataPublisher:
             ).start()
             logging.info("Scraping task is done")
         except Exception as e:
-            logging.error(f"An error occurred during scraping: {e}")
+            logging.error("An error occurred during scraping: %s", e)
             raise e
 
     def _execute_converting(self):
@@ -141,12 +144,9 @@ class BaseSupermarketDataPublisher:
         )
         database.upload(force_restart=reset_cache)
 
-    def _upload_to_kaggle(self, compose=True):
+    def _upload_to_kaggle(self):
         """
         Upload the data to the long-term database (Kaggle by default).
-
-        Args:
-            compose: Whether to compose the dataset before uploading (default: True).
         """
         logging.info("Starting the long term database task")
         database = LongTermDatasetManager(
@@ -158,7 +158,8 @@ class BaseSupermarketDataPublisher:
         )
         database.compose()
         database.upload()
-        # clean the dataset only if the data was uploaded successfully (upload_to_dataset raise an exception)
+        # clean the dataset only if the data was uploaded successfully
+        # (upload_to_dataset raise an exception)
         # if not, "compose" will clean it next time
         database.clean()
 
@@ -168,12 +169,16 @@ class BaseSupermarketDataPublisher:
 
         Args:
             compose: Whether to compose the dataset before uploading (default: True).
+                     This parameter is maintained for compatibility but is not used
+                     in the current implementation.
 
         Raises:
             ValueError: If uploading to Kaggle fails.
         """
         try:
-            self._upload_to_kaggle(compose=compose)
+            # compose parameter is maintained for API compatibility
+            # but is not used in current implementation
+            self._upload_to_kaggle()
         except ValueError as e:
             logging.error("Failed to upload to kaggle")
             raise e

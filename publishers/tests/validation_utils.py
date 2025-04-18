@@ -1,3 +1,7 @@
+"""
+Utility functions for validating the state of the system during and after tests.
+Provides validation helpers for scraper output, converter output, and database state.
+"""
 from il_supermarket_scarper import DumpFolderNames, FileTypesFilters
 from data_models.raw_schema import ScraperStatus, ParserStatus, file_name_to_table
 from managers.cache_manager import CacheManager
@@ -8,6 +12,13 @@ import pandas as pd
 
 
 def validate_scraper_output(data_folder, enabled_scrapers):
+    """
+    Validate the output produced by the scraper.
+    
+    Args:
+        data_folder: Folder containing the scraped data
+        enabled_scrapers: List of enabled scrapers
+    """
     assert os.path.exists(data_folder)
     assert len(os.listdir(data_folder)) == 2
     # status folder
@@ -38,6 +49,14 @@ def validate_scraper_output(data_folder, enabled_scrapers):
 def validate_state_after_deleted_dump_files(
     data_folder, outputs_folder, enabled_scrapers
 ):
+    """
+    Validate the state of the system after dump files have been deleted.
+    
+    Args:
+        data_folder: Folder that contained the scraped data
+        outputs_folder: Folder containing the converted output
+        enabled_scrapers: List of enabled scrapers
+    """
     assert len(os.listdir(data_folder)) == 1
 
     assert os.path.exists(outputs_folder)
@@ -56,6 +75,14 @@ def validate_state_after_deleted_dump_files(
 
 
 def validate_converting_output(data_folder, outputs_folder, enabled_scrapers):
+    """
+    Validate the output produced by the converter.
+    
+    Args:
+        data_folder: Folder containing the scraped data
+        outputs_folder: Folder containing the converted output
+        enabled_scrapers: List of enabled scrapers
+    """
     assert os.path.exists(outputs_folder)
     assert len(os.listdir(outputs_folder)) == 2
     assert os.path.exists(os.path.join(outputs_folder, "parser-status.json"))
@@ -75,6 +102,16 @@ def validate_converting_output(data_folder, outputs_folder, enabled_scrapers):
 def validate_state_after_api_update(
     app_folder, data_folder, outputs_folder, enabled_scrapers, short_term_db_target
 ):
+    """
+    Validate the state of the system after API update.
+    
+    Args:
+        app_folder: Base application folder
+        data_folder: Folder containing the scraped data
+        outputs_folder: Folder containing the converted output
+        enabled_scrapers: List of enabled scrapers
+        short_term_db_target: The short-term database target
+    """
     assert os.path.exists(app_folder)
 
     # dump exist and empty
@@ -121,6 +158,14 @@ def validate_state_after_api_update(
 
 
 def validate_long_term_structure(remote_dataset_path, stage_folder, enabled_scrapers):
+    """
+    Validate the structure of the long-term dataset.
+    
+    Args:
+        remote_dataset_path: Path to the remote dataset
+        stage_folder: Path to the staging folder
+        enabled_scrapers: List of enabled scrapers
+    """
     assert os.path.exists(remote_dataset_path)
     assert os.path.exists(os.path.join(remote_dataset_path, "index.json"))
     assert os.path.exists(os.path.join(remote_dataset_path, "parser-status.json"))
@@ -138,6 +183,15 @@ def validate_long_term_structure(remote_dataset_path, stage_folder, enabled_scra
 
 
 def validate_cleanup(app_folder, data_folder, outputs_folder, status_folder):
+    """
+    Validate that cleanup has been performed correctly.
+    
+    Args:
+        app_folder: Base application folder
+        data_folder: Folder containing the scraped data
+        outputs_folder: Folder containing the converted output
+        status_folder: Folder containing status information
+    """
     assert not os.path.exists(data_folder)
     assert not os.path.exists(outputs_folder)
     assert not os.path.exists(status_folder)
@@ -153,6 +207,16 @@ def validate_api_scan(
     num_of_expected_files,
     long_term_remote_dataset_path,
 ):
+    """
+    Validate the API scan results.
+    
+    Args:
+        enabled_scrapers: List of enabled scrapers
+        short_term_database_connector: Connector to the short-term database
+        long_term_database_connector: Connector to the long-term database
+        num_of_expected_files: Expected number of files
+        long_term_remote_dataset_path: Path to the long-term remote dataset
+    """
     #
     access_layer = AccessLayer(
         short_term_database_connector=short_term_database_connector,

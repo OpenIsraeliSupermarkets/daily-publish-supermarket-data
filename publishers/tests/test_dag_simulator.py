@@ -1,18 +1,26 @@
-import datetime
-from publishers.dag_simulator import SupermarketDataPublisher
-from il_supermarket_scarper.scrappers_factory import ScraperFactory
-from remotes import DummyFileStorage, DummyDocumentDbUploader
+"""
+Integration tests for the SupermarketDataPublisher class.
+Tests the full DAG execution pipeline from disk.
+"""
 import os
-from utils import now
 import tempfile
+import datetime
+from il_supermarket_scarper.scrappers_factory import ScraperFactory
+from publishers.dag_simulator import SupermarketDataPublisher
 from publishers.tests.validation_utils import (
     validate_cleanup,
     validate_long_term_structure,
     validate_api_scan,
 )
+from remotes import DummyFileStorage, DummyDocumentDbUploader
+from utils import now
 
 
 def test_full_dag_integration_from_disk():
+    """
+    Test the full DAG integration for the SupermarketDataPublisher.
+    Verifies data scraping, converting, API updates, and publishing.
+    """
     # params
     expected_duration_in_minutes = 1
     num_of_occasions = 1
@@ -59,9 +67,9 @@ def test_full_dag_integration_from_disk():
             when_date=when_date,
         )
         publisher.run(
-            now=True,
-            itreative_operations="scraping,converting,api_update,clean_dump_files",
+            operations="scraping,converting,api_update,clean_dump_files",
             final_operations="publishing,clean_all_source_data",
+            now=True
         )
 
         validate_api_scan(

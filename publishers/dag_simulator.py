@@ -1,13 +1,22 @@
-import schedule
-import time
+"""
+Module for simulating DAG-based execution of supermarket data publishing tasks.
+Provides scheduling and execution of tasks at specified times.
+"""
 import logging
+import time
 import datetime
-import os
+import schedule
 from remotes import KaggleUploader, MongoDbUploader
 from publishers.dag_publisher import SupermarketDataPublisherInterface
 
 
 class SupermarketDataPublisher(SupermarketDataPublisherInterface):
+    """
+    Publisher that simulates DAG execution by scheduling tasks at specified intervals.
+
+    Extends SupermarketDataPublisherInterface to provide functionality for scheduling
+    and tracking execution of tasks.
+    """
 
     def __init__(
         self,
@@ -48,7 +57,7 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
         self.occasions = self._compute_occasions()
 
     def _setup_schedule(self, operations):
-        logging.info(f"Scheduling the scraping tasks at {self.occasions}")
+        logging.info("Scheduling the scraping tasks at %s", self.occasions)
         for occasion in self.occasions:
             schedule.every().day.at(occasion).do(self._execute_operations, operations)
 
@@ -96,11 +105,26 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
         """Return the start of the day"""
         return datetime.datetime.combine(self.today, datetime.time(12, 0))
 
-    def run(self, itreative_operations, final_operations, now=False):
+    def run(self, operations, final_operations=None, now=False):
+        """
+        Run the scheduled operations and then the final operations.
+
+        Args:
+            operations: Operations to run on schedule
+            final_operations: Operations to run after scheduled operations complete
+            now: Whether to run the iterative operations immediately
+
+        Note:
+            This method overrides the parent class run method with different parameters.
+        """
+        itreative_operations = operations
+
         if now:
             self._execute_operations(itreative_operations)
 
         self._check_tz()
         self._setup_schedule(itreative_operations)
         self._track_task()
-        super().run(operations=final_operations)
+
+        if final_operations:
+            super().run(operations=final_operations)
