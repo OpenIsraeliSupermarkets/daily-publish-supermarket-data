@@ -161,3 +161,27 @@ class TestCacheManager:
             # Verify temp file was created
             assert os.path.exists(temp_file)
             mock_replace.assert_called_once_with(temp_file, cache_file)
+            
+         
+    def test_clear(self, temp_dir):
+        """Test clearing the cache."""
+        cache_file = os.path.join(temp_dir, ".push_cache")
+        
+        # Create initial cache data
+        initial_data = {
+            "file1": {"timestamps": [1, 2, 3]},
+            "last_pushed": {"file1": 10}
+        }
+        with open(cache_file, 'w') as f:
+            json.dump(initial_data, f)
+        
+        # Clear the cache
+        cache_manager = CacheManager(temp_dir)
+        with cache_manager as cache_state:
+            cache_state.clear()
+            assert cache_state.is_empty() is True
+        
+        # Verify cache file is empty
+        with open(cache_file, 'r') as f:
+            data = json.load(f)
+            assert data == {}

@@ -76,11 +76,12 @@ def validate_long_term_structure(remote_dataset_path,stage_folder,enabled_scrape
     assert os.path.exists(os.path.join(remote_dataset_path, "index.json"))
     assert os.path.exists(os.path.join(remote_dataset_path, "parser-status.json"))
     assert os.path.exists(os.path.join(remote_dataset_path, f"{DumpFolderNames[enabled_scrapers[0]].value.lower()}.json"))
-    csv_file = glob.glob(os.path.join(remote_dataset_path, "*.csv"))[0]
+    
     
     assert not os.path.exists(stage_folder)
     
-    assert f"{DumpFolderNames[enabled_scrapers[0]].value.lower()}.csv" in csv_file
+    for csv_file in glob.glob(os.path.join(remote_dataset_path, "*.csv")):
+        assert f"{DumpFolderNames[enabled_scrapers[0]].value.lower()}.csv" in csv_file
 
 
 def validate_cleanup(app_folder,data_folder,outputs_folder,status_folder):
@@ -92,7 +93,7 @@ def validate_cleanup(app_folder,data_folder,outputs_folder,status_folder):
         assert cache.is_empty()
 
 
-def validate_api_scan(enabled_scrapers,short_term_database_connector,long_term_database_connector,num_of_expected_files):
+def validate_api_scan(enabled_scrapers,short_term_database_connector,long_term_database_connector,num_of_expected_files,long_term_remote_dataset_path):
     #
     access_layer = AccessLayer(
         short_term_database_connector=short_term_database_connector,
@@ -102,7 +103,17 @@ def validate_api_scan(enabled_scrapers,short_term_database_connector,long_term_d
     files = access_layer.list_files(chain=enabled_scrapers[0])
     assert len(files.processed_files) == num_of_expected_files
     
+    entries_in_short_term_db = 0
     for file in files.processed_files:
         content = access_layer.get_file_content(chain=enabled_scrapers[0], file=file.file_name)
-        assert len(content.rows) > 0
+        entries_in_short_term_db += len(content.rows)
+        
+    entries_in_long_term_db = 0
+    csv_file = glob.glob(os.path.join(long_term_remote_dataset_path, "*.csv"))
+    for file in csv_file:
+        df = pd.read_csv(file)
+        entries_in_long_term_db += df.shape[0]
+    
+    assert entries_in_short_term_db == entries_in_long_term_db
+    
     

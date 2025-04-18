@@ -61,9 +61,10 @@ def test_full_dag():
         )
 
 
-        validate_api_scan(enabled_scrapers,short_term_db_target,long_term_db_target,num_of_occasions * file_per_run)
+        validate_api_scan(enabled_scrapers,short_term_db_target,long_term_db_target,num_of_occasions * file_per_run,remote_dataset_path)
         #
         validate_long_term_structure(remote_dataset_path,stage_folder,enabled_scrapers)
+        
         # validate the output
         validate_cleanup(app_folder,data_folder,outputs_folder,status_folder)
 

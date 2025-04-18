@@ -85,7 +85,7 @@ class CacheState:
         """
         Clear the cache data.
         """
-        self._data = {}
+        self._data.clear()
 
 class CacheManager:
     """
