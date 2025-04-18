@@ -132,6 +132,10 @@ class DataTable(CommonModel):
         return self.model_dump()
 
     @classmethod
+    def by_file_name(cls, file_name: str):
+        return {"file_name": file_name}
+
+    @classmethod
     def get_table_name(cls) -> str:
         if hasattr(cls, 'Config') and hasattr(cls.Config, 'table_name'):
             return cls.Config.table_name

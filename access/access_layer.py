@@ -2,7 +2,7 @@ import os
 import re
 from il_supermarket_scarper import ScraperFactory, FileTypesFilters
 from remotes import DummyDocumentDbUploader, MongoDbUploader, KaggleUploader
-from data_models.raw_schema import ParserStatus
+from data_models.raw_schema import ParserStatus,DataTable
 from data_models.response import ScrapedFile, TypeOfFileScraped, ScrapedFiles
 from data_models.response import (
     ScrapedFiles,
@@ -92,5 +92,5 @@ class AccessLayer:
             )
 
         table_name = get_table_name(file_type.name, chain)
-        return FileContent(rows=self.short_term_database_connector._get_table_content(table_name, file))
+        return FileContent(rows=self.short_term_database_connector._get_table_content(table_name, DataTable.by_file_name(file)))
 
