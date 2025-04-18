@@ -116,9 +116,7 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
 
         Note:
             This method overrides the parent class run method with different parameters.
-        """
-        iterative_operations = operations
-        
+        """        
         logging.info(f"Executing operations with {self.wait_time_seconds}s wait time between runs")
         for i in range(self.num_of_occasions):
             logging.info(f"Starting execution {i+1}/{self.num_of_occasions}")
