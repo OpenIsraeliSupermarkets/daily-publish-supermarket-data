@@ -54,9 +54,10 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
         self.completed_by = completed_by if completed_by else self._end_of_day()
         self.start_at = start_at if start_at else self._non()
         self.executed_jobs = 0
-        self.occasions = self._compute_occasions()
+        self.occasions = None
 
     def _setup_schedule(self, operations):
+        self.occasions = self._compute_occasions()
         logging.info("Scheduling the scraping tasks at %s", self.occasions)
         for occasion in self.occasions:
             schedule.every().day.at(occasion).do(self._execute_operations, operations)
@@ -121,10 +122,12 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
 
         if now:
             self._execute_operations(itreative_operations)
+            self.num_of_occasions = self.num_of_occasions - 1
 
-        self._check_tz()
-        self._setup_schedule(itreative_operations)
-        self._track_task()
+        if self.num_of_occasions > 0:   
+            self._check_tz()
+            self._setup_schedule(itreative_operations)
+            self._track_task()
 
         if final_operations:
             super().run(operations=final_operations)
