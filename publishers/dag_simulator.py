@@ -30,11 +30,10 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
         status_folder="status",
         enabled_scrapers=None,
         enabled_file_types=None,
-        start_at=None,
-        completed_by=None,
         num_of_occasions=3,
         limit=None,
         when_date=None,
+        wait_time_seconds=60,
     ):
         super().__init__(
             number_of_scraping_processes=number_of_scraping_processes,
@@ -51,10 +50,9 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
             when_date=when_date,
         )
         self.num_of_occasions = num_of_occasions
-        self.completed_by = completed_by if completed_by else self._end_of_day()
-        self.start_at = start_at if start_at else self._non()
         self.executed_jobs = 0
         self.occasions = None
+        self.wait_time_seconds = wait_time_seconds
 
     def _setup_schedule(self, operations):
         self.occasions = self._compute_occasions()
@@ -106,7 +104,7 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
         """Return the start of the day"""
         return datetime.datetime.combine(self.today, datetime.time(12, 0))
 
-    def run(self, operations, final_operations=None, now=False):
+    def run(self, operations, final_operations=None):
         """
         Run the scheduled operations and then the final operations.
 
@@ -114,21 +112,19 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
             operations: Operations to run on schedule
             final_operations: Operations to run after scheduled operations complete
             now: Whether to run the iterative operations immediately
+            use_wait_time: Whether to use wait time between executions (True) or time-based scheduling (False)
 
         Note:
             This method overrides the parent class run method with different parameters.
         """
-        itreative_operations = operations
-
-        if now:
-            self._execute_operations(itreative_operations)
-            self.num_of_occasions = self.num_of_occasions - 1
-            self.executed_jobs = self.executed_jobs - 1
-
-        if self.num_of_occasions > 0:   
-            self._check_tz()
-            self._setup_schedule(itreative_operations)
-            self._track_task()
+        iterative_operations = operations
+        
+        logging.info(f"Executing operations with {self.wait_time_seconds}s wait time between runs")
+        for i in range(self.num_of_occasions):
+            logging.info(f"Starting execution {i+1}/{self.num_of_occasions}")
+            self._execute_operations(operations)
+            time.sleep(self.wait_time_seconds)
+        logging.info("All scheduled executions completed")
 
         if final_operations:
             super().run(operations=final_operations)

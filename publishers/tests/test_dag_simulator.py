@@ -22,7 +22,7 @@ def test_full_dag_integration_from_disk():
     Verifies data scraping, converting, API updates, and publishing.
     """
     # params
-    expected_duration_in_minutes = 1
+    wait_time_seconds = 5  # Time to wait between executions
     num_of_occasions = 2
     file_per_run = 3
     app_folder = "app_data"
@@ -49,7 +49,7 @@ def test_full_dag_integration_from_disk():
         short_term_db_target = DummyDocumentDbUploader(db_path=temp_dir)
 
         enabled_scrapers = ScraperFactory.sample(n=1)
-        # run the process for couple of times
+        # run the process with wait time between executions
         publisher = SupermarketDataPublisher(
             long_term_db_target=long_term_db_target,
             short_term_db_target=short_term_db_target,
@@ -58,18 +58,15 @@ def test_full_dag_integration_from_disk():
             enabled_scrapers=enabled_scrapers,
             enabled_file_types=None,
             limit=file_per_run,
-            start_at=now(),
-            completed_by=now()
-            + datetime.timedelta(
-                minutes=num_of_occasions * expected_duration_in_minutes
-            ),
             num_of_occasions=num_of_occasions,
             when_date=when_date,
+            wait_time_seconds=wait_time_seconds,
         )
+        
+        # Run with wait time approach
         publisher.run(
             operations="scraping,converting,api_update,clean_dump_files",
-            final_operations="publishing,clean_all_source_data",
-            now=True
+            final_operations="publishing,clean_all_source_data"
         )
 
         validate_api_scan(
@@ -79,7 +76,7 @@ def test_full_dag_integration_from_disk():
             num_of_occasions * file_per_run,
             remote_dataset_path,
         )
-        #
+        
         validate_long_term_structure(
             remote_dataset_path, stage_folder, enabled_scrapers
         )
