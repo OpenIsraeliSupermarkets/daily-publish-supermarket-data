@@ -8,6 +8,7 @@ from abc import ABC, abstractmethod
 import shutil
 import datetime
 
+
 class LongTermDatabaseUploader(ABC):
     """Abstract base class for uploading data to remote databases.
 
@@ -15,11 +16,13 @@ class LongTermDatabaseUploader(ABC):
     It provides methods for managing dataset versions, uploading data, and checking
     update status.
     """
+
     NO_INDEX = -1
-    def __init__(self, dataset_path:str, when:datetime.datetime):
+
+    def __init__(self, dataset_path: str, when: datetime.datetime):
         self.dataset_path = dataset_path
         self.when = when
-        
+
     @abstractmethod
     def increase_index(self):
         """Increment the dataset version index.
@@ -53,7 +56,7 @@ class LongTermDatabaseUploader(ABC):
         shutil.rmtree(self.dataset_path)
 
     @abstractmethod
-    def was_updated_in_last(self, seconds: int = 24*60*60) -> bool:
+    def was_updated_in_last(self, seconds: int = 24 * 60 * 60) -> bool:
         """Check if the remote dataset was updated within specified hours.
 
         Args:
@@ -63,7 +66,6 @@ class LongTermDatabaseUploader(ABC):
             bool: True if the dataset was updated within specified hours,
                  False otherwise
         """
-         
 
     def stage(self, folder):
         """Stage a folder for upload to Kaggle.
@@ -71,18 +73,19 @@ class LongTermDatabaseUploader(ABC):
         Args:
             folder (str): Path to the folder to stage
         """
-        shutil.copytree(folder, self.dataset_path, dirs_exist_ok=True)  
-           
-    def _read_index(self,index):
+        shutil.copytree(folder, self.dataset_path, dirs_exist_ok=True)
+
+    def _read_index(self, index):
         if index is None:
             return self.NO_INDEX
         return max(map(int, index.keys()))
-           
-    def _increase_index(self,index):
-        """Increase the index of the dataset.
-        """
+
+    def _increase_index(self, index):
+        """Increase the index of the dataset."""
         if index is None or index == -1:
             index = {self.NO_INDEX + 1: self.when.strftime("%Y-%m-%d %H:%M:%S")}
-        else:   
-            index[str(max(map(int, index.keys())) + 1)] = self.when.strftime("%Y-%m-%d %H:%M:%S")
+        else:
+            index[str(max(map(int, index.keys())) + 1)] = self.when.strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
         return index

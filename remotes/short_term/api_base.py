@@ -77,15 +77,17 @@ class ShortTermDatabaseUploader:
 
     def restart_database(self):
         """Clean and recreate all tables in the database.
-        
+
         This function drops all existing tables and recreates them with their original structure.
         """
         try:
             self._clean_all_tables()
             #
             self._create_table(ParserStatus.get_index(), ParserStatus.get_table_name())
-            self._create_table(ScraperStatus.get_index(), ScraperStatus.get_table_name())
+            self._create_table(
+                ScraperStatus.get_index(), ScraperStatus.get_table_name()
+            )
             for table in list_all_dynamic_tables():
-                self._create_table(table.get_index(), table.get_table_name()) 
+                self._create_table(table.get_index(), table.get_table_name())
         except Exception as e:
             raise

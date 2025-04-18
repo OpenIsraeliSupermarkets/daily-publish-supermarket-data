@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Union,Any
+from typing import Union, Any
 
 
 class ScrapedFile(BaseModel):
@@ -24,14 +24,12 @@ class RawFileContent(BaseModel):
     file_name: str
     row_content: dict[str, Union[str, int, float]]
 
-
-
-                # row_content={
-                #     k: str(v) if isinstance(v, float) and (v in [float('inf'), float('-inf')] or v != v)  # v != v checks for NaN
-                #     else v
-                #     for k, v in row.items()
-                #     if k not in ["found_folder", "file_name", "row_index"]
-                # },
+    # row_content={
+    #     k: str(v) if isinstance(v, float) and (v in [float('inf'), float('-inf')] or v != v)  # v != v checks for NaN
+    #     else v
+    #     for k, v in row.items()
+    #     if k not in ["found_folder", "file_name", "row_index"]
+    # },
 
 
 class FileContent(BaseModel):

@@ -32,7 +32,7 @@ class TestCacheState:
         cache_state = CacheState({})
         cache_state.update_pushed_timestamps("file1", [1, 2, 3])
         assert cache_state._data == {"file1": {"timestamps": [1, 2, 3]}}
-        
+
         # Update existing file
         cache_state.update_pushed_timestamps("file1", [4, 5, 6])
         assert cache_state._data == {"file1": {"timestamps": [4, 5, 6]}}
@@ -50,7 +50,7 @@ class TestCacheState:
         cache_state = CacheState({})
         cache_state.update_last_processed_row("file1", 10)
         assert cache_state._data == {"last_pushed": {"file1": 10}}
-        
+
         # Update existing file
         cache_state.update_last_processed_row("file1", 20)
         assert cache_state._data == {"last_pushed": {"file1": 20}}
@@ -76,15 +76,15 @@ class TestCacheManager:
         with cache_manager as cache_state:
             assert isinstance(cache_state, CacheState)
             assert cache_state.is_empty() is True
-            
+
             # Update cache state
             cache_state.update_pushed_timestamps("file1", [1, 2, 3])
-        
+
         # Verify file was created
         assert os.path.exists(cache_manager.cache_file)
-        
+
         # Verify file content
-        with open(cache_manager.cache_file, 'r') as f:
+        with open(cache_manager.cache_file, "r") as f:
             data = json.load(f)
             assert data == {"file1": {"timestamps": [1, 2, 3]}}
 
@@ -93,50 +93,50 @@ class TestCacheManager:
         # Create initial cache file
         cache_file = os.path.join(temp_dir, ".push_cache")
         initial_data = {"file1": {"timestamps": [1, 2, 3]}}
-        with open(cache_file, 'w') as f:
+        with open(cache_file, "w") as f:
             json.dump(initial_data, f)
-        
+
         # Test loading existing data
         cache_manager = CacheManager(temp_dir)
         with cache_manager as cache_state:
             assert cache_state.get_pushed_timestamps("file1") == [1, 2, 3]
-            
+
             # Update cache state
             cache_state.update_pushed_timestamps("file2", [4, 5, 6])
-        
+
         # Verify file was updated
-        with open(cache_file, 'r') as f:
+        with open(cache_file, "r") as f:
             data = json.load(f)
             assert data == {
                 "file1": {"timestamps": [1, 2, 3]},
-                "file2": {"timestamps": [4, 5, 6]}
+                "file2": {"timestamps": [4, 5, 6]},
             }
 
     def test_corrupted_cache_file(self, temp_dir):
         """Test handling of corrupted cache file."""
         # Create corrupted cache file
         cache_file = os.path.join(temp_dir, ".push_cache")
-        with open(cache_file, 'w') as f:
+        with open(cache_file, "w") as f:
             f.write("This is not valid JSON")
-        
+
         # Test loading corrupted data
         cache_manager = CacheManager(temp_dir)
         with cache_manager as cache_state:
             assert cache_state.is_empty() is True
-            
+
             # Update cache state
             cache_state.update_pushed_timestamps("file1", [1, 2, 3])
-        
+
         # Verify file was fixed
-        with open(cache_file, 'r') as f:
+        with open(cache_file, "r") as f:
             data = json.load(f)
             assert data == {"file1": {"timestamps": [1, 2, 3]}}
 
-    @patch('filelock.FileLock.acquire')
+    @patch("filelock.FileLock.acquire")
     def test_lock_timeout(self, mock_acquire, temp_dir):
         """Test handling of lock timeout."""
         mock_acquire.side_effect = Timeout("Could not acquire lock")
-        
+
         cache_manager = CacheManager(temp_dir)
         with pytest.raises(RuntimeError, match="Could not acquire lock on cache file"):
             with cache_manager:
@@ -146,42 +146,41 @@ class TestCacheManager:
         """Test atomic file writing with temporary file."""
         cache_file = os.path.join(temp_dir, ".push_cache")
         temp_file = f"{cache_file}.tmp"
-        
+
         # Create initial cache file
         initial_data = {"file1": {"timestamps": [1, 2, 3]}}
-        with open(cache_file, 'w') as f:
+        with open(cache_file, "w") as f:
             json.dump(initial_data, f)
-        
+
         # Test that temp file is created during update
-        with patch('os.replace') as mock_replace:
+        with patch("os.replace") as mock_replace:
             cache_manager = CacheManager(temp_dir)
             with cache_manager as cache_state:
                 cache_state.update_pushed_timestamps("file2", [4, 5, 6])
-            
+
             # Verify temp file was created
             assert os.path.exists(temp_file)
             mock_replace.assert_called_once_with(temp_file, cache_file)
-            
-         
+
     def test_clear(self, temp_dir):
         """Test clearing the cache."""
         cache_file = os.path.join(temp_dir, ".push_cache")
-        
+
         # Create initial cache data
         initial_data = {
             "file1": {"timestamps": [1, 2, 3]},
-            "last_pushed": {"file1": 10}
+            "last_pushed": {"file1": 10},
         }
-        with open(cache_file, 'w') as f:
+        with open(cache_file, "w") as f:
             json.dump(initial_data, f)
-        
+
         # Clear the cache
         cache_manager = CacheManager(temp_dir)
         with cache_manager as cache_state:
             cache_state.clear()
             assert cache_state.is_empty() is True
-        
+
         # Verify cache file is empty
-        with open(cache_file, 'r') as f:
+        with open(cache_file, "r") as f:
             data = json.load(f)
             assert data == {}

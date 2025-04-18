@@ -27,12 +27,7 @@ class KaggleUploader(LongTermDatabaseUploader):
     and check update status of datasets.
     """
 
-    def __init__(
-        self,
-        dataset_path,
-        dataset_remote_name,
-        when
-    ):
+    def __init__(self, dataset_path, dataset_remote_name, when):
         """Initialize the Kaggle uploader.
 
         Args:
@@ -53,21 +48,24 @@ class KaggleUploader(LongTermDatabaseUploader):
         self.api.authenticate()
 
     def _sync_n_load_index(self):
-        """Sync the index of the dataset.
-        """
+        """Sync the index of the dataset."""
         try:
             if not os.path.exists(os.path.join(self.dataset_path, "index.json")):
                 self.api.dataset_download_cli(
-                    f"erlichsefi/{self.dataset_remote_name}", file_name="index.json", force=True,
-                    path=self.dataset_path
+                    f"erlichsefi/{self.dataset_remote_name}",
+                    file_name="index.json",
+                    force=True,
+                    path=self.dataset_path,
                 )
             else:
                 logging.warn("Index file already exists")
-                
-            with open(os.path.join(self.dataset_path, "index.json"), "r", encoding="utf-8") as file:
+
+            with open(
+                os.path.join(self.dataset_path, "index.json"), "r", encoding="utf-8"
+            ) as file:
                 index = json.load(file)
             return index
-        except ApiException as e: 
+        except ApiException as e:
             if e.reason == "Not Found":
                 return None
             raise Exception("Error connection to kaggle")
@@ -78,10 +76,9 @@ class KaggleUploader(LongTermDatabaseUploader):
         Returns:
             int: The current index of the dataset
         """
-        
+
         index = self._sync_n_load_index()
         return self._read_index(index)
-
 
     def increase_index(self):
         """Download and update the dataset index from Kaggle."""
@@ -100,12 +97,13 @@ class KaggleUploader(LongTermDatabaseUploader):
         Args:
             message (str): Version notes for the upload
         """
-        with open(os.path.join(self.dataset_path, "dataset-metadata.json"), "w") as file:
+        with open(
+            os.path.join(self.dataset_path, "dataset-metadata.json"), "w"
+        ) as file:
             json.dump(
-                {
-                    "id": f"erlichsefi/{self.dataset_remote_name}",
-                    **additional_metadata
-                },file)
+                {"id": f"erlichsefi/{self.dataset_remote_name}", **additional_metadata},
+                file,
+            )
         self.api.dataset_create_version(
             folder=self.dataset_path,
             version_notes=message,
@@ -117,7 +115,7 @@ class KaggleUploader(LongTermDatabaseUploader):
         shutil.rmtree(self.dataset_path)
         super().clean()
 
-    def was_updated_in_last(self, seconds: int = 24*60*60) -> bool:
+    def was_updated_in_last(self, seconds: int = 24 * 60 * 60) -> bool:
         """Check if the dataset was updated within specified hours.
 
         Args:
@@ -128,10 +126,12 @@ class KaggleUploader(LongTermDatabaseUploader):
         """
         try:
             dataset_info = self.api.dataset_list(
-                user="erlichsefi",
-                search=self.dataset_remote_name
+                user="erlichsefi", search=self.dataset_remote_name
             )[0]
-            return (datetime.now(tz=pytz.utc) - dataset_info.lastUpdated.replace(tzinfo=pytz.utc)) < timedelta(seconds=seconds)
+            return (
+                datetime.now(tz=pytz.utc)
+                - dataset_info.lastUpdated.replace(tzinfo=pytz.utc)
+            ) < timedelta(seconds=seconds)
         except Exception as e:  # pylint: disable=W0718
             logging.error("Error checking Kaggle dataset update time: %s", str(e))
             return False

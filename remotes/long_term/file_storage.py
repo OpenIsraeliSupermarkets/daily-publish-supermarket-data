@@ -44,7 +44,7 @@ class DummyFileStorage(LongTermDatabaseUploader):
             with open(os.path.join(self.dataset_path, "index.json"), "r") as f:
                 index = json.load(f)
         return index
-        
+
     def get_current_index(self):
         """Get the current index of the dataset.
 
@@ -58,7 +58,7 @@ class DummyFileStorage(LongTermDatabaseUploader):
         """Write an index file with value 1."""
         index = self._load_index()
         index = self._increase_index(index)
-        
+
         os.makedirs(self.dataset_path, exist_ok=True)
         with open(os.path.join(self.dataset_path, "index.json"), "w") as f:
             json.dump(index, f)
@@ -80,8 +80,7 @@ class DummyFileStorage(LongTermDatabaseUploader):
             if os.path.isfile(file_path):
                 shutil.copy(file_path, self.dataset_remote_path)
 
-
-    def was_updated_in_last(self, seconds: int = 24*60*60) -> bool:
+    def was_updated_in_last(self, seconds: int = 24 * 60 * 60) -> bool:
         """Check if any files in the storage were updated within specified hours.
 
         Args:

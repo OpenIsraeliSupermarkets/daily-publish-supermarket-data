@@ -26,7 +26,6 @@ from datetime import datetime, timedelta
 from utils import get_long_term_database_connector, get_short_term_database_connector
 
 
-
 class TelemetryMiddleware(BaseHTTPMiddleware):
     def __init__(self, app):
         super().__init__(app)
@@ -162,17 +161,23 @@ async def file_content(
 
 
 @app.get("/service_health", tags=["Health"])
-async def service_health_check(credentials: HTTPAuthorizationCredentials = Security(security)) -> ServiceHealth:
-    return ServiceHealth(status="healthy", timestamp=datetime.now().astimezone().isoformat())
+async def service_health_check(
+    credentials: HTTPAuthorizationCredentials = Security(security),
+) -> ServiceHealth:
+    return ServiceHealth(
+        status="healthy", timestamp=datetime.now().astimezone().isoformat()
+    )
 
 
 @app.get("/short_term_health", tags=["Health"])
-async def is_short_term_updated(credentials: HTTPAuthorizationCredentials = Security(security)) -> ShortTermDatabaseHealth:
+async def is_short_term_updated(
+    credentials: HTTPAuthorizationCredentials = Security(security),
+) -> ShortTermDatabaseHealth:
     return access_layer.is_short_term_updated()
-     
 
 
 @app.get("/long_term_health", tags=["Health"])
-async def is_long_term_updated(credentials: HTTPAuthorizationCredentials = Security(security)) -> LongTermDatabaseHealth:
+async def is_long_term_updated(
+    credentials: HTTPAuthorizationCredentials = Security(security),
+) -> LongTermDatabaseHealth:
     return access_layer.is_long_term_updated()
-

@@ -15,22 +15,20 @@ class ShortTermDBDatasetManager:
         app_folder,
         outputs_folder,
         status_folder,
-        short_term_db_target:ShortTermDatabaseUploader
+        short_term_db_target: ShortTermDatabaseUploader,
     ):
         self.app_folder = app_folder
         self.uploader = short_term_db_target
         self.outputs_folder = outputs_folder
         self.status_folder = status_folder
-    
+
     def _push_parser_status(self):
         with open(f"{self.outputs_folder}/parser-status.json", "r") as file:
             records = json.load(file)
-        
+
         processed_records = [
             ParserStatus(
-                index=record["file_type"]
-                + "@"
-                + record["store_enum"],
+                index=record["file_type"] + "@" + record["store_enum"],
                 chain_name=record["store_enum"],
                 requested_limit=record["limit"],
                 requested_store_enum=record["store_enum"],
@@ -38,26 +36,27 @@ class ShortTermDBDatasetManager:
                 scaned_data_folder=record["data_folder"],
                 output_folder=record["output_folder"],
                 status=record["status"],
-                response=record["response"]
+                response=record["response"],
             ).to_dict()
             for record in records
         ]
-        self.uploader._insert_to_database(ParserStatus.get_table_name(), processed_records)
+        self.uploader._insert_to_database(
+            ParserStatus.get_table_name(), processed_records
+        )
         logging.info("Parser status stored in DynamoDB successfully.")
 
-    def _push_status_files(self, local_cahce:CacheState):
+    def _push_status_files(self, local_cahce: CacheState):
         for file in os.listdir(self.status_folder):
             if not file.endswith(".json"):
                 logging.warn(f"Skipping '{file}', should we store it?")
                 continue
-            
+
             self._push_scraper_status(file, local_cahce)
-            
+
         self._push_parser_status()
 
-               
-    def _push_scraper_status(self, file_name:str, local_cahce:CacheState):
-        
+    def _push_scraper_status(self, file_name: str, local_cahce: CacheState):
+
         with open(os.path.join(self.status_folder, file_name), "r") as f:
             data = json.load(f)
 
@@ -66,7 +65,7 @@ class ShortTermDBDatasetManager:
 
         records = []
         for index, (timestamp, actions) in enumerate(data.items()):
-            
+
             if timestamp == "verified_downloads":
                 continue
 
@@ -74,7 +73,7 @@ class ShortTermDBDatasetManager:
                 continue
 
             logging.info(f"Pushing {file_name}: {timestamp}")
-            for action in actions:     
+            for action in actions:
                 records.append(
                     ScraperStatus(
                         index=file_name.split(".")[0]
@@ -85,44 +84,45 @@ class ShortTermDBDatasetManager:
                         + "@"
                         + str(index),
                         file_name=file_name.split(".")[0],
-                        timestamp=datetime.strptime(timestamp, "%Y%m%d%H%M%S").strftime("%Y-%m-%d %H:%M:%S.%f%z"),
+                        timestamp=datetime.strptime(timestamp, "%Y%m%d%H%M%S").strftime(
+                            "%Y-%m-%d %H:%M:%S.%f%z"
+                        ),
                         status=action["status"],
                         when=action["when"],
                         status_data={
-                            key: value 
-                            for key, value in action.items() 
+                            key: value
+                            for key, value in action.items()
                             if key != "status" and key != "when"
-                        }
+                        },
                     ).to_dict()
                 )
-      
-                
+
             pushed_timestamp.append(timestamp)
 
         local_cahce.update_pushed_timestamps(file_name, pushed_timestamp)
 
         self.uploader._insert_to_database(ScraperStatus.get_table_name(), records)
 
-    def _push_files_data(self, local_cahce:CacheState):
+    def _push_files_data(self, local_cahce: CacheState):
         #
         for file in os.listdir(self.outputs_folder):
             if not file.endswith(".csv"):
                 logging.warn(f"Skipping '{file}', should we store it?")
                 continue
-            
+
             large_file_pusher = LargeFilePushManager(self.outputs_folder, self.uploader)
             large_file_pusher.process_file(file, local_cahce)
-            
+
         logging.info("Files data pushed in DynamoDB successfully.")
 
-    def upload(self,force_restart=False):
+    def upload(self, force_restart=False):
         """
         Upload the data to the database.
         """
         with CacheManager(self.app_folder) as local_cache:
             if local_cache.is_empty() or force_restart:
                 self.uploader.restart_database()
-                
+
             # push
             self._push_status_files(local_cache)
             self._push_files_data(local_cache)

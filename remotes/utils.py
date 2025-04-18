@@ -36,7 +36,9 @@ def get_latest_file_modification_time(directory_path: str) -> datetime | None:
     return last_modified
 
 
-def was_updated_within_seconds(directory_path: str, seconds: int = 24*60*60) -> bool:
+def was_updated_within_seconds(
+    directory_path: str, seconds: int = 24 * 60 * 60
+) -> bool:
     """Check if any file in a directory was updated within specified seconds.
 
     Args:

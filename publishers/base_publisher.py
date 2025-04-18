@@ -7,16 +7,15 @@ from il_supermarket_scarper import ScarpingTask
 from il_supermarket_parsers import ConvertingTask
 from managers.long_term_database_manager import LongTermDatasetManager
 from managers.short_term_database_manager import ShortTermDBDatasetManager
-from remotes import (
-    KaggleUploader,
-    MongoDbUploader
-)
+from remotes import KaggleUploader, MongoDbUploader
 from utils import now
 from managers.cache_manager import CacheManager
+
 logging.getLogger("Logger").setLevel(logging.INFO)
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
+
 
 class BaseSupermarketDataPublisher:
     """
@@ -41,7 +40,7 @@ class BaseSupermarketDataPublisher:
     ):
         """
         Initialize the BaseSupermarketDataPublisher.
-        
+
         Args:
             long_term_db_target: Target for long-term database storage (default: KaggleUploader)
             short_term_db_target: Target for short-term database storage (default: MongoDbUploader)
@@ -69,32 +68,28 @@ class BaseSupermarketDataPublisher:
         self.app_folder = app_folder
         self.data_folder = os.path.join(app_folder, data_folder)
         self.outputs_folder = os.path.join(app_folder, outputs_folder)
-        self.status_folder = os.path.join(
-            app_folder, data_folder, status_folder
-        )
+        self.status_folder = os.path.join(app_folder, data_folder, status_folder)
         self.enabled_scrapers = enabled_scrapers
         self.enabled_file_types = enabled_file_types
         self.limit = limit
 
         logging.info(f"app_folder={app_folder}")
 
-
     def _check_tz(self):
         """
         Verify that the system timezone is set to Asia/Jerusalem.
-        
+
         Raises:
             AssertionError: If the timezone is not correctly set.
         """
         assert (
-            datetime.datetime.now().hour
-            == now().hour
+            datetime.datetime.now().hour == now().hour
         ), "The timezone should be set to Asia/Jerusalem"
 
     def _execute_scraping(self):
         """
         Execute the scraping task to collect supermarket data.
-        
+
         Raises:
             Exception: If an error occurs during scraping.
         """
@@ -133,7 +128,7 @@ class BaseSupermarketDataPublisher:
     def _update_api_database(self, reset_cache=False):
         """
         Update the short-term database with the converted data.
-        
+
         Args:
             reset_cache: Whether to force a restart of the cache (default: False).
         """
@@ -141,17 +136,15 @@ class BaseSupermarketDataPublisher:
         database = ShortTermDBDatasetManager(
             short_term_db_target=self.short_term_db_target,
             app_folder=self.app_folder,
-            outputs_folder=self.outputs_folder, 
+            outputs_folder=self.outputs_folder,
             status_folder=self.status_folder,
         )
-        database.upload(
-            force_restart=reset_cache
-        )
+        database.upload(force_restart=reset_cache)
 
     def _upload_to_kaggle(self, compose=True):
         """
         Upload the data to the long-term database (Kaggle by default).
-        
+
         Args:
             compose: Whether to compose the dataset before uploading (default: True).
         """
@@ -160,8 +153,8 @@ class BaseSupermarketDataPublisher:
             long_term_db_target=self.long_term_db_target,
             enabled_scrapers=self.enabled_scrapers,
             enabled_file_types=self.enabled_file_types,
-            outputs_folder=self.outputs_folder, 
-            status_folder=self.status_folder
+            outputs_folder=self.outputs_folder,
+            status_folder=self.status_folder,
         )
         database.compose()
         database.upload()
@@ -172,10 +165,10 @@ class BaseSupermarketDataPublisher:
     def _upload_and_clean(self, compose=True):
         """
         Upload data to Kaggle and clean up afterward, regardless of success.
-        
+
         Args:
             compose: Whether to compose the dataset before uploading (default: True).
-            
+
         Raises:
             ValueError: If uploading to Kaggle fails.
         """

@@ -28,7 +28,7 @@ class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
             elif operation == "publishing":
                 self._upload_and_clean()
             elif operation == "api_update":
-                self._update_api_database()    
+                self._update_api_database()
             elif operation == "reload_complete_api":
                 self._update_api_database(reset_cache=True)
             elif operation == "upload_compose":

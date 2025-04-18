@@ -9,11 +9,11 @@ from utils import now
 class LongTermDatasetManager:
     """
     Manages the long-term storage and organization of supermarket data.
-    
+
     This class provides an abstraction layer for handling both local and remote storage
     of supermarket data, including parser outputs and scraper status files. It manages
     the staging, uploading, and versioning of datasets to remote storage platforms.
-    
+
     Attributes:
         when (datetime): Timestamp of the current operation
         enabled_scrapers (str): Comma-separated list of enabled scrapers or "ALL"
@@ -22,18 +22,18 @@ class LongTermDatasetManager:
         outputs_folder (str): Path to the outputs directory
         status_folder (str): Path to the status directory
     """
+
     def __init__(
         self,
-        outputs_folder, 
+        outputs_folder,
         status_folder,
-        long_term_db_target:LongTermDatabaseUploader,
+        long_term_db_target: LongTermDatabaseUploader,
         enabled_scrapers=None,
-        enabled_file_types=None
-        
+        enabled_file_types=None,
     ):
         """
         Initialize the LongTermDatasetManager.
-        
+
         Args:
             outputs_folder (str): Path to the outputs directory
             status_folder (str): Path to the status directory
@@ -52,11 +52,10 @@ class LongTermDatasetManager:
         self.outputs_folder = outputs_folder
         self.status_folder = status_folder
 
-
     def _read_parser_status(self):
         """
         Read and parse the parser status file.
-        
+
         Returns:
             list: List of dictionaries containing file paths and descriptions
                   for successfully created files
@@ -82,7 +81,7 @@ class LongTermDatasetManager:
     def _read_scraper_status_files(self):
         """
         Read all scraper status files from the status directory.
-        
+
         Returns:
             list: List of dictionaries containing file paths and descriptions
                   for each scraper status file
@@ -101,43 +100,43 @@ class LongTermDatasetManager:
     def compose(self):
         """
         Stage data for upload to the remote database.
-        
+
         This method stages both the outputs folder and status folder,
         and increments the dataset version index.
         """
         self.remote_database_manager.stage(self.outputs_folder)
-        self.remote_database_manager.stage(self.status_folder)        
+        self.remote_database_manager.stage(self.status_folder)
         self.remote_database_manager.increase_index()
 
     def upload(self):
         """
         Upload staged data to the remote dataset.
-        
+
         Creates a new version of the dataset with updated files and metadata.
         Includes parser status, scraper status, and processed files.
-        
+
         Raises:
             ValueError: If the upload fails
         """
-        resources  = {
-                "title": "Israeli Supermarkets 2024",
-                "resources": [
-                    {
-                        "path": "index.json",
-                        "description": "Index mapping between Kaggle versions and dataset creation times",
-                    },
-                    {
-                        "path": "parser-status.json",
-                        "description": "Parser status file",
-                    },
-                ]
-                + self._read_parser_status()
-                + self._read_scraper_status_files(),
+        resources = {
+            "title": "Israeli Supermarkets 2024",
+            "resources": [
+                {
+                    "path": "index.json",
+                    "description": "Index mapping between Kaggle versions and dataset creation times",
+                },
+                {
+                    "path": "parser-status.json",
+                    "description": "Parser status file",
+                },
+            ]
+            + self._read_parser_status()
+            + self._read_scraper_status_files(),
         }
         try:
             self.remote_database_manager.upload_to_dataset(
                 message=f"Update-Time: {self.when}, Scrapers:{self.enabled_scrapers}, Files:{self.enabled_file_types}",
-                **resources
+                **resources,
             )
         except Exception as e:
             logging.critical(f"Error uploading file: {e}")
@@ -147,6 +146,6 @@ class LongTermDatasetManager:
         """
         Clean up temporary files and resources used during the upload process.
         """
-        shutil.rmtree(self.outputs_folder,ignore_errors=True)
-        shutil.rmtree(self.status_folder,ignore_errors=True)
+        shutil.rmtree(self.outputs_folder, ignore_errors=True)
+        shutil.rmtree(self.status_folder, ignore_errors=True)
         self.remote_database_manager.clean()

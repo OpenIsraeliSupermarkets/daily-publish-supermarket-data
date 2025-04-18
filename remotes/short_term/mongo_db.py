@@ -35,7 +35,6 @@ class MongoDbUploader(ShortTermDatabaseUploader):
         self.client = pymongo.MongoClient(uri)
         self.db = self.client.supermarket_data
 
-
     def _insert_to_database(self, table_target_name, items):
         """Insert items into a MongoDB collection with error handling.
 
@@ -56,7 +55,7 @@ class MongoDbUploader(ShortTermDatabaseUploader):
             logging.warning("Bulk insert failed, trying individual inserts: %s", str(e))
             successful_records = 0
             for record in items:
-                if "_id" in record: #
+                if "_id" in record:  #
                     try:
                         collection.insert_one(record)
                         successful_records += 1
@@ -89,7 +88,6 @@ class MongoDbUploader(ShortTermDatabaseUploader):
         for collection in self.db.list_collection_names():
             self.db[collection].drop()
         logging.info("All collections deleted successfully!")
-
 
     def _is_collection_updated(
         self, collection_name: str, seconds: int = 10800
@@ -136,7 +134,7 @@ class MongoDbUploader(ShortTermDatabaseUploader):
             list: List of all documents in the collection
         """
         try:
-            return list(self.db[table_name].find(filter,{"_id": 0}))
+            return list(self.db[table_name].find(filter, {"_id": 0}))
         except pymongo.errors.PyMongoError as e:
             logging.error(
                 "Error retrieving documents from collection %s: %s", table_name, str(e)

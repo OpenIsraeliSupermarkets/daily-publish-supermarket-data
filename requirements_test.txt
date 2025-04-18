@@ -1,3 +1,4 @@
 mongomock==24.2
 pytest==8.3.5
 pytest-env==8.3.5
+black==25.1.0

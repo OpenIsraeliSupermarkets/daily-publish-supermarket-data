@@ -3,12 +3,8 @@ import time
 import logging
 import datetime
 import os
-from remotes import (
-    KaggleUploader,
-    MongoDbUploader
-)
+from remotes import KaggleUploader, MongoDbUploader
 from publishers.dag_publisher import SupermarketDataPublisherInterface
-
 
 
 class SupermarketDataPublisher(SupermarketDataPublisherInterface):
@@ -108,4 +104,3 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
         self._setup_schedule(itreative_operations)
         self._track_task()
         super().run(operations=final_operations)
-

@@ -8,12 +8,20 @@ from remotes.long_term.kaggle import KaggleUploader
 from unittest.mock import MagicMock
 
 
-def long_term_test_case(long_term_db_target, dataset_path="test-path" ,dataset_remote_name="test-super-dataset", when=datetime.now(), **kwargs):
+def long_term_test_case(
+    long_term_db_target,
+    dataset_path="test-path",
+    dataset_remote_name="test-super-dataset",
+    when=datetime.now(),
+    **kwargs
+):
 
     class TestLongTermDatabaseUploader(unittest.TestCase):
-        
+
         def setUp(self):
-            self.uploader = long_term_db_target(dataset_path, dataset_remote_name, when, **kwargs)
+            self.uploader = long_term_db_target(
+                dataset_path, dataset_remote_name, when, **kwargs
+            )
             self.dataset_path = dataset_path
             self.dataset_remote_name = dataset_remote_name
 
@@ -28,7 +36,7 @@ def long_term_test_case(long_term_db_target, dataset_path="test-path" ,dataset_r
                 f.write("test")
             self.assertFalse(self.uploader.was_updated_in_last(seconds=1))
             self.uploader.upload_to_dataset("test_message", **{"test": "test"})
-            time.sleep(3) # kaggle need a momnet
+            time.sleep(3)  # kaggle need a momnet
             self.assertTrue(self.uploader.was_updated_in_last(seconds=120))
 
     return TestLongTermDatabaseUploader
@@ -40,13 +48,11 @@ class DummyLongTermTest(long_term_test_case(DummyFileStorage)):
         # Clean up the database file after each test
         if os.path.exists("test-path"):
             shutil.rmtree("test-path")
-            
+
         super().tearDown()
 
 
-class KaggleLongTermTest(
-    long_term_test_case(KaggleUploader)
-):
+class KaggleLongTermTest(long_term_test_case(KaggleUploader)):
     pass
 
 
