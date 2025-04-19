@@ -104,7 +104,7 @@ class LargeFilePushManager:
             self.database_manager._insert_to_database(target_table_name, items)
 
             # Save last row for next iteration
-            last_row_saw = chunk.tail(1)
+            last_row_saw = chunk.tail(1).set_index("row_index")
 
         # Update cache with last processed row
         local_cache.update_last_processed_row(file, last_row)
