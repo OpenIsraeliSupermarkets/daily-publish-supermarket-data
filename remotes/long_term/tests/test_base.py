@@ -3,11 +3,10 @@ import os
 import shutil
 import time
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime
 from remotes.long_term.file_storage import DummyFileStorage
 from remotes.long_term.kaggle import KaggleUploader
-from unittest.mock import MagicMock
-from il_supermarket_scarper import ScraperFactory
+
 
 def long_term_test_case(
     long_term_db_target,
@@ -31,7 +30,6 @@ def long_term_test_case(
             self.uploader.increase_index()
             self.assertEqual(self.uploader.get_current_index(), initial_index + 1)
 
-        @pytest.mark.lock_resources("kaggle_uploader")
         def test_work_with_remote_dataset(self):
             os.makedirs(self.dataset_path, exist_ok=True)
             with open("test.txt", "w") as f:

@@ -105,7 +105,6 @@ def test_full_dag_integration_from_disk():
             temp_dir
         )
         
-@pytest.mark.lock_resources("kaggle_uploader")      
 def test_full_dag_integration_real():
     
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -115,7 +114,7 @@ def test_full_dag_integration_real():
         stage_folder = os.path.join(temp_dir, "stage")
         long_term_db_target = KaggleUploader(
                 dataset_path=stage_folder,
-                dataset_remote_name="test-super-dataset",
+                dataset_remote_name="test-super-dataset-2",
                 when=now(),
             )
         
