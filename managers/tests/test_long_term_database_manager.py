@@ -152,11 +152,10 @@ def test_integration():
         remote_name = "test_dataset"
 
         manager = LongTermDatasetManager(
-            app_folder=temp_dir,
             outputs_folder=os.path.join(temp_dir, "outputs"),
             status_folder=os.path.join(temp_dir, "status"),
             long_term_db_target=DummyFileStorage(
-                dataset_remote_name=remote_name,
+                dataset_remote_path=remote_name,
                 dataset_path=os.path.join(temp_dir, "dataset"),
                 when=now(),
             ),

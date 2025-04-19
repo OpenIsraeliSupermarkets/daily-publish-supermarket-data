@@ -124,6 +124,7 @@ class BaseSupermarketDataPublisher:
             data_folder=self.data_folder,
             multiprocessing=self.number_of_parseing_processs,
             output_folder=self.outputs_folder,
+            when_date=datetime.datetime.now(),
         ).start()
 
         logging.info("Converting task is done")
