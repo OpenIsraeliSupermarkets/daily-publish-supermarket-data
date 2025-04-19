@@ -158,7 +158,7 @@ def validate_state_after_api_update(
         )  # last row index is size -1
 
 
-def validate_long_term_structure(remote_dataset_path, stage_folder, enabled_scrapers):
+def validate_long_term_structure(long_term_db_target, stage_folder, enabled_scrapers):
     """
     Validate the structure of the long-term dataset.
     
@@ -167,23 +167,21 @@ def validate_long_term_structure(remote_dataset_path, stage_folder, enabled_scra
         stage_folder: Path to the staging folder
         enabled_scrapers: List of enabled scrapers
     """
-    assert os.path.exists(remote_dataset_path)
-    assert os.path.exists(os.path.join(remote_dataset_path, "index.json"))
-    assert os.path.exists(os.path.join(remote_dataset_path, "parser-status.json"))
-    assert os.path.exists(
-        os.path.join(
-            remote_dataset_path,
-            f"{DumpFolderNames[enabled_scrapers[0]].value.lower()}.json",
-        )
-    )
+    assert long_term_db_target.was_updated_in_last(seconds=10*60)
+    
+    files = long_term_db_target.list_files()
+    assert "index.json" in files
+    assert "parser-status.json" in files
+    assert f"{DumpFolderNames[enabled_scrapers[0]].value.lower()}.json" in files
 
-    for csv_file in glob.glob(os.path.join(remote_dataset_path, "*.csv")):
+    files = long_term_db_target.list_files(extension="csv")
+    for csv_file in files:
         assert f"{enabled_scrapers[0].lower()}.csv" in csv_file
 
     assert not os.path.exists(stage_folder)
 
 
-def validate_cleanup(app_folder, data_folder, outputs_folder, status_folder):
+def validate_local_structure(app_folder, data_folder, outputs_folder, status_folder):
     """
     Validate that cleanup has been performed correctly.
     
@@ -252,7 +250,7 @@ def validate_api_scan(
         entries_in_short_term_db += len(content.rows)
 
     entries_in_long_term_db = 0
-    csv_file = long_term_database_connector.list_files(chain=DumpFolderNames[enabled_scrapers[0]].value,extension="csv") 
+    csv_file = long_term_database_connector.list_files(chain=enabled_scrapers[0].lower(),extension="csv") 
     for file in csv_file:
         df = long_term_database_connector.get_file_content(file)
         entries_in_long_term_db += df.shape[0]

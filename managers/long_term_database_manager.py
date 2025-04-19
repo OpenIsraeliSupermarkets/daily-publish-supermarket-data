@@ -63,19 +63,30 @@ class LongTermDatasetManager:
         with open(f"{self.outputs_folder}/parser-status.json", "r") as file:
             data = json.load(file)
 
-        descriptions = []
+        collector = {}
         for entry in data:
 
             if "response" in entry and entry["response"]["file_was_created"]:
-                descriptions.append(
-                    {
-                        "path": os.path.split(entry["response"]["file_created_path"])[
-                            -1
-                        ],
-                        "description": f"{len(entry['response']['files_to_process'])} XML files from type {entry['response']['files_types']} published by '{entry['store_enum']}'",
+                file_name = os.path.split(entry["response"]["file_created_path"])[-1]
+                
+                if file_name not in collector:
+                    collector[file_name] = {
+                        "path": file_name,
+                        "store": entry['store_enum'],
+                        "files_types": entry['response']['files_types'],
+                        "files_in_csv": entry['response']['files_to_process']
                     }
-                )
-
+                else:
+                    collector[file_name]["files_in_csv"].extend(entry['response']['files_to_process'])
+                
+        descriptions = []
+        for file_name, file_info in collector.items():
+            descriptions.append(
+                {
+                    "path": file_name,
+                    "description": f"{len(file_info['files_in_csv'])} XML files from type {file_info['files_types']} published by '{file_info['store']}'",
+                }
+            )
         return descriptions
 
     def _read_scraper_status_files(self):

@@ -54,7 +54,7 @@ class LongTermDatabaseUploader(ABC):
         This method should handle cleanup of any temporary files, resources
         created during the upload process and the data that was uploaded.
         """
-        shutil.rmtree(self.dataset_path)
+        shutil.rmtree(self.dataset_path, ignore_errors=True)
 
     @abstractmethod
     def was_updated_in_last(self, seconds: int = 24 * 60 * 60) -> bool:

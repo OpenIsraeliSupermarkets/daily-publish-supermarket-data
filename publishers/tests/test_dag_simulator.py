@@ -9,7 +9,7 @@ from unittest.mock import patch
 from il_supermarket_scarper.scrappers_factory import ScraperFactory
 from publishers.dag_simulator import SupermarketDataPublisher
 from publishers.tests.validation_utils import (
-    validate_cleanup,
+    validate_local_structure,
     validate_long_term_structure,
     validate_api_scan,
     validate_short_term_structure
@@ -74,11 +74,11 @@ def run_full_dag_integration(remote_dataset_path, stage_folder, long_term_db_tar
         num_of_occasions
     )
     validate_long_term_structure(
-        remote_dataset_path, stage_folder, enabled_scrapers
+        long_term_db_target, stage_folder, enabled_scrapers
     )
 
     # validate the output
-    validate_cleanup(app_folder, data_folder, outputs_folder, status_folder)
+    validate_local_structure(app_folder, data_folder, outputs_folder, status_folder)
 
 
 
@@ -114,7 +114,7 @@ def test_full_dag_integration_real():
         stage_folder = os.path.join(temp_dir, "stage")
         long_term_db_target = KaggleUploader(
                 dataset_path=stage_folder,
-                dataset_remote_name="erlichsefi/test-super-dataset",
+                dataset_remote_name="test-super-dataset",
                 when=now(),
             )
         
