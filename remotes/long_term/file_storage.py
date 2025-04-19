@@ -5,14 +5,14 @@ primarily used for testing and development purposes.
 """
 
 import os
+import glob
 import logging
 import shutil
-from datetime import datetime
 from ..utils import was_updated_within_seconds
 from .base import LongTermDatabaseUploader
 import json
-
-
+import pandas as pd
+from il_supermarket_scarper import DumpFolderNames
 class DummyFileStorage(LongTermDatabaseUploader):
     """A dummy implementation of remote storage using local file system.
 
@@ -90,3 +90,11 @@ class DummyFileStorage(LongTermDatabaseUploader):
             bool: True if any file was updated within specified hours, False otherwise
         """
         return was_updated_within_seconds(self.dataset_remote_path, seconds)
+
+
+    def list_files(self, chain=None, extension=None):
+        return glob.glob(os.path.join(self.dataset_remote_path, self._build_pattern(chain, extension)))
+    
+    
+    def get_file_content(self, file_name):
+        return pd.read_csv(os.path.join(self.dataset_remote_path, file_name))

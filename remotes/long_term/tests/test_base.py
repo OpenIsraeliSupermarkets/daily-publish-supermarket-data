@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from remotes.long_term.file_storage import DummyFileStorage
 from remotes.long_term.kaggle import KaggleUploader
 from unittest.mock import MagicMock
-
+from il_supermarket_scarper import ScraperFactory
 
 def long_term_test_case(
     long_term_db_target,
@@ -38,6 +38,17 @@ def long_term_test_case(
             self.uploader.upload_to_dataset("test_message", **{"test": "test"})
             time.sleep(3)  # kaggle need a momnet
             self.assertTrue(self.uploader.was_updated_in_last(seconds=120))
+
+        def test_list_files(self):
+            files = self.uploader.list_files()
+            self.assertEqual(len(files), 1)
+            self.assertEqual(files[0], os.path.join(self.dataset_path, "test.txt"))
+            
+        def test_get_file_content(self):
+            file_content = self.uploader.get_file_content("test.txt")
+            self.assertEqual(file_content, "test")
+            
+            
 
         def tearDown(self):
             # Clean up the database file after each test

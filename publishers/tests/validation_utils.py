@@ -254,9 +254,9 @@ def validate_api_scan(
         entries_in_short_term_db += len(content.rows)
 
     entries_in_long_term_db = 0
-    csv_file = glob.glob(os.path.join(long_term_remote_dataset_path, "*.csv"))
+    csv_file = long_term_remote_dataset_path.list_files(chain=enabled_scrapers[0]) 
     for file in csv_file:
-        df = pd.read_csv(file)
+        df = long_term_remote_dataset_path.get_file_content(file)
         entries_in_long_term_db += df.shape[0]
 
     assert entries_in_short_term_db == entries_in_long_term_db

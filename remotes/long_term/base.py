@@ -67,6 +67,28 @@ class LongTermDatabaseUploader(ABC):
                  False otherwise
         """
 
+    @abstractmethod
+    def list_files(self, chain=None, extension=None):
+        """List all files in the remote dataset.
+
+        Args:
+            chain (str, optional): Filter files by chain name. Defaults to None.
+            extension (str, optional): Filter files by extension. Defaults to None.
+        Returns:
+            list: List of file paths in the dataset
+        """
+
+    @abstractmethod
+    def get_file_content(self, file_name):
+        """Get the content of a specific file from the dataset.
+
+        Args:
+            file_name (str): Name of the file to retrieve
+
+        Returns:
+            pandas.DataFrame: Content of the file as a DataFrame
+        """
+
     def stage(self, folder):
         """Stage a folder for upload to Kaggle.
 
@@ -89,3 +111,12 @@ class LongTermDatabaseUploader(ABC):
                 "%Y-%m-%d %H:%M:%S"
             )
         return index
+
+
+    def _build_pattern(self, chain=None, extension=None):
+        pattern = "*"
+        if chain:
+            pattern = f"*{chain.lower()}"
+        if extension:
+            pattern = f"{pattern}.{extension}"
+        return pattern

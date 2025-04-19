@@ -9,8 +9,11 @@ import pytz
 import logging
 import shutil
 import json
+import pandas as pd
+import glob
 from datetime import datetime, timedelta
 from .base import LongTermDatabaseUploader
+from il_supermarket_scarper import DumpFolderNames
 
 KAGGLE_API_AVAILABLE = None
 try:
@@ -135,3 +138,64 @@ class KaggleUploader(LongTermDatabaseUploader):
         except Exception as e:  # pylint: disable=W0718
             logging.error("Error checking Kaggle dataset update time: %s", str(e))
             return False
+
+    def list_files(self, chain=None, extension=None):
+        """List all CSV files in the dataset.
+
+        Args:
+            chain (str, optional): Filter files by chain name. Defaults to None.
+
+        Returns:
+            list: List of file paths in the dataset
+        """
+        # Download files if needed
+        try:
+            # Create dataset path if it doesn't exist
+            os.makedirs(self.dataset_path, exist_ok=True)
+            
+            # Download all dataset files if not already present
+            page_token = None
+            collected_files = []
+            while True:
+                files = self.api.dataset_list_files(
+                    f"erlichsefi/{self.dataset_remote_name}",
+                    page_token=page_token,
+                )
+                collected_files.extend([file.name for file in files.files])
+                if files.nextPageToken == "":
+                    break
+                page_token = files.nextPageToken
+            
+            # Filter by chain if specified
+            if chain:
+                collected_files = [f for f in collected_files if self._build_pattern(chain, extension) in os.path.basename(f).lower()]
+            return collected_files
+        except ApiException as e:
+            logging.error("Error listing files from Kaggle: %s", str(e))
+            return []
+
+    def get_file_content(self, file_name):
+        """Get the content of a specific file from the dataset.
+
+        Args:
+            file_name (str): Name of the file to retrieve
+
+        Returns:
+            pandas.DataFrame: Content of the file as a DataFrame
+        """
+        try:
+            # Ensure the file exists locally
+            file_path = os.path.join(self.dataset_path, file_name)
+            if not os.path.exists(file_path):
+                # Download specific file if it doesn't exist
+                self.api.dataset_download_file(
+                    f"erlichsefi/{self.dataset_remote_name}",
+                    file_name=file_name,
+                    path=self.dataset_path,
+                )
+            
+            # Read and return the CSV file as a DataFrame
+            return pd.read_csv(file_path)
+        except ApiException as e:
+            logging.error("Error getting file content from Kaggle: %s", str(e))
+            return pd.DataFrame()

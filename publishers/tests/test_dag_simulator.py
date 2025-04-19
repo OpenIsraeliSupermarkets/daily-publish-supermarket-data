@@ -115,12 +115,12 @@ def test_full_dag_integration_real():
         stage_folder = os.path.join(temp_dir, "stage")
         long_term_db_target = KaggleUploader(
                 dataset_path=stage_folder,
-                dataset_remote_path="erlichsefi/test-super-dataset",
+                dataset_remote_name="erlichsefi/test-super-dataset",
                 when=now(),
             )
         
         with patch("pymongo.MongoClient", mongomock.MongoClient):
-            short_term_db_target = MongoDbUploader(mongo_uri=temp_dir)
+            short_term_db_target = MongoDbUploader(mongodb_uri=temp_dir)
         
             test_full_dag_integration(
                 remote_dataset_path,
