@@ -100,6 +100,7 @@ class KaggleUploader(LongTermDatabaseUploader):
         Args:
             message (str): Version notes for the upload
         """
+        os.makedirs(self.dataset_path, exist_ok=True)
         with open(
             os.path.join(self.dataset_path, "dataset-metadata.json"), "w"
         ) as file:
@@ -194,8 +195,15 @@ class KaggleUploader(LongTermDatabaseUploader):
                     path=self.dataset_path,
                 )
             
-            # Read and return the CSV file as a DataFrame
-            return pd.read_csv(file_path)
+            if file_name.endswith(".json"):
+                with open(file_path, "r", encoding="utf-8") as file:
+                    return json.load(file)
+            elif file_name.endswith(".csv"):
+                # Read and return the CSV file as a DataFrame
+                return pd.read_csv(file_path)
+            else:
+                with open(file_path, "r") as file:
+                    return file.read()
         except ApiException as e:
             logging.error("Error getting file content from Kaggle: %s", str(e))
             return pd.DataFrame()

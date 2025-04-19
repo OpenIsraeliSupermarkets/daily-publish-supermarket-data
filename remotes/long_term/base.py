@@ -6,6 +6,7 @@ ensuring consistent interface across different implementations.
 
 from abc import ABC, abstractmethod
 import shutil
+import os
 import datetime
 
 
@@ -89,13 +90,16 @@ class LongTermDatabaseUploader(ABC):
             pandas.DataFrame: Content of the file as a DataFrame
         """
 
-    def stage(self, folder):
+    def stage(self, folder_or_file):
         """Stage a folder for upload to Kaggle.
 
         Args:
-            folder (str): Path to the folder to stage
+            folder_or_file (str): Path to the folder or file to stage
         """
-        shutil.copytree(folder, self.dataset_path, dirs_exist_ok=True)
+        if os.path.isdir(folder_or_file):
+            shutil.copytree(folder_or_file, self.dataset_path, dirs_exist_ok=True)
+        else:
+            shutil.copy2(folder_or_file, self.dataset_path)
 
     def _read_index(self, index):
         if index is None:

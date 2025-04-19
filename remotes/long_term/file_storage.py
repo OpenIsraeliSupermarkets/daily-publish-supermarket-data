@@ -93,8 +93,17 @@ class DummyFileStorage(LongTermDatabaseUploader):
 
 
     def list_files(self, chain=None, extension=None):
-        return glob.glob(os.path.join(self.dataset_remote_path, self._build_pattern(chain, extension)))
+        files = glob.glob(os.path.join(self.dataset_remote_path, self._build_pattern(chain, extension)))
+        return [os.path.basename(f) for f in files]
     
     
     def get_file_content(self, file_name):
-        return pd.read_csv(os.path.join(self.dataset_remote_path, file_name))
+        if file_name.endswith(".json"):
+            with open(os.path.join(self.dataset_remote_path, file_name), "r", encoding="utf-8") as file:
+                return json.load(file)
+        elif file_name.endswith(".csv"):
+            # Read and return the CSV file as a DataFrame
+            return pd.read_csv(os.path.join(self.dataset_remote_path, file_name))
+        else:
+            with open(os.path.join(self.dataset_remote_path, file_name), "r") as file:
+                return file.read()

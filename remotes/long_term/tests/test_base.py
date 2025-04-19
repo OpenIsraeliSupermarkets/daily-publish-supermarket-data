@@ -30,23 +30,24 @@ def long_term_test_case(
             self.uploader.increase_index()
             self.assertEqual(self.uploader.get_current_index(), initial_index + 1)
 
-        def test_upload_to_dataset(self):
+        def test_work_with_remote_dataset(self):
             os.makedirs(self.dataset_path, exist_ok=True)
-            with open(os.path.join(self.dataset_path, "test.txt"), "w") as f:
+            with open("test.txt", "w") as f:
                 f.write("test")
+                
+            self.uploader.stage("test.txt")
             self.assertFalse(self.uploader.was_updated_in_last(seconds=1))
             self.uploader.upload_to_dataset("test_message", **{"test": "test"})
             time.sleep(3)  # kaggle need a momnet
             self.assertTrue(self.uploader.was_updated_in_last(seconds=120))
-
-        def test_list_files(self):
             files = self.uploader.list_files()
             self.assertEqual(len(files), 1)
-            self.assertEqual(files[0], os.path.join(self.dataset_path, "test.txt"))
+            self.assertEqual(files[0], "test.txt")
             
-        def test_get_file_content(self):
             file_content = self.uploader.get_file_content("test.txt")
             self.assertEqual(file_content, "test")
+
+            
             
             
 

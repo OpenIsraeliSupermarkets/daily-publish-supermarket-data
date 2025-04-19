@@ -225,7 +225,6 @@ def validate_api_scan(
     short_term_database_connector,
     long_term_database_connector,
     num_of_expected_files,
-    long_term_remote_dataset_path,
 ):
     """
     Validate the API scan results.
@@ -235,7 +234,6 @@ def validate_api_scan(
         short_term_database_connector: Connector to the short-term database
         long_term_database_connector: Connector to the long-term database
         num_of_expected_files: Expected number of files
-        long_term_remote_dataset_path: Path to the long-term remote dataset
     """
     #
     access_layer = AccessLayer(
@@ -254,9 +252,9 @@ def validate_api_scan(
         entries_in_short_term_db += len(content.rows)
 
     entries_in_long_term_db = 0
-    csv_file = long_term_remote_dataset_path.list_files(chain=enabled_scrapers[0]) 
+    csv_file = long_term_database_connector.list_files(chain=DumpFolderNames[enabled_scrapers[0]].value,extension="csv") 
     for file in csv_file:
-        df = long_term_remote_dataset_path.get_file_content(file)
+        df = long_term_database_connector.get_file_content(file)
         entries_in_long_term_db += df.shape[0]
 
     assert entries_in_short_term_db == entries_in_long_term_db

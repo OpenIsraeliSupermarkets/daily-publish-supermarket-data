@@ -18,7 +18,7 @@ from remotes import DummyFileStorage, DummyDocumentDbUploader,KaggleUploader, Mo
 from utils import now
 
 
-def test_full_dag_integration(remote_dataset_path, stage_folder, long_term_db_target, short_term_db_target, temp_dir):
+def run_full_dag_integration(remote_dataset_path, stage_folder, long_term_db_target, short_term_db_target, temp_dir):
     """
     Test the full DAG integration for the SupermarketDataPublisher.
     Verifies data scraping, converting, API updates, and publishing.
@@ -66,7 +66,6 @@ def test_full_dag_integration(remote_dataset_path, stage_folder, long_term_db_ta
         short_term_db_target,
         long_term_db_target,
         num_of_occasions * file_per_run,
-        remote_dataset_path,
     )
     
     validate_short_term_structure(
@@ -97,7 +96,7 @@ def test_full_dag_integration_from_disk():
             )
         short_term_db_target = DummyDocumentDbUploader(db_path=temp_dir)
         
-        test_full_dag_integration(
+        run_full_dag_integration(
             remote_dataset_path,
             stage_folder,
             long_term_db_target,
@@ -122,7 +121,7 @@ def test_full_dag_integration_real():
         with patch("pymongo.MongoClient", mongomock.MongoClient):
             short_term_db_target = MongoDbUploader(mongodb_uri=temp_dir)
         
-            test_full_dag_integration(
+            run_full_dag_integration(
                 remote_dataset_path,
                 stage_folder,
                 long_term_db_target,
