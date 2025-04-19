@@ -5,12 +5,12 @@ specifically designed for supermarket data management.
 """
 
 import os
+import re
 import pytz
 import logging
 import shutil
 import json
 import pandas as pd
-import glob
 from datetime import datetime, timedelta
 from .base import LongTermDatabaseUploader
 from il_supermarket_scarper import DumpFolderNames
@@ -168,8 +168,10 @@ class KaggleUploader(LongTermDatabaseUploader):
                 page_token = files.nextPageToken
             
             # Filter by chain if specified
-            if chain:
-                collected_files = [f for f in collected_files if self._build_pattern(chain, extension) in os.path.basename(f).lower()]
+            if chain is not None or extension is not None:
+                pattern = self._build_pattern(chain, extension)
+                # Use glob-style pattern matching to filter files
+                collected_files = [f for f in collected_files if re.match(pattern.replace("*", ".*"), f)]
             return collected_files
         except ApiException as e:
             logging.error("Error listing files from Kaggle: %s", str(e))
