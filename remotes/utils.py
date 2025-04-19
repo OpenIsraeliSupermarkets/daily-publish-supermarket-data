@@ -8,7 +8,7 @@ import os
 from datetime import datetime, timedelta
 
 
-def get_latest_file_modification_time(directory_path: str) -> datetime | None:
+def get_latest_file_modification_time(directory_path: str) -> datetime:
     """Get the most recent modification time of any file in a directory.
 
     This function scans all files in a directory and returns the timestamp
