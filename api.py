@@ -1,15 +1,15 @@
 from fastapi import FastAPI, HTTPException, Header, Request, Security
 from starlette.middleware.base import BaseHTTPMiddleware
-from accass.access_layer import AccessLayer
-from remotes import MongoDbUploader, KaggleUploader
+from access.access_layer import AccessLayer
 from typing import Optional
-from token_validator import TokenValidator, SupabaseTelemetry
+from access.token_validator import TokenValidator, SupabaseTelemetry
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import JSONResponse, Response
-import time
+import os
 
-from datetime import datetime, timedelta
-from utils import get_long_term_database_connector, get_short_term_database_connector
+from datetime import datetime
+from remotes import KaggleUploader, MongoDbUploader
+
 from data_models.response import (
     ScrapedFiles,
     TypeOfFileScraped,
@@ -20,86 +20,8 @@ from data_models.response import (
     ShortTermDatabaseHealth,
 )
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.responses import JSONResponse, Response
-import time
-from datetime import datetime, timedelta
-from utils import get_long_term_database_connector, get_short_term_database_connector
-
-
-class TelemetryMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app):
-        super().__init__(app)
-        self.telemetry = SupabaseTelemetry()
-
-    async def dispatch(self, request: Request, call_next):
-        start_time = time.time()
-        response = await call_next(request)
-        process_time = time.time() - start_time
-
-        # Get response body
-        response_body = b""
-        async for chunk in response.body_iterator:
-            response_body += chunk
-
-        # הכנת נתוני הטלמטריה
-        telemetry_data = {
-            "timestamp": datetime.now().isoformat(),
-            "method": request.method,
-            "path": request.url.path,
-            "query_params": str(request.query_params),
-            "process_time_ms": round(process_time * 1000, 2),
-            "response_status": response.status_code,
-            "response_size_bytes": len(response_body),
-            "client_ip": request.client.host if request.client else None,
-            "user_agent": request.headers.get("user-agent"),
-            "authorization_method": str(
-                request.headers.get("Authorization", "").replace("Bearer ", "")
-            ),
-        }
-
-        # שליחת הנתונים ל-Supabase
-        await self.telemetry.send_telemetry(telemetry_data)
-
-        # Reconstruct response with the original body
-        return Response(
-            content=response_body,
-            status_code=response.status_code,
-            headers=dict(response.headers),
-            media_type=response.media_type,
-        )
-
-
-class AuthMiddleware(BaseHTTPMiddleware):
-    token_validator = TokenValidator()
-
-    async def dispatch(self, request: Request, call_next):
-        try:
-            if request.url.path == "/docs" or request.url.path == "/openapi.json":
-                response = await call_next(request)
-                return response
-
-            token = request.headers.get("Authorization")
-            if not token:
-                return JSONResponse(
-                    status_code=401, content={"detail": "Missing Authorization header"}
-                )
-
-            if not token.startswith("Bearer "):
-                return JSONResponse(
-                    status_code=401, content={"detail": "Invalid token format"}
-                )
-
-            token = token.replace("Bearer ", "")
-            if not self.token_validator.validate_token(token):
-                return JSONResponse(
-                    status_code=401, content={"detail": "Invalid token"}
-                )
-
-            response = await call_next(request)
-            return response
-
-        except Exception as e:
-            return JSONResponse(status_code=500, content={"detail": str(e)})
+from datetime import datetime
+from access.middleware import AuthMiddleware, TelemetryMiddleware
 
 
 security = HTTPBearer()
@@ -116,9 +38,16 @@ app.add_middleware(AuthMiddleware)
 app.add_middleware(TelemetryMiddleware)
 
 # Initialize the access layer and token validator
+
 access_layer = AccessLayer(
-    short_term_database_connector=get_short_term_database_connector(),
-    long_term_database_connector=get_long_term_database_connector(),
+    short_term_database_connector=MongoDbUploader(
+        db_path=os.environ["MONGO_DB_PATH"]
+    ),
+    long_term_database_connector=KaggleUploader(
+        dataset_path=os.environ["KAGGLE_DATASET_PATH"],
+        dataset_remote_name=os.environ["KAGGLE_DATASET_REMOTE_NAME"],
+        when=datetime.now(),
+    ),
 )
 
 

@@ -22,7 +22,7 @@ RUN pip install -r requirements.txt
 FROM base as data_processing
 COPY . .
 
-CMD python daily_raw_dump.py
+CMD python main.py
 
 # Serving
 FROM base as serving
