@@ -68,11 +68,9 @@ def short_term_test_case(short_term_db_target):
 
     return TestShortTermDatabaseUploader
 
-
-class MongoTestCase(short_term_test_case(MongoDbUploader)):
-    @patch("pymongo.MongoClient", mongomock.MongoClient)
-    def setUp(self):
-        super().setUp()
+with patch("pymongo.MongoClient", mongomock.MongoClient):
+    class MongoTestCase(short_term_test_case(MongoDbUploader(mongodb_uri="mongodb://localhost:27017"))):
+        pass
 
 
 class DummyTestCase(short_term_test_case(DummyDocumentDbUploader(db_path="./document_db"))):

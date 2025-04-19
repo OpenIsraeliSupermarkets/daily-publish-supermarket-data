@@ -195,20 +195,23 @@ def test_upload_to_kaggle_integration():
 
     try:
         # Create a publisher with minimum processing
-        enabled_scrapers = ScraperFactory.sample(n=1)
         remote_dataset_path = os.path.join(temp_dir, "remote_test_dataset")
         stage_folder = os.path.join(temp_dir, "stage")
+
+        long_term_db_target = DummyFileStorage(
+                dataset_remote_path=remote_dataset_path,
+                dataset_path=stage_folder,
+                when=now(),
+            )
+        enabled_scrapers = ScraperFactory.sample(n=1)
+        
         publisher = BaseSupermarketDataPublisher(
             app_folder=temp_dir,
             number_of_scraping_processes=1,
             number_of_parseing_processs=1,
             limit=1,
             enabled_scrapers=enabled_scrapers,
-            long_term_db_target=DummyFileStorage(
-                dataset_remote_path=remote_dataset_path,
-                dataset_path=stage_folder,
-                when=now(),
-            ),
+            long_term_db_target=long_term_db_target,
         )
 
         # We need to run scraping and converting first
@@ -226,7 +229,7 @@ def test_upload_to_kaggle_integration():
         publisher._upload_to_kaggle()
 
         validate_long_term_structure(
-            remote_dataset_path, stage_folder, enabled_scrapers
+            long_term_db_target, stage_folder, enabled_scrapers
         )
 
         # Check if the DummyFileStorage was updated
