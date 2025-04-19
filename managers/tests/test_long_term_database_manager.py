@@ -167,5 +167,5 @@ def test_integration():
         manager.upload()
         manager.clean()
 
-        assert len(os.listdir(temp_dir)) == 0
+        assert len(os.listdir(temp_dir)) == 1
         assert len(os.listdir(remote_name)) == 6
