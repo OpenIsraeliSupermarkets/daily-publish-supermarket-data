@@ -3,6 +3,7 @@ import pytest
 import tempfile
 import shutil
 import pandas as pd
+import numpy as np
 from unittest.mock import MagicMock, patch, mock_open, ANY
 from managers.large_file_push_manager import LargeFilePushManager
 from managers.cache_manager import CacheState
@@ -255,3 +256,4 @@ class TestLargeFilePushManager:
 
         # Verify cache was updated with the final row count
         assert cache_state.get_last_processed_row(test_file) == 9
+

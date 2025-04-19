@@ -78,6 +78,7 @@ class LargeFilePushManager:
 
             # Process and upload chunk
             try:
+                chunk = chunk.reset_index(names=["row_index"]).ffill()
                 items = [
                     DataTable(
                         row_index=record["row_index"],
@@ -89,9 +90,7 @@ class LargeFilePushManager:
                             if k not in ["row_index", "found_folder", "file_name"]
                         },
                     ).to_dict()
-                    for record in chunk.reset_index(names=["row_index"])
-                    .ffill()
-                    .to_dict(orient="records")
+                    for record in chunk.to_dict(orient="records")
                 ]
             except Exception as e:
                 logging.error(f"Error processing chunk: {e}")
