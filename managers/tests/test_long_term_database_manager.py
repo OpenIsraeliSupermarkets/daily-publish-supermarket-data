@@ -149,7 +149,7 @@ def test_clean(sample_manager):
 def test_integration():
     with tempfile.TemporaryDirectory() as temp_dir:
         expected_app_folder_stracture(temp_dir)
-        remote_name = "test_dataset"
+        remote_name = os.path.join(temp_dir, "test_dataset")
 
         manager = LongTermDatasetManager(
             outputs_folder=os.path.join(temp_dir, "outputs"),
