@@ -41,10 +41,10 @@ app.add_middleware(TelemetryMiddleware)
 
 access_layer = AccessLayer(
     short_term_database_connector=MongoDbUploader(
-        db_path=os.environ["MONGO_DB_PATH"]
+        mongodb_uri=os.environ["MONGODB_URI"]
     ),
     long_term_database_connector=KaggleUploader(
-        dataset_path=os.environ["KAGGLE_DATASET_PATH"],
+        dataset_path=os.environ["KAGGLE_DATASET_REMOTE_NAME"],
         dataset_remote_name=os.environ["KAGGLE_DATASET_REMOTE_NAME"],
         when=datetime.now(),
     ),
