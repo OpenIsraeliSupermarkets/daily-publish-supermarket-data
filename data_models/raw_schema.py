@@ -39,6 +39,7 @@ class Response(CommonModel):
 
 class ParserStatus(CommonModel):
     index: str
+    when_date: str
     requested_limit: Optional[str] = None
     requested_store_enum: str
     requested_file_type: str

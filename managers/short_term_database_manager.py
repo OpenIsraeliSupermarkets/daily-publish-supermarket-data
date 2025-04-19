@@ -22,27 +22,35 @@ class ShortTermDBDatasetManager:
         self.outputs_folder = outputs_folder
         self.status_folder = status_folder
 
-    def _push_parser_status(self):
+    def _push_parser_status(self, local_cahce: CacheState):
         with open(f"{self.outputs_folder}/parser-status.json", "r") as file:
             records = json.load(file)
 
-        processed_records = [
-            ParserStatus(
-                index=record["file_type"] + "@" + record["store_enum"],
-                chain_name=record["store_enum"],
-                requested_limit=record["limit"],
-                requested_store_enum=record["store_enum"],
-                requested_file_type=record["file_type"],
-                scaned_data_folder=record["data_folder"],
-                output_folder=record["output_folder"],
-                status=record["status"],
-                response=record["response"],
-            ).to_dict()
-            for record in records
-        ]
+        pushed_timestamps = local_cahce.get_pushed_timestamps("parser-status.json")
+        added_timestamps = []
+        processed_records = []
+        
+        for record in records:
+            if record["when_date"] not in pushed_timestamps:
+                processed_records.append(ParserStatus(
+                    index=record["file_type"] + "@" + record["store_enum"] + "@" + record["when_date"],
+                    when_date=record["when_date"],
+                    requested_limit=record["limit"],
+                    requested_store_enum=record["store_enum"],
+                    requested_file_type=record["file_type"],
+                    scaned_data_folder=record["data_folder"],
+                    output_folder=record["output_folder"],
+                    status=record["status"],
+                    response=record["response"],
+                ).to_dict())
+                added_timestamps.append(record["when_date"])
+        
         self.uploader._insert_to_database(
             ParserStatus.get_table_name(), processed_records
         )
+        
+        local_cahce.update_pushed_timestamps("parser-status.json", list(set(added_timestamps)) + pushed_timestamps)
+        
         logging.info("Parser status stored in DynamoDB successfully.")
 
     def _push_status_files(self, local_cahce: CacheState):
@@ -53,7 +61,7 @@ class ShortTermDBDatasetManager:
 
             self._push_scraper_status(file, local_cahce)
 
-        self._push_parser_status()
+        self._push_parser_status(local_cahce)
 
     def _push_scraper_status(self, file_name: str, local_cahce: CacheState):
 
