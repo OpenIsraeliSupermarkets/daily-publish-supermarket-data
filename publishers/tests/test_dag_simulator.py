@@ -11,6 +11,7 @@ from publishers.tests.validation_utils import (
     validate_cleanup,
     validate_long_term_structure,
     validate_api_scan,
+    validate_short_term_structure
 )
 from remotes import DummyFileStorage, DummyDocumentDbUploader
 from utils import now
@@ -77,6 +78,11 @@ def test_full_dag_integration_from_disk():
             remote_dataset_path,
         )
         
+        validate_short_term_structure(
+            short_term_db_target,
+            enabled_scrapers,
+            num_of_occasions
+        )
         validate_long_term_structure(
             remote_dataset_path, stage_folder, enabled_scrapers
         )

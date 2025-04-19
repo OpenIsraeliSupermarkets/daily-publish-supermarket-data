@@ -3,6 +3,7 @@ Utility functions for validating the state of the system during and after tests.
 Provides validation helpers for scraper output, converter output, and database state.
 """
 from il_supermarket_scarper import DumpFolderNames, FileTypesFilters
+from il_supermarket_scarper.utils import ScraperStatus as ScraperStatusReport
 from data_models.raw_schema import ScraperStatus, ParserStatus, file_name_to_table
 from managers.cache_manager import CacheManager
 from access.access_layer import AccessLayer
@@ -199,6 +200,25 @@ def validate_cleanup(app_folder, data_folder, outputs_folder, status_folder):
     with CacheManager(app_folder) as cache:
         assert cache.is_empty()
 
+
+def validate_short_term_structure(
+    short_term_db_target,
+    enabled_scrapers,
+    num_of_occasions
+):
+    """
+    Validate the structure of the short-term database.
+    
+    Args:
+        short_term_db_target: The short-term database target
+        enabled_scrapers: List of enabled scrapers
+    """
+    
+    num_of_documents_in_scraper_status_per_chain = len([ScraperStatusReport.STARTED, ScraperStatusReport.COLLECTED, ScraperStatusReport.DOWNLOADED, ScraperStatusReport.ESTIMATED_SIZE])
+    num_of_documents_in_parser_status_per_chain = len(FileTypesFilters)
+    assert len(short_term_db_target._get_table_content(ScraperStatus.get_table_name())) == num_of_occasions*num_of_documents_in_scraper_status_per_chain*len(enabled_scrapers)
+    assert len(short_term_db_target._get_table_content(ParserStatus.get_table_name())) == num_of_occasions * len(enabled_scrapers) * num_of_documents_in_parser_status_per_chain
+    
 
 def validate_api_scan(
     enabled_scrapers,
