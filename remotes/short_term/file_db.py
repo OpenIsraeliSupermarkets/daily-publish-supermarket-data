@@ -20,7 +20,7 @@ class DummyDocumentDbUploader(ShortTermDatabaseUploader):
     Each table is a directory and each document is stored as a JSON file.
     """
 
-    def __init__(self, db_path="us-east-1"):
+    def __init__(self, db_path):
         """Initialize the document database.
 
         Args:

@@ -14,7 +14,7 @@ def short_term_test_case(short_term_db_target):
 
     class TestShortTermDatabaseUploader(unittest.TestCase):
         def setUp(self):
-            self.uploader: ShortTermDatabaseUploader = short_term_db_target()
+            self.uploader: ShortTermDatabaseUploader = short_term_db_target
 
         def test_create_and_insert_to_table(self):
             # Test table creation
@@ -75,7 +75,7 @@ class MongoTestCase(short_term_test_case(MongoDbUploader)):
         super().setUp()
 
 
-class DummyTestCase(short_term_test_case(DummyDocumentDbUploader)):
+class DummyTestCase(short_term_test_case(DummyDocumentDbUploader(db_path="./document_db"))):
 
     def tearDown(self):
         # Clean up the database file after each test

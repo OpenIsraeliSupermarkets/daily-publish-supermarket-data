@@ -39,6 +39,14 @@ def long_term_test_case(
             time.sleep(3)  # kaggle need a momnet
             self.assertTrue(self.uploader.was_updated_in_last(seconds=120))
 
+        def tearDown(self):
+            # Clean up the database file after each test
+            if os.path.exists(dataset_remote_name):
+                shutil.rmtree(dataset_remote_name)
+
+            if os.path.exists(dataset_path):
+                shutil.rmtree(dataset_path)
+            super().tearDown()
     return TestLongTermDatabaseUploader
 
 
