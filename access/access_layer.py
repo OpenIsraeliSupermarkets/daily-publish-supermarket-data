@@ -89,7 +89,7 @@ class AccessLayer:
                 f"chain {scraper} is not a valid chain {ScraperFactory.all_scrapers_name()}",
             )
 
-        file_type = FileTypesFilters.get_type_from_file(file)
+        file_type = FileTypesFilters.get_type_from_file(file.replace("NULL", ""))
         if not file_type:
             raise Exception(
                 f"file {file} doesn't follow the correct pattern.",
