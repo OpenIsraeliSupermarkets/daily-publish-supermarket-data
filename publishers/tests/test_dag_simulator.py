@@ -3,6 +3,7 @@ Integration tests for the SupermarketDataPublisher class.
 Tests the full DAG execution pipeline from disk.
 """
 import os
+import pytest
 import tempfile
 import mongomock
 from unittest.mock import patch
@@ -104,7 +105,7 @@ def test_full_dag_integration_from_disk():
             temp_dir
         )
         
-        
+@pytest.mark.lock_resources("kaggle_uploader")      
 def test_full_dag_integration_real():
     
     with tempfile.TemporaryDirectory() as temp_dir:
