@@ -151,8 +151,6 @@ class KaggleUploader(LongTermDatabaseUploader):
         """
         # Download files if needed
         try:
-            # Create dataset path if it doesn't exist
-            os.makedirs(self.dataset_path, exist_ok=True)
             
             # Download all dataset files if not already present
             page_token = None
