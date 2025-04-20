@@ -40,12 +40,12 @@ services:
       - mongo-network
     restart: unless-stopped
 
-  publisher:
+  data_processor:
     build:
       context: .
       dockerfile: Dockerfile
       target: data_processing
-    container_name: data-publisher
+    container_name: data-processor
     depends_on:
       - mongodb
     environment:
