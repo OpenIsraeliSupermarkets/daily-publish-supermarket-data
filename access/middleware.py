@@ -1,18 +1,38 @@
-from fastapi import  Request
-from starlette.middleware.base import BaseHTTPMiddleware
-
-from access.token_validator import TokenValidator, SupabaseTelemetry
-from fastapi.responses import JSONResponse, Response
+"""Module providing authentication and telemetry middleware for the API."""
 import time
 from datetime import datetime
 
+from fastapi import Request
+from fastapi.responses import JSONResponse, Response
+from starlette.middleware.base import BaseHTTPMiddleware
 
-class TelemetryMiddleware(BaseHTTPMiddleware):
+from access.token_validator import TokenValidator, SupabaseTelemetry
+
+
+class TelemetryMiddleware(BaseHTTPMiddleware):  # pylint: disable=too-few-public-methods
+    """Middleware for tracking and logging API request telemetry."""
+
     def __init__(self, app):
+        """
+        Initialize the TelemetryMiddleware.
+
+        Args:
+            app: The FastAPI application
+        """
         super().__init__(app)
         self.telemetry = SupabaseTelemetry()
 
     async def dispatch(self, request: Request, call_next):
+        """
+        Process the request, measure performance, and record telemetry.
+
+        Args:
+            request: The incoming request
+            call_next: The next middleware or endpoint handler
+
+        Returns:
+            Response: The API response
+        """
         start_time = time.time()
         response = await call_next(request)
         process_time = time.time() - start_time
@@ -22,7 +42,7 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
         async for chunk in response.body_iterator:
             response_body += chunk
 
-        # הכנת נתוני הטלמטריה
+        # Prepare telemetry data
         telemetry_data = {
             "timestamp": datetime.now().isoformat(),
             "method": request.method,
@@ -38,7 +58,7 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
             ),
         }
 
-        # שליחת הנתונים ל-Supabase
+        # Send data to Supabase
         await self.telemetry.send_telemetry(telemetry_data)
 
         # Reconstruct response with the original body
@@ -50,15 +70,29 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
         )
 
 
-class AuthMiddleware(BaseHTTPMiddleware):
+class AuthMiddleware(BaseHTTPMiddleware):  # pylint: disable=too-few-public-methods
+    """Middleware for API authentication using token validation."""
+
     token_validator = TokenValidator()
 
+    # pylint: disable=too-many-return-statements
     async def dispatch(self, request: Request, call_next):
-        try:
-            if request.url.path == "/docs" or request.url.path == "/openapi.json":
-                response = await call_next(request)
-                return response
+        """
+        Process the request, validate authentication token if required.
 
+        Args:
+            request: The incoming request
+            call_next: The next middleware or endpoint handler
+
+        Returns:
+            Response: The API response or an error response
+        """
+        try:
+            # Allow documentation endpoints without authentication
+            if request.url.path in ("/docs", "/openapi.json"):
+                return await call_next(request)
+
+            # Validate Authorization header
             token = request.headers.get("Authorization")
             if not token:
                 return JSONResponse(
@@ -70,14 +104,22 @@ class AuthMiddleware(BaseHTTPMiddleware):
                     status_code=401, content={"detail": "Invalid token format"}
                 )
 
+            # Validate token
             token = token.replace("Bearer ", "")
             if not self.token_validator.validate_token(token):
                 return JSONResponse(
                     status_code=401, content={"detail": "Invalid token"}
                 )
 
-            response = await call_next(request)
-            return response
+            # Process the request if authentication succeeds
+            return await call_next(request)
 
-        except Exception as e:
+        except ValueError:
+            return JSONResponse(status_code=400, content={"detail": "Invalid request parameters"})
+        except ConnectionError:
+            return JSONResponse(
+                status_code=503, content={"detail": "Authentication service unavailable"}
+            )
+        except Exception as e:  # pylint: disable=broad-except
+            # We need to catch all exceptions here to prevent API crashes
             return JSONResponse(status_code=500, content={"detail": str(e)})

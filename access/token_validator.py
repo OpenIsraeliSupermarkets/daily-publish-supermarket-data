@@ -1,18 +1,31 @@
-from supabase import create_client
-import os
+"""Module providing token validation functionality with Supabase."""
 import logging
+import os
+
 from supabase import create_client, Client
 
 
-class TokenValidator:
+class TokenValidator:  # pylint: disable=too-few-public-methods
+    """Class for validating API tokens against Supabase database."""
+
     def __init__(self):
+        """Initialize the TokenValidator with Supabase client."""
         supabase_url = os.getenv("SUPABASE_URL")
         supabase_key = os.getenv("SUPABASE_KEY")
         self.supabase = create_client(supabase_url, supabase_key)
 
     def validate_token(self, token: str) -> bool:
+        """
+        Validate if a token exists and is active.
+
+        Args:
+            token: The token string to validate
+
+        Returns:
+            bool: True if token is valid, False otherwise
+        """
         try:
-            # בדיקה האם הטוקן קיים בטבלת הטוקנים ופעיל באמצעות שאילתת SQL ישירה
+            # Check if token exists and is active via direct SQL query
             result = self.supabase.rpc(
                 "validate_token", {"input_token": token}
             ).execute()
@@ -21,7 +34,7 @@ class TokenValidator:
             if len(result.data) == 0:
                 return False
 
-            # עדכון זמן השימוש האחרון
+            # Update last used time
             token_id = result.data[0]["id"]
             self.supabase.rpc(
                 "update_token_last_used", {"token_id": token_id}
@@ -29,13 +42,17 @@ class TokenValidator:
 
             return True
 
-        except Exception as e:
-            print(f"Error validating token: {str(e)}")
+        except Exception as e:  # pylint: disable=broad-except
+            # We need to catch any exception here to prevent API crashes during validation
+            print("Error validating token: %s", str(e))
             return False
 
 
-class SupabaseTelemetry:
+class SupabaseTelemetry:  # pylint: disable=too-few-public-methods
+    """Class for sending telemetry data to Supabase."""
+
     def __init__(self):
+        """Initialize the SupabaseTelemetry with Supabase client."""
         supabase_url = os.getenv("SUPABASE_URL")
         supabase_key = os.getenv("SUPABASE_KEY")
         if not supabase_url or not supabase_key:
@@ -45,10 +62,17 @@ class SupabaseTelemetry:
         self.supabase: Client = create_client(supabase_url, supabase_key)
 
     def send_telemetry(self, telemetry_data: dict):
+        """
+        Send telemetry data to Supabase.
+
+        Args:
+            telemetry_data: Dictionary containing telemetry data to send
+        """
         try:
-            # שליחת הנתונים לטבלת api_telemetry ב-Supabase
+            # Send data to api_telemetry table in Supabase
             self.supabase.table("api_telemetry").insert(telemetry_data).execute()
-        except Exception as e:
-            logging.error(f"Failed to send telemetry to Supabase: {e}")
-            # נמשיך לרשום ללוג גם אם השליחה ל-Supabase נכשלה
-            logging.info(f"API Telemetry: {telemetry_data}")
+        except Exception as e:  # pylint: disable=broad-except
+            # We need to catch any exception here to prevent API crashes during telemetry
+            logging.error("Failed to send telemetry to Supabase: %s", e)
+            # Continue logging even if Supabase send fails
+            logging.info("API Telemetry: %s", telemetry_data)
