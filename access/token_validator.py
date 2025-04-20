@@ -1,8 +1,6 @@
 from supabase import create_client
 import os
 import logging
-from datetime import datetime
-import os
 from supabase import create_client, Client
 
 
@@ -46,7 +44,7 @@ class SupabaseTelemetry:
             )
         self.supabase: Client = create_client(supabase_url, supabase_key)
 
-    async def send_telemetry(self, telemetry_data: dict):
+    def send_telemetry(self, telemetry_data: dict):
         try:
             # שליחת הנתונים לטבלת api_telemetry ב-Supabase
             self.supabase.table("api_telemetry").insert(telemetry_data).execute()

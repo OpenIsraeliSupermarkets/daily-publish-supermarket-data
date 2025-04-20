@@ -38,8 +38,6 @@ def run_full_dag_integration(remote_dataset_path, stage_folder, long_term_db_tar
     status_folder = os.path.join(app_folder, status_folder)
     data_folder = os.path.join(app_folder, data_folder)
 
-    
-
     enabled_scrapers = ScraperFactory.sample(n=1)
     # run the process with wait time between executions
     publisher = SupermarketDataPublisher(
