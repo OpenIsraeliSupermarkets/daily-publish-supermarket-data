@@ -87,12 +87,13 @@ class DummyDocumentDbUploader(ShortTermDatabaseUploader):
     def _clean_all_tables(self):
         """Remove all tables and their contents."""
         self._clean_meta_data()
-        for table_name in os.listdir(self.db_path):
-            table_path = os.path.join(self.db_path, table_name)
-            if os.path.isdir(table_path):
-                for file in os.listdir(table_path):
-                    os.remove(os.path.join(table_path, file))
-                os.rmdir(table_path)
+        if os.path.exists(self.db_path):
+            for table_name in os.listdir(self.db_path):
+                table_path = os.path.join(self.db_path, table_name)
+                if os.path.isdir(table_path):
+                    for file in os.listdir(table_path):
+                        os.remove(os.path.join(table_path, file))
+                    os.rmdir(table_path)
         logging.info("All tables deleted successfully!")
 
     def _is_collection_updated(

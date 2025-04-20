@@ -18,6 +18,7 @@ def short_term_test_case(short_term_db_target):
 
         def test_create_and_insert_to_table(self):
             # Test table creation
+            self.uploader._clean_all_tables()
             self.uploader._create_table("id", "test_table")
             self.assertIn("test_table", self.uploader._list_tables())
 
