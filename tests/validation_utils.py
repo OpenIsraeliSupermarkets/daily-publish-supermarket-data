@@ -85,7 +85,7 @@ def validate_converting_output(data_folder, outputs_folder, enabled_scrapers):
     assert len(os.listdir(chain_folder)) > 0, f"No files found in chain folder {chain_folder}"
     
     downloaded_file = os.listdir(chain_folder)[0]
-    detected_file_type = FileTypesFilters.get_type_from_file(downloaded_file)
+    detected_file_type = FileTypesFilters.get_type_from_file(downloaded_file.replace("NULL", ""))
     
     output_file = os.path.join(
         outputs_folder,

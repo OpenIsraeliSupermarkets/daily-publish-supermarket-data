@@ -9,7 +9,7 @@ import tempfile
 from remotes import DummyFileStorage, DummyDocumentDbUploader
 from il_supermarket_scarper import ScraperFactory
 from utils import now
-from publishers.tests.validation_utils import (
+from tests.validation_utils import (
     validate_scraper_output,
     validate_converting_output,
     validate_state_after_deleted_dump_files,
