@@ -8,7 +8,7 @@ import mongomock
 from unittest.mock import patch
 from il_supermarket_scarper.scrappers_factory import ScraperFactory
 from publishers.dag_simulator import SupermarketDataPublisher
-from publishers.tests.validation_utils import (
+from tests.validation_utils import (
     validate_local_structure,
     validate_long_term_structure,
     validate_api_scan,
