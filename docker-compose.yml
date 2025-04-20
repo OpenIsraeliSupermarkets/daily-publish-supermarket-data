@@ -30,8 +30,9 @@ services:
       - SUPABASE_URL=${SUPABASE_URL}
       - KAGGLE_KEY=${KAGGLE_KEY}
       - KAGGLE_USERNAME=${KAGGLE_USERNAME}
-      - LONG_TERM_MEMORY=${LONG_TERM_MEMORY}
-      - SHORT_TERM_MEMORY=${SHORT_TERM_MEMORY}
+      - KAGGLE_DATASET_REMOTE_NAME=${KAGGLE_DATASET_REMOTE_NAME}
+      - APP_DATA_PATH=app_data
+
     networks:
       - mongo-network
     restart: unless-stopped
@@ -49,8 +50,8 @@ services:
       - OPREATION=${OPREATION}
       - KAGGLE_KEY=${KAGGLE_KEY}
       - KAGGLE_USERNAME=${KAGGLE_USERNAME}
-      - LONG_TERM_MEMORY=${LONG_TERM_MEMORY}
-      - SHORT_TERM_MEMORY=${SHORT_TERM_MEMORY}
+      - KAGGLE_DATASET_REMOTE_NAME=${KAGGLE_DATASET_REMOTE_NAME}
+      - APP_DATA_PATH=app_data
       - LIMIT=${LIMIT}
     volumes:
       - app_data:/usr/src/app/app_data
