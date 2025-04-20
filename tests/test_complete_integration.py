@@ -106,7 +106,6 @@ def test_full_dag_integration_real():
     
     with tempfile.TemporaryDirectory() as temp_dir:
         
-        
         remote_dataset_path = os.path.join(temp_dir, "remote_test_dataset")
         stage_folder = os.path.join(temp_dir, "stage")
         long_term_db_target = KaggleUploader(
