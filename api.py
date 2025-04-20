@@ -37,8 +37,8 @@ app = FastAPI(
 app.add_middleware(AuthMiddleware)
 app.add_middleware(TelemetryMiddleware)
 
-# Initialize the access layer and token validator
 
+# Initialize the access layer and token validator
 access_layer = AccessLayer(
     short_term_database_connector=MongoDbUploader(
         mongodb_uri=os.environ["MONGODB_URI"]
