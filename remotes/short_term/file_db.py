@@ -146,7 +146,7 @@ class DummyDocumentDbUploader(ShortTermDatabaseUploader):
                 tables.append(item)
         return tables
 
-    def _get_table_content(self, table_name, filter=None):
+    def get_table_content(self, table_name, filter=None):
         """Get all content of a specific table.
 
         Args:

@@ -136,16 +136,16 @@ def validate_state_after_api_update(
 
     # document_db folder
     scraper_status_table = ScraperStatus.get_table_name()
-    scraper_status_count = len(short_term_db_target._get_table_content(scraper_status_table))
+    scraper_status_count = len(short_term_db_target.get_table_content(scraper_status_table))
     assert scraper_status_count == 4, f"Expected 4 documents in {scraper_status_table}, found {scraper_status_count}"
     
     parser_status_table = ParserStatus.get_table_name()
-    parser_status_count = len(short_term_db_target._get_table_content(parser_status_table))
+    parser_status_count = len(short_term_db_target.get_table_content(parser_status_table))
     expected_parser_count = len(FileTypesFilters) * 1  # limit
     assert parser_status_count == expected_parser_count, f"Expected {expected_parser_count} documents in {parser_status_table}, found {parser_status_count}"
     
     data_table = file_name_to_table(csv_file)
-    data_count = len(short_term_db_target._get_table_content(data_table))
+    data_count = len(short_term_db_target.get_table_content(data_table))
     assert data_count == df.shape[0], f"Expected {df.shape[0]} rows in {data_table}, found {data_count}"
 
     # cache
@@ -223,12 +223,12 @@ def validate_short_term_structure(
     
     expected_scraper_status_count = num_of_occasions * num_of_documents_in_scraper_status_per_chain * len(enabled_scrapers)
     scraper_status_table = ScraperStatus.get_table_name()
-    actual_scraper_status_count = len(short_term_db_target._get_table_content(scraper_status_table))
+    actual_scraper_status_count = len(short_term_db_target.get_table_content(scraper_status_table))
     assert actual_scraper_status_count == expected_scraper_status_count, f"Expected {expected_scraper_status_count} documents in {scraper_status_table}, found {actual_scraper_status_count}"
     
     expected_parser_status_count = num_of_occasions * len(enabled_scrapers) * num_of_documents_in_parser_status_per_chain
     parser_status_table = ParserStatus.get_table_name()
-    actual_parser_status_count = len(short_term_db_target._get_table_content(parser_status_table))
+    actual_parser_status_count = len(short_term_db_target.get_table_content(parser_status_table))
     assert actual_parser_status_count == expected_parser_status_count, f"Expected {expected_parser_status_count} documents in {parser_status_table}, found {actual_parser_status_count}"
     
 

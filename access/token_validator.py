@@ -1,4 +1,5 @@
 """Module providing token validation functionality with Supabase."""
+
 import logging
 import os
 

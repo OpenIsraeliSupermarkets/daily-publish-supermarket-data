@@ -124,7 +124,7 @@ class MongoDbUploader(ShortTermDatabaseUploader):
         """
         return self.db.list_collection_names()
 
-    def _get_table_content(self, table_name, filter=None):
+    def get_table_content(self, table_name, filter=None):
         """Get all content of a specific table.
 
         Args:

@@ -26,7 +26,7 @@ def short_term_test_case(short_term_db_target):
             test_items = [{"id": 1, "data": "test1"}, {"id": 2, "data": "test2"}]
             self.uploader._insert_to_database("test_table", copy.deepcopy(test_items))
             self.assertEqual(
-                list(self.uploader._get_table_content("test_table")), test_items
+                list(self.uploader.get_table_content("test_table")), test_items
             )
 
         def test_clean_all_tables(self):
@@ -38,7 +38,7 @@ def short_term_test_case(short_term_db_target):
             self.uploader._clean_all_tables()
             self.assertEqual(len(self.uploader._list_tables()), 0)
 
-        def test_get_table_content(self):
+        def testget_table_content(self):
             # Create test data
             self.uploader._create_table("id", "files")
             test_items = [
@@ -49,11 +49,11 @@ def short_term_test_case(short_term_db_target):
             self.uploader._insert_to_database("files", test_items)
 
             # Test filtering by chain
-            chain1_files = self.uploader._get_table_content("files")
+            chain1_files = self.uploader.get_table_content("files")
             self.assertEqual(len(chain1_files), 3)
 
             # Test filtering by chain and file type
-            chain1_csv = self.uploader._get_table_content("files", {"file_type": "csv"})
+            chain1_csv = self.uploader.get_table_content("files", {"file_type": "csv"})
             self.assertEqual(len(chain1_csv), 2)
 
         def test_collection_updated(self):

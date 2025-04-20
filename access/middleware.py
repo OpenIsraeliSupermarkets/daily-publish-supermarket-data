@@ -1,4 +1,5 @@
 """Module providing authentication and telemetry middleware for the API."""
+
 import time
 from datetime import datetime
 
@@ -115,10 +116,13 @@ class AuthMiddleware(BaseHTTPMiddleware):  # pylint: disable=too-few-public-meth
             return await call_next(request)
 
         except ValueError:
-            return JSONResponse(status_code=400, content={"detail": "Invalid request parameters"})
+            return JSONResponse(
+                status_code=400, content={"detail": "Invalid request parameters"}
+            )
         except ConnectionError:
             return JSONResponse(
-                status_code=503, content={"detail": "Authentication service unavailable"}
+                status_code=503,
+                content={"detail": "Authentication service unavailable"},
             )
         except Exception as e:  # pylint: disable=broad-except
             # We need to catch all exceptions here to prevent API crashes

@@ -1,4 +1,5 @@
 """Module providing access layer to interface with supermarket data system."""
+
 from datetime import datetime
 import re
 
@@ -116,7 +117,7 @@ class AccessLayer:
 
         files = []
         # pylint: disable=protected-access
-        for doc in self.short_term_database_connector._get_table_content(
+        for doc in self.short_term_database_connector.get_table_content(
             ParserStatus.get_table_name(), {"index": {"$regex": filter_condition}}
         ):
             if "response" in doc and "files_to_process" in doc["response"]:
@@ -162,7 +163,7 @@ class AccessLayer:
         table_name = get_table_name(file_type.name, chain)
         # pylint: disable=protected-access
         return FileContent(
-            rows=self.short_term_database_connector._get_table_content(
+            rows=self.short_term_database_connector.get_table_content(
                 table_name, DataTable.by_file_name(file)
             )
         )

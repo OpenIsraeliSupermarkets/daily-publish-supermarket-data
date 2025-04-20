@@ -42,7 +42,7 @@ class ShortTermDatabaseUploader:
     def _clean_all_tables(self):
         """Delete all tables/collections in the database."""
 
-    def _get_table_content(self, table_name, filter=None):
+    def get_table_content(self, table_name, filter=None):
         """Get all content of all tables/collections in the database.
 
         Args:
