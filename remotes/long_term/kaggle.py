@@ -188,24 +188,25 @@ class KaggleUploader(LongTermDatabaseUploader):
         """
         try:
             # Ensure the file exists locally
-            file_path = os.path.join(self.dataset_path, file_name)
-            if not os.path.exists(file_path):
+            if not os.path.exists(file_name):
                 # Download specific file if it doesn't exist
                 self.api.dataset_download_file(
                     f"erlichsefi/{self.dataset_remote_name}",
-                    file_name=file_name,
-                    path=self.dataset_path,
+                    file_name=file_name
                 )
-            
+                
             if file_name.endswith(".json"):
-                with open(file_path, "r", encoding="utf-8") as file:
+                with open(file_name, "r", encoding="utf-8") as file:
                     return json.load(file)
             elif file_name.endswith(".csv"):
                 # Read and return the CSV file as a DataFrame
-                return pd.read_csv(file_path)
+                return pd.read_csv(file_name)
             else:
-                with open(file_path, "r") as file:
+                with open(file_name, "r") as file:
                     return file.read()
         except ApiException as e:
             logging.error("Error getting file content from Kaggle: %s", str(e))
-            return pd.DataFrame()
+            raise e
+        finally:
+            if os.path.exists(file_name):
+                os.remove(file_name)
