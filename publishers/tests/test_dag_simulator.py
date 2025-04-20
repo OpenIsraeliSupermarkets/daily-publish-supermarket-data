@@ -3,7 +3,6 @@ Integration tests for the SupermarketDataPublisher class.
 Tests the full DAG execution pipeline from disk.
 """
 import os
-import time
 import tempfile
 import mongomock
 from unittest.mock import patch
@@ -62,7 +61,6 @@ def run_full_dag_integration(remote_dataset_path, stage_folder, long_term_db_tar
         final_operations="publishing,clean_all_source_data"
     )
 
-    time.sleep(3)
     validate_api_scan(
         enabled_scrapers,
         short_term_db_target,

@@ -4,6 +4,7 @@ This module provides functionality to upload, update and manage datasets on Kagg
 specifically designed for supermarket data management.
 """
 
+import time
 import os
 import re
 import pytz
@@ -113,6 +114,7 @@ class KaggleUploader(LongTermDatabaseUploader):
             version_notes=message,
             delete_old_versions=False,
         )
+        time.sleep(3) # wait for kaggle to process the request.
 
     def clean(self):
         """Clean up temporary files."""
