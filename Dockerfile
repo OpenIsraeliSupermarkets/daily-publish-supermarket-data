@@ -15,22 +15,18 @@ RUN pyenv install $PY_VERSION
 RUN pyenv global $PY_VERSION
 
 WORKDIR /usr/src/app
-COPY requirements.txt .
+COPY . .
 
 RUN pip install -r requirements.txt
 
-FROM base as data_processing
-COPY . .
+FROM base as dev
+RUN pip install -r requirements-dev.txt
 
-CMD python daily_raw_dump.py
+
+FROM base as data_processing
+CMD python main.py
 
 # Serving
+# api.py
 FROM base as serving
-COPY remotes.py .
-COPY api.py .
-COPY access_layer.py .
-COPY token_validator.py .
-COPY response_models.py .
-COPY utils.py .
 CMD uvicorn api:app --host 0.0.0.0 --port 8000 --proxy-headers
-# RUN pip install -r requirements-dev.txt

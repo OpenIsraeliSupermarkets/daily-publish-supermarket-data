@@ -50,5 +50,3 @@ jobs:
 
       - name: Run Docker Compose
         run: docker compose up -d api 
-
-      # act -W '.github/workflows/deploy_api.yml' -P self-hosted=catthehacker/ubuntu:act-latest
