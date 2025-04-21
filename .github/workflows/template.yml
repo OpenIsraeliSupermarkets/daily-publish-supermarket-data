@@ -58,6 +58,6 @@ jobs:
       run: docker compose up -d mongodb 
 
     - name: Process Request
-      run: docker compose up publisher
+      run: docker compose up data_processor
 
     # act -W '.github/workflows/template.yml' -P self-hosted=catthehacker/ubuntu:act-latest
