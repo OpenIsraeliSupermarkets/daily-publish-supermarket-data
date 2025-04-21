@@ -62,7 +62,7 @@ class SupabaseTelemetry:  # pylint: disable=too-few-public-methods
             )
         self.supabase: Client = create_client(supabase_url, supabase_key)
 
-    def send_telemetry(self, telemetry_data: dict):
+    async def send_telemetry(self, telemetry_data: dict):
         """
         Send telemetry data to Supabase.
 
