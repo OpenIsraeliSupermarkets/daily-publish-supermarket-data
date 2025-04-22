@@ -56,6 +56,7 @@ services:
       - KAGGLE_DATASET_REMOTE_NAME=${KAGGLE_DATASET_REMOTE_NAME}
       - APP_DATA_PATH=app_data
       - LIMIT=${LIMIT}
+      - ENABLED_SCRAPERS=${ENABLED_SCRAPERS}
     volumes:
       - app_data:/usr/src/app/app_data
     networks:

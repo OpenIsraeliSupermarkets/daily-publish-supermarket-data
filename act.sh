@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-if [ -f .env.test ]; then
-    export $(cat .env.test | xargs)
+if [ -f .env.unittest ]; then
+    export $(cat .env.unittest | xargs)
 fi
 
 echo "Running production API deployment workflow..."

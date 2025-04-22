@@ -17,8 +17,8 @@ if __name__ == "__main__":
         data_folder="dumps",
         outputs_folder="outputs",
         status_folder="status",
-        enabled_scrapers=None,
-        enabled_file_types=None,
+        enabled_scrapers=os.environ.get("ENABLED_SCRAPERS", None),
+        enabled_file_types=os.environ.get("ENABLED_FILE_TYPES", None),
         long_term_db_target=KaggleUploader(
             dataset_path=os.environ["KAGGLE_DATASET_REMOTE_NAME"], # make the folder the same name
             dataset_remote_name=os.environ["KAGGLE_DATASET_REMOTE_NAME"],
