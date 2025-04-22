@@ -13,6 +13,8 @@ echo "Running production scraping workflow..."
 act -W '.github/workflows/_stage_scrape.yml' -P self-hosted=catthehacker/ubuntu:act-latest -j call-workflow -s GITHUB_TOKEN=$GITHUB_TOKEN || { echo "Scraping workflow failed. Aborting."; exit 1; }
 echo "Production scraping workflow completed"
 
+python3 data_validation/main.py
+
 echo "Running production publishing workflow..."
 act -W '.github/workflows/_stage_publishing.yml' -P self-hosted=catthehacker/ubuntu:act-latest  -j call-workflow -s GITHUB_TOKEN=$GITHUB_TOKEN|| { echo "Publishing workflow failed. Aborting."; exit 1; }
 echo "Production publishing workflow completed"
