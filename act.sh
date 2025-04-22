@@ -10,9 +10,9 @@ act -W '.github/workflows/_stage_deploy_api.yml' -P self-hosted=catthehacker/ubu
 echo "Production API deployment workflow completed"
 
 echo "Running production scraping workflow..."
-act -W '.github/workflows/_stage_scrape.yml' -P self-hosted=catthehacker/ubuntu:act-latest || { echo "Scraping workflow failed. Aborting."; exit 1; }
+act -W '.github/workflows/_stage_scrape.yml' -P self-hosted=catthehacker/ubuntu:act-latest -j call-workflow || { echo "Scraping workflow failed. Aborting."; exit 1; }
 echo "Production scraping workflow completed"
 
 echo "Running production publishing workflow..."
-act -W '.github/workflows/_stage_publishing.yml' -P self-hosted=catthehacker/ubuntu:act-latest || { echo "Publishing workflow failed. Aborting."; exit 1; }
+act -W '.github/workflows/_stage_publishing.yml' -P self-hosted=catthehacker/ubuntu:act-latest  -j call-workflow || { echo "Publishing workflow failed. Aborting."; exit 1; }
 echo "Production publishing workflow completed"
