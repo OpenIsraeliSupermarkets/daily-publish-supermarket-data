@@ -39,8 +39,8 @@ jobs:
 
     - name: Adding env variables
       run: |
-        echo "APP_DATA_PATH=${{ runner.workspace }}/app_data" >> $GITHUB_ENV
-        echo "MONGO_DATA_PATH=${{ runner.workspace }}/mongo_data" >> $GITHUB_ENV
+        echo "APP_DATA_PATH=${{ env.GITHUB_WORKSPACE }}/app_data" >> $GITHUB_ENV
+        echo "MONGO_DATA_PATH=${{ env.GITHUB_WORKSPACE }}/mongo_data" >> $GITHUB_ENV
         echo "MONGO_URL=${{ secrets.MONGO_URL }}" >> $GITHUB_ENV
         echo "MONGO_PORT=${{ secrets.MONGO_PORT }}" >> $GITHUB_ENV
         echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> $GITHUB_ENV
