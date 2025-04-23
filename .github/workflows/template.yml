@@ -15,6 +15,9 @@ on:
       environment:
         type: string
         default: 'production'
+      kaggle_dataset_remote_name:
+        type: string
+        default: 'test-super-dataset-2'
         
 jobs:
   build:
@@ -27,9 +30,6 @@ jobs:
       matrix:
         python-version: ["3.11.0"]
 
-    env:
-      OPERATION: ${{ inputs.operation }}
-      KAGGLE_DATASET_REMOTE_NAME: ${{ inputs.kaggle_dataset_remote_name }}
 
     steps:
 
