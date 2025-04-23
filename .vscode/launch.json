@@ -29,7 +29,7 @@
             "justMyCode": false,
             "envFile": "${workspaceFolder}/.env.test",
             "env": {
-                "OPREATION":"scraping,converting,api_update,clean_dump_files"
+                "OPERATION":"scraping,converting,api_update,clean_dump_files"
             }
         },
         {
