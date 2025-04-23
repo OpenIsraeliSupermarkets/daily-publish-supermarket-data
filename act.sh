@@ -11,11 +11,11 @@ act -W '.github/workflows/_stage_deploy_api.yml' -P self-hosted=catthehacker/ubu
 echo "Production API deployment workflow completed"
 
 echo "Running production scraping workflow..."
-act schedule -W '.github/workflows/_stage_scrape.yml' -P self-hosted=catthehacker/ubuntu:act-latest -s GITHUB_TOKEN=$ACCESS_TOKEN  || { echo "Scraping workflow failed. Aborting."; exit 1; }
+act schedule -W '.github/workflows/_stage_scrape.yml' -P self-hosted=catthehacker/ubuntu:act-latest  -s GITHUB_TOKEN=$ACCESS_TOKEN || { echo "Scraping workflow failed. Aborting."; exit 1; }
 echo "Production scraping workflow completed"
 
 python3 data_validation/main.py
 
 echo "Running production publishing workflow..."
-act schedule -W '.github/workflows/_stage_publishing.yml' -P self-hosted=catthehacker/ubuntu:act-latest  -s GITHUB_TOKEN=$ACCESS_TOKEN --secret-file .secrets || { echo "Publishing workflow failed. Aborting."; exit 1; }
+act schedule -W '.github/workflows/_stage_publishing.yml' -P self-hosted=catthehacker/ubuntu:act-latest -s GITHUB_TOKEN=$ACCESS_TOKEN || { echo "Publishing workflow failed. Aborting."; exit 1; }
 echo "Production publishing workflow completed"
