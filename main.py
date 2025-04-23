@@ -1,6 +1,5 @@
 from remotes import KaggleUploader, MongoDbUploader
 from publishers.dag_publisher import SupermarketDataPublisherInterface
-from il_supermarket_scarper import ScraperFactory
 import os
 from utils import now
 import logging
@@ -20,14 +19,14 @@ if __name__ == "__main__":
         
     enabled_scrapers = os.environ.get("ENABLED_SCRAPERS", "")
     if enabled_scrapers == "":
-        enabled_scrapers = ScraperFactory.all_scrapers_name()
+        enabled_scrapers = None
     else:
         enabled_scrapers = enabled_scrapers.split(",")
 
 
     enabled_file_types = os.environ.get("ENABLED_FILE_TYPES", "")
     if enabled_file_types == "":
-        enabled_file_types = ScraperFactory.all_file_types()
+        enabled_file_types = None
     else:
         enabled_file_types = enabled_file_types.split(",")
     
