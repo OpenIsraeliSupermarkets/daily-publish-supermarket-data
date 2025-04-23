@@ -130,7 +130,7 @@ class ScraperCollectedStatus(CommonModel):
         Returns:
             List: Empty list if input is empty string, otherwise original value
         """
-        if v is "":
+        if v == "":
             return []
         return v
 
