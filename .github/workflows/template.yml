@@ -29,6 +29,7 @@ jobs:
 
     env:
       OPERATION: ${{ inputs.operation }}
+      KAGGLE_DATASET_REMOTE_NAME: ${{ inputs.kaggle_dataset_remote_name }}
 
     steps:
 
@@ -46,7 +47,7 @@ jobs:
         echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> $GITHUB_ENV
         echo "KAGGLE_USERNAME=${{ secrets.KAGGLE_USERNAME }}" >> $GITHUB_ENV
         echo "KAGGLE_KEY=${{ secrets.KAGGLE_KEY }}" >> $GITHUB_ENV
-        echo "OPREATION=${{ inputs.operation }}" >> $GITHUB_ENV
+        echo "OPERATION=${{ inputs.operation }}" >> $GITHUB_ENV
         echo "MONGO_USERNAME=${{ secrets.MONGO_USERNAME }}" >> $GITHUB_ENV
         echo "MONGO_PASSWORD=${{ secrets.MONGO_PASSWORD }}" >> $GITHUB_ENV
         echo "KAGGLE_DATASET_REMOTE_NAME=${{ inputs.kaggle_dataset_remote_name }}" >> $GITHUB_ENV

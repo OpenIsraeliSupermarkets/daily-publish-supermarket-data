@@ -56,4 +56,4 @@ if __name__ == "__main__":
         limit=limit,
         when_date=when,
     )
-    publisher.run(operations=os.environ["OPREATION"])
+    publisher.run(operations=os.environ["OPERATION"])
