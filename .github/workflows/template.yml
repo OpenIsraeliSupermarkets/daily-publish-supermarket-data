@@ -40,6 +40,9 @@ jobs:
 
     - name: Adding env variables
       run: |
+        echo "ENABLED_SCRAPERS=${{ secrets.ENABLED_SCRAPERS }}" >> $GITHUB_ENV
+        echo "ENABLED_FILE_TYPES=${{ secrets.ENABLED_FILE_TYPES }}" >> $GITHUB_ENV
+        echo "LIMIT=${{ secrets.LIMIT }}" >> $GITHUB_ENV
         echo "APP_DATA_PATH=${{ env.GITHUB_WORKSPACE }}/app_data" >> $GITHUB_ENV
         echo "MONGO_DATA_PATH=${{ env.GITHUB_WORKSPACE }}/mongo_data" >> $GITHUB_ENV
         echo "MONGO_URL=${{ secrets.MONGO_URL }}" >> $GITHUB_ENV
@@ -51,9 +54,7 @@ jobs:
         echo "MONGO_USERNAME=${{ secrets.MONGO_USERNAME }}" >> $GITHUB_ENV
         echo "MONGO_PASSWORD=${{ secrets.MONGO_PASSWORD }}" >> $GITHUB_ENV
         echo "KAGGLE_DATASET_REMOTE_NAME=${{ inputs.kaggle_dataset_remote_name }}" >> $GITHUB_ENV
-        echo "ENABLED_SCRAPERS=${{ secrets.ENABLED_SCRAPERS }}" >> $GITHUB_ENV
-        echo "ENABLED_FILE_TYPES=${{ secrets.ENABLED_FILE_TYPES }}" >> $GITHUB_ENV
-        echo "LIMIT=${{ secrets.LIMIT }}" >> $GITHUB_ENV
+       
         
     - name: Build with Docker
       run: docker compose build
