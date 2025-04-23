@@ -18,7 +18,6 @@ on:
       kaggle_dataset_remote_name:
         type: string
         default: 'test-super-dataset-2'
-        
 jobs:
   build:
 
