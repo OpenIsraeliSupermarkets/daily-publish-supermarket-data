@@ -53,7 +53,7 @@ jobs:
         echo "OPERATION=${{ inputs.operation }}" >> $GITHUB_ENV
         echo "MONGO_USERNAME=${{ secrets.MONGO_USERNAME }}" >> $GITHUB_ENV
         echo "MONGO_PASSWORD=${{ secrets.MONGO_PASSWORD }}" >> $GITHUB_ENV
-        echo "KAGGLE_DATASET_REMOTE_NAME=${{ inputs.kaggle_dataset_remote_name }}" >> $GITHUB_ENV
+        echo "KAGGLE_DATASET_REMOTE_NAME=inputs.kaggle_dataset_remote_name" >> $GITHUB_ENV
        
         
     - name: Build with Docker
