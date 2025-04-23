@@ -37,6 +37,15 @@ jobs:
       with:
         ref: ${{ inputs.branch }}
 
+
+    - name: Set enabled scrapers
+      run: |
+        echo "ENABLED_SCRAPERS=${{ inputs.enabled_scrapers }}" >> $GITHUB_ENV
+
+    - name: Set enabled file types
+      run: |
+        echo "ENABLED_FILE_TYPES=${{ inputs.enabled_file_types }}" >> $GITHUB_ENV
+        
     - name: Adding env variables
       run: |
         echo "APP_DATA_PATH=${{ env.GITHUB_WORKSPACE }}/app_data" >> $GITHUB_ENV
