@@ -110,6 +110,20 @@ class ScraperStartedStatus(CommonModel):
     filter_zero: bool
     suppress_exception: bool
 
+    @field_validator("limit", mode="before")
+    @classmethod
+    def all_empty(cls, v):
+        """Convert empty string to -1.
+        
+        Args:
+            v: Value to validate
+            
+        Returns:
+            List: Empty list if input is empty string, otherwise original value
+        """
+        if v == "":
+            return -1
+        return v
 
 class ScraperCollectedStatus(CommonModel):
     """Status model for the file collection phase of scraping.
