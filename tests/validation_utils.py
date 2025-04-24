@@ -79,21 +79,24 @@ def validate_converting_output(data_folder, outputs_folder, enabled_scrapers):
         enabled_scrapers: List of enabled scrapers
     """
     assert os.path.exists(outputs_folder), f"Outputs folder {outputs_folder} does not exist"
-    assert len(os.listdir(outputs_folder)) == 2, f"Expected 2 items in outputs folder, found {len(os.listdir(outputs_folder))}"
+    assert len(os.listdir(outputs_folder)) == len(enabled_scrapers) + 1, f"Expected csv files per chain + parser-status.json, found {len(os.listdir(outputs_folder))}"
     assert os.path.exists(os.path.join(outputs_folder, "parser-status.json")), f"parser-status.json not found in {outputs_folder}"
 
-    chain_folder = os.path.join(data_folder, DumpFolderNames[enabled_scrapers[0]].value)
-    assert os.path.exists(chain_folder), f"Chain folder {chain_folder} does not exist"
-    assert len(os.listdir(chain_folder)) > 0, f"No files found in chain folder {chain_folder}"
+    for scraper in enabled_scrapers:
+        # find the source file
+        chain_folder = os.path.join(data_folder, DumpFolderNames[scraper].value)
+        assert os.path.exists(chain_folder), f"Chain folder {chain_folder} does not exist"
+        assert len(os.listdir(chain_folder))  == 1, "We are expecting only one file per chain"
+        
+        downloaded_file = os.listdir(chain_folder)[0]
+        # validate that a file was created
+        detected_file_type = FileTypesFilters.get_type_from_file(downloaded_file.replace("NULL", ""))
     
-    downloaded_file = os.listdir(chain_folder)[0]
-    detected_file_type = FileTypesFilters.get_type_from_file(downloaded_file.replace("NULL", ""))
-    
-    output_file = os.path.join(
-        outputs_folder,
-        f"{detected_file_type.name.lower()}_{enabled_scrapers[0].lower()}.csv",
-    )
-    assert os.path.exists(output_file), f"Expected output file {output_file} does not exist"
+        output_file = os.path.join(
+            outputs_folder,
+            f"{detected_file_type.name.lower()}_{scraper.lower()}.csv",
+        )
+        assert os.path.exists(output_file), f"Expected output file {output_file} does not exist. {downloaded_file}. {chain_folder}"
 
 
 def validate_state_after_api_update(
