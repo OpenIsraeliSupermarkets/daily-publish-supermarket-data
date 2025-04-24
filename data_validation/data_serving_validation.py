@@ -68,7 +68,7 @@ class ApiCallValidator:
                     f"{self.host}/raw/file_content?chain={chain}&file={file}"
                 ) as response:
                     if response.status != 200:
-                        raise Exception(f"Failed to fetch content for {chain}/{file}: {response.status}")
+                        raise Exception(f"Failed to fetch content for {chain}/{file}: {response.status}, {response.reason}")
                     return (await response.json()).get("rows", [])
 
     async def validate_all_data(self) -> Dict[str, Dict[str, Any]]:
@@ -164,7 +164,7 @@ async def main():
     
     # Get API token and host from environment variables
     api_token = os.getenv("API_TOKEN","0f8698d8-db8f-46e7-b460-8e0a2f3abab9")
-    host = os.getenv("API_HOST", "http://192.168.1.129:8080")
+    host = os.getenv("API_HOST", "http://localhost:8080")
     rate_limit = int(os.getenv("RATE_LIMIT", "3"))  # Add rate limit env var
     
     if not api_token:
@@ -187,6 +187,14 @@ async def main():
             json.dump(results, f, indent=2, default=str)
         logging.info(f"\nResults saved to {output_file}")
         
+        
+        for chain in results:
+            failed_files = list(filter(lambda x:x['validation']['api_call_status'] != "success", results[chain]['validation_results']))
+            if failed_files:
+                logging.error(f"Failed files for chain {chain}: {failed_files}")
+                raise Exception(f"Failed files for chain {chain}: {failed_files}")
+            else:
+                logging.info(f"No failed files for chain {chain}")
     except Exception as e:
         logging.error(f"Error in main process: {str(e)}")
         raise
