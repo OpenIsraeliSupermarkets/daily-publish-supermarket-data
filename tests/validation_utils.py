@@ -21,22 +21,24 @@ def validate_scraper_output(data_folder, enabled_scrapers):
         enabled_scrapers: List of enabled scrapers
     """
     assert os.path.exists(data_folder), f"Data folder {data_folder} does not exist"
-    assert len(os.listdir(data_folder)) == 2, f"Expected 2 items in data folder, found {len(os.listdir(data_folder))}"
+    assert len(os.listdir(data_folder)) == len(enabled_scrapers) + 1, f"Expected One folder per chain + status folder, found {len(os.listdir(data_folder))}"
     # status folder
     assert os.path.exists(os.path.join(data_folder, "status")), f"Status folder does not exist in {data_folder}"
-    assert len(os.listdir(os.path.join(data_folder, "status"))) == 1, f"Expected 1 status file, found {len(os.listdir(os.path.join(data_folder, 'status')))}"
+    assert len(os.listdir(os.path.join(data_folder, "status"))) == len(enabled_scrapers), f"Expected scraper status file per chain, found {len(os.listdir(os.path.join(data_folder, 'status')))}"
     
-    status_file = os.path.join(
-        data_folder,
-        "status",
-        f"{DumpFolderNames[enabled_scrapers[0]].value.lower()}.json",
-    )
-    assert os.path.exists(status_file), f"Status file {status_file} does not exist"
+    for scraper in enabled_scrapers:
+        status_file = os.path.join(
+            data_folder,
+            "status",
+            f"{DumpFolderNames[scraper].value.lower()}.json",
+        )
+        assert os.path.exists(status_file), f"Status file {status_file} does not exist"
 
     # data folder
-    chain_folder = os.path.join(data_folder, DumpFolderNames[enabled_scrapers[0]].value)
-    assert os.path.exists(chain_folder), f"Chain folder {chain_folder} does not exist"
-    assert len(os.listdir(chain_folder)) == 1, f"Expected 1 file in chain folder, found {len(os.listdir(chain_folder))}"
+    for scraper in enabled_scrapers:
+        chain_folder = os.path.join(data_folder, DumpFolderNames[scraper].value)
+        assert os.path.exists(chain_folder), f"Chain folder {chain_folder} does not exist"
+        assert len(os.listdir(chain_folder)) == 1, f"Expected 1 file in chain folder, found {len(os.listdir(chain_folder))}"
 
 
 def validate_state_after_deleted_dump_files(

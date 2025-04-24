@@ -35,7 +35,7 @@ def test_execute_scraping_integration():
 
     try:
         # Create a publisher with minimum scraping processes
-        enabled_scrapers = ScraperFactory.sample(n=1)
+        enabled_scrapers = ScraperFactory.all_scrapers_name()
         publisher = BaseSupermarketDataPublisher(
             app_folder=temp_dir,
             number_of_scraping_processes=1,
@@ -69,7 +69,7 @@ def test_execute_converting_integration():
 
     try:
         # Create a publisher with minimum processing
-        enabled_scrapers = ScraperFactory.sample(n=1)
+        enabled_scrapers = ScraperFactory.all_scrapers_name()
         publisher = BaseSupermarketDataPublisher(
             app_folder=temp_dir,
             number_of_scraping_processes=1,
@@ -112,7 +112,7 @@ def test_dump_files_clean_integration():
 
     try:
         # Create a publisher with minimum processing
-        enabled_scrapers = ScraperFactory.sample(n=1)
+        enabled_scrapers = ScraperFactory.all_scrapers_name()
         publisher = BaseSupermarketDataPublisher(
             app_folder=temp_dir,
             number_of_scraping_processes=1,
@@ -152,7 +152,7 @@ def test_update_api_database_integration():
 
     try:
         # Create a publisher with minimum processing
-        enabled_scrapers = ScraperFactory.sample(n=1)
+        enabled_scrapers = ScraperFactory.all_scrapers_name()
         short_term_db_target = DummyDocumentDbUploader(db_path=temp_dir)
         publisher = BaseSupermarketDataPublisher(
             app_folder=temp_dir,
@@ -203,7 +203,7 @@ def test_upload_to_kaggle_integration():
                 dataset_path=stage_folder,
                 when=now(),
             )
-        enabled_scrapers = ScraperFactory.sample(n=1)
+        enabled_scrapers = ScraperFactory.all_scrapers_name()
         
         publisher = BaseSupermarketDataPublisher(
             app_folder=temp_dir,
@@ -254,7 +254,7 @@ def test_clean_all_source_data_integration():
 
     try:
         # Create a publisher with minimum processing
-        enabled_scrapers = ScraperFactory.sample(n=1)
+        enabled_scrapers = ScraperFactory.all_scrapers_name()
         publisher = BaseSupermarketDataPublisher(
             app_folder=temp_dir,
             number_of_scraping_processes=1,

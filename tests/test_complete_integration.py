@@ -18,15 +18,13 @@ from remotes import DummyFileStorage, DummyDocumentDbUploader,KaggleUploader, Mo
 from utils import now
 
 
-def run_full_dag_integration(remote_dataset_path, stage_folder, long_term_db_target, short_term_db_target, temp_dir):
+def run_full_dag_integration(remote_dataset_path, stage_folder, long_term_db_target, short_term_db_target, temp_dir, enabled_scrapers, file_per_run=3, num_of_occasions=2):
     """
     Test the full DAG integration for the SupermarketDataPublisher.
     Verifies data scraping, converting, API updates, and publishing.
     """
     # params
     wait_time_seconds = 5  # Time to wait between executions
-    num_of_occasions = 2
-    file_per_run = 3
     app_folder = "app_data"
     data_folder = "dumps"
     outputs_folder = "outputs"
@@ -38,7 +36,6 @@ def run_full_dag_integration(remote_dataset_path, stage_folder, long_term_db_tar
     status_folder = os.path.join(app_folder, status_folder)
     data_folder = os.path.join(app_folder, data_folder)
 
-    enabled_scrapers = ScraperFactory.sample(n=1)
     # run the process with wait time between executions
     publisher = SupermarketDataPublisher(
         long_term_db_target=long_term_db_target,
@@ -99,7 +96,8 @@ def test_full_dag_integration_from_disk():
             stage_folder,
             long_term_db_target,
             short_term_db_target,
-            temp_dir
+            temp_dir,
+            enabled_scrapers=ScraperFactory.sample(n=1)
         )
         
 def test_full_dag_integration_real():
@@ -122,5 +120,6 @@ def test_full_dag_integration_real():
                 stage_folder,
                 long_term_db_target,
                 short_term_db_target,
-                temp_dir
+                temp_dir,
+                
             )
