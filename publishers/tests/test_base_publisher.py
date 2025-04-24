@@ -37,7 +37,7 @@ def test_execute_scraping_integration():
         enabled_scrapers = ScraperFactory.all_scrapers_name()
         publisher = BaseSupermarketDataPublisher(
             app_folder=temp_dir,
-            number_of_scraping_processes=1,
+            number_of_scraping_processes=5,
             enabled_scrapers=enabled_scrapers,
             limit=1,  # Limit to just 1 item for faster tests
         )
@@ -71,8 +71,8 @@ def test_execute_converting_integration():
         enabled_scrapers = ScraperFactory.all_scrapers_name()
         publisher = BaseSupermarketDataPublisher(
             app_folder=temp_dir,
-            number_of_scraping_processes=1,
-            number_of_parseing_processs=1,
+            number_of_scraping_processes=5,
+            number_of_parseing_processs=5,
             limit=1,
             enabled_scrapers=enabled_scrapers,
         )
@@ -114,8 +114,8 @@ def test_dump_files_clean_integration():
         enabled_scrapers = ScraperFactory.all_scrapers_name()
         publisher = BaseSupermarketDataPublisher(
             app_folder=temp_dir,
-            number_of_scraping_processes=1,
-            number_of_parseing_processs=1,
+            number_of_scraping_processes=5,
+            number_of_parseing_processs=5,
             limit=1,
             enabled_scrapers=enabled_scrapers,
         )
@@ -158,8 +158,8 @@ def test_update_api_database_integration():
         short_term_db_target = DummyDocumentDbUploader(db_path=temp_dir)
         publisher = BaseSupermarketDataPublisher(
             app_folder=temp_dir,
-            number_of_scraping_processes=1,
-            number_of_parseing_processs=1,
+            number_of_scraping_processes=5,
+            number_of_parseing_processs=5,
             limit=1,
             enabled_scrapers=enabled_scrapers,
             short_term_db_target=short_term_db_target,
@@ -213,8 +213,8 @@ def test_upload_to_kaggle_integration():
         
         publisher = BaseSupermarketDataPublisher(
             app_folder=temp_dir,
-            number_of_scraping_processes=1,
-            number_of_parseing_processs=1,
+            number_of_scraping_processes=5,
+            number_of_parseing_processs=5,
             limit=1,
             enabled_scrapers=enabled_scrapers,
             long_term_db_target=long_term_db_target,
@@ -263,8 +263,8 @@ def test_clean_all_source_data_integration():
         enabled_scrapers = ScraperFactory.all_scrapers_name()
         publisher = BaseSupermarketDataPublisher(
             app_folder=temp_dir,
-            number_of_scraping_processes=1,
-            number_of_parseing_processs=1,
+            number_of_scraping_processes=5,
+            number_of_parseing_processs=5,
             limit=1,
             enabled_scrapers=enabled_scrapers,
         )
