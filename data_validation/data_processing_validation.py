@@ -2,8 +2,7 @@ import pymongo
 from collections import defaultdict
 import datetime
 from itertools import chain
-from il_supermarket_scarper import DumpFolderNames, ScraperFactory
-
+from il_supermarket_scarper import DumpFolderNames
 
 # פונקציות עזר
 def connect_to_mongodb(uri="mongodb://192.168.1.129:27017/"):
@@ -89,13 +88,6 @@ def match_parsing_timestamps(used_timestamp, parser_status_collection, sample_ti
     return associated_stamp, used_timestamp + [associated_stamp]
 
 
-def match_chain_names(chain_name):
-    """התאמת שמות רשתות"""
-    for k in DumpFolderNames:
-        if k.value.lower() == chain_name.split(".")[0].lower():
-            return str(k.name)
-    return None
-
 
 def get_parsing_status(parser_status_collection, matched_chain_name, matched_timestamp):
     """קבלת נתוני פרסור"""
@@ -159,7 +151,7 @@ def get_parsing_status(parser_status_collection, matched_chain_name, matched_tim
 
 def collect_validation_results():
     """פונקציה ראשית"""
-    scraper_status_collection, parser_status_collection = connect_to_mongodb()
+    scraper_status_collection, parser_status_collection = connect_to_mongodb(uri="mongodb://your_mongo_user:your_mongo_password@localhost:27017/")
 
     # קבלת חותמות זמן לכל קובץ
     file_name_dict = get_file_timestamps(scraper_status_collection)
