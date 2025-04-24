@@ -155,17 +155,13 @@ class ApiCallValidator:
         }
 
 
-async def main():
+async def main(api_token,host,rate_limit):
     # Configure logging
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s'
     )
-    
-    # Get API token and host from environment variables
-    api_token = os.getenv("API_TOKEN","0f8698d8-db8f-46e7-b460-8e0a2f3abab9")
-    host = os.getenv("API_HOST", "http://localhost:8080")
-    rate_limit = int(os.getenv("RATE_LIMIT", "3"))  # Add rate limit env var
+
     
     if not api_token:
         raise ValueError("API_TOKEN environment variable is not set")
@@ -202,5 +198,9 @@ async def main():
         logging.info("Validation process completed")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # Get API token and host from environment variables
+    api_token = os.getenv("API_TOKEN","0f8698d8-db8f-46e7-b460-8e0a2f3abab9")
+    host = os.getenv("API_HOST", "http://localhost:8080")
+    rate_limit = int(os.getenv("RATE_LIMIT", "3"))  # Add rate limit env var
+    asyncio.run(main(api_token,host,rate_limit))
 

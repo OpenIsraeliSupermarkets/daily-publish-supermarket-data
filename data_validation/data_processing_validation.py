@@ -1,6 +1,7 @@
 import pymongo
 from collections import defaultdict
 import datetime
+import json
 from itertools import chain
 from il_supermarket_scarper import DumpFolderNames
 
@@ -44,16 +45,16 @@ def get_scraper_status(scraper_status_collection, chain_name, timestamp):
 
     files_saw = [
         f.replace(".gz", "").replace(".xml", "")
-        for f in collected["file_name_collected_from_site"]
+        for f in collected['status_data']["file_name_collected_from_site"]
     ]
     downloaded_files_success = [
         f["file_name"].replace(".gz", "").replace(".xml", "")
-        for f in downloaded["results"]
+        for f in downloaded['status_data']["results"]
         if f["downloaded"] == True and f["extract_succefully"] == True
     ]
     downloaded_files_failed = {
         f["file_name"].replace(".gz", "").replace(".xml", ""): f['error']
-        for f in downloaded["results"]
+        for f in downloaded['status_data']["results"]
         if not (f["downloaded"] == True and f["extract_succefully"] == True)
     }
 
@@ -64,20 +65,20 @@ def match_parsing_timestamps(used_timestamp, parser_status_collection, sample_ti
     """התאמת חותמות זמן של הפרסור"""
     all_parsing_timestamps = list(
         set(
-            doc["timestamp"]
+            doc["when_date"]
             for doc in parser_status_collection.find(
-                {"store_enum": chain_name}, {"timestamp": 1, "_id": 0}
+                {"requested_store_enum": chain_name}, {"when_date": 1, "_id": 0}
             )
         )
     )
 
-    scraping_timestamp = datetime.datetime.strptime(sample_timestamp, "%Y%m%d%H%M%S")
+    scraping_timestamp = datetime.datetime.strptime(sample_timestamp, "%Y-%m-%d %H:%M:%S")
 
     min_delta = None
     associated_stamp = None
     for parsing_timestamp in all_parsing_timestamps:
         parsing_timestamp_dt = datetime.datetime.strptime(
-            parsing_timestamp, "%d%m%Y%H%M%S"
+            parsing_timestamp.strip(), "%Y-%m-%d %H:%M:%S"
         )
         diff = parsing_timestamp_dt - scraping_timestamp
         if parsing_timestamp_dt > scraping_timestamp and (
@@ -94,7 +95,7 @@ def get_parsing_status(parser_status_collection, matched_chain_name, matched_tim
 
     parsing_results = list(
         parser_status_collection.find(
-            {"store_enum": matched_chain_name, "timestamp": matched_timestamp}
+            {"requested_store_enum": matched_chain_name, "when_date": matched_timestamp}
         )
     )
     assert len(parsing_results) == 5
@@ -149,9 +150,9 @@ def get_parsing_status(parser_status_collection, matched_chain_name, matched_tim
     return files_to_parse, parsing_results_success, parsing_results_failed
 
 
-def collect_validation_results():
+def collect_validation_results(uri="mongodb://192.168.1.129:27017/"):
     """פונקציה ראשית"""
-    scraper_status_collection, parser_status_collection = connect_to_mongodb(uri="mongodb://your_mongo_user:your_mongo_password@localhost:27017/")
+    scraper_status_collection, parser_status_collection = connect_to_mongodb(uri)
 
     # קבלת חותמות זמן לכל קובץ
     file_name_dict = get_file_timestamps(scraper_status_collection)
@@ -227,14 +228,16 @@ def collect_validation_results():
                     raise ValueError(f"file {file} is not in any of the lists")
             saw = set(files_saw) | set(saw)
             validation_results[chain_name][itreation_timestamp] = pipeline
-    return validation_results, aggregated_errors
-
-
-if __name__ == "__main__":
-    import json
-
-    validation_results, aggregated_errors = collect_validation_results()
+    
     with open("validation_results.json", "w") as f:
         json.dump(validation_results, f, indent=4)
     with open("aggregated_errors.json", "w") as f:
         json.dump(aggregated_errors, f, indent=4)
+    
+    if not all(list(map(lambda x:x == {},aggregated_errors.values()))):
+        raise ValueError("found errors in the data")
+
+    
+if __name__ == "__main__":
+    collect_validation_results(uri="mongodb://your_mongo_user:your_mongo_password@localhost:27017/")
+
