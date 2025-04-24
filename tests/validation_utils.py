@@ -12,7 +12,7 @@ import glob
 import pandas as pd
 
 
-def validate_scraper_output(data_folder, enabled_scrapers):
+def validate_scraper_output(data_folder, enabled_scrapers, dump_files_deleted=False):
     """
     Validate the output produced by the scraper.
     
@@ -21,7 +21,6 @@ def validate_scraper_output(data_folder, enabled_scrapers):
         enabled_scrapers: List of enabled scrapers
     """
     assert os.path.exists(data_folder), f"Data folder {data_folder} does not exist"
-    assert len(os.listdir(data_folder)) == len(enabled_scrapers) + 1, f"Expected One folder per chain + status folder, found {len(os.listdir(data_folder))}"
     # status folder
     assert os.path.exists(os.path.join(data_folder, "status")), f"Status folder does not exist in {data_folder}"
     assert len(os.listdir(os.path.join(data_folder, "status"))) == len(enabled_scrapers), f"Expected scraper status file per chain, found {len(os.listdir(os.path.join(data_folder, 'status')))}"
@@ -35,41 +34,20 @@ def validate_scraper_output(data_folder, enabled_scrapers):
         assert os.path.exists(status_file), f"Status file {status_file} does not exist"
 
     # data folder
-    for scraper in enabled_scrapers:
-        chain_folder = os.path.join(data_folder, DumpFolderNames[scraper].value)
-        assert os.path.exists(chain_folder), f"Chain folder {chain_folder} does not exist"
-        assert len(os.listdir(chain_folder)) == 1, f"Expected 1 file in chain folder, found {len(os.listdir(chain_folder))}"
+    if not dump_files_deleted:
+        assert len(os.listdir(data_folder)) == len(enabled_scrapers) + 1, f"Expected One folder per chain + status folder, found {len(os.listdir(data_folder))}"
+
+        for scraper in enabled_scrapers:
+            chain_folder = os.path.join(data_folder, DumpFolderNames[scraper].value)
+            assert os.path.exists(chain_folder), f"Chain folder {chain_folder} does not exist"
+            assert len(os.listdir(chain_folder)) == 1, f"Expected 1 file in chain folder, found {len(os.listdir(chain_folder))}"
+            assert os.listdir(chain_folder)[0].endswith(".xml"), f"Expected XML file, found {os.listdir(chain_folder)[0]}"
+    else:
+        assert len(os.listdir(data_folder)) == 1, f"Expected One folder per chain + status folder, found {len(os.listdir(data_folder))}"
 
 
-def validate_state_after_deleted_dump_files(
-    data_folder, outputs_folder, enabled_scrapers
-):
-    """
-    Validate the state of the system after dump files have been deleted.
-    
-    Args:
-        data_folder: Folder that contained the scraped data
-        outputs_folder: Folder containing the converted output
-        enabled_scrapers: List of enabled scrapers
-    """
-    assert len(os.listdir(data_folder)) == 1, f"Expected only 1 item in data folder after deletion, found {len(os.listdir(data_folder))}"
 
-    assert os.path.exists(outputs_folder), f"Outputs folder {outputs_folder} does not exist"
-    assert len(os.listdir(outputs_folder)) == 2, f"Expected 2 items in outputs folder, found {len(os.listdir(outputs_folder))}"
-    assert os.path.exists(os.path.join(outputs_folder, "parser-status.json")), f"parser-status.json not found in {outputs_folder}"
-
-    assert os.path.exists(os.path.join(data_folder, "status")), f"Status folder does not exist in {data_folder}"
-    assert len(os.listdir(os.path.join(data_folder, "status"))) == 1, f"Expected 1 status file, found {len(os.listdir(os.path.join(data_folder, 'status')))}"
-    
-    status_file = os.path.join(
-        data_folder,
-        "status",
-        f"{DumpFolderNames[enabled_scrapers[0]].value.lower()}.json",
-    )
-    assert os.path.exists(status_file), f"Status file {status_file} does not exist"
-
-
-def validate_converting_output(data_folder, outputs_folder, enabled_scrapers):
+def validate_converting_output(data_folder, outputs_folder, enabled_scrapers, dump_files_deleted=False):
     """
     Validate the output produced by the converter.
     
@@ -82,22 +60,23 @@ def validate_converting_output(data_folder, outputs_folder, enabled_scrapers):
     assert len(os.listdir(outputs_folder)) == len(enabled_scrapers) + 1, f"Expected csv files per chain + parser-status.json, found {len(os.listdir(outputs_folder))}"
     assert os.path.exists(os.path.join(outputs_folder, "parser-status.json")), f"parser-status.json not found in {outputs_folder}"
 
-    for scraper in enabled_scrapers:
-        # find the source file
-        chain_folder = os.path.join(data_folder, DumpFolderNames[scraper].value)
-        assert os.path.exists(chain_folder), f"Chain folder {chain_folder} does not exist"
-        assert len(os.listdir(chain_folder))  == 1, "We are expecting only one file per chain"
+    if not dump_files_deleted:
+        for scraper in enabled_scrapers:
+            # find the source file
+            chain_folder = os.path.join(data_folder, DumpFolderNames[scraper].value)
+            assert os.path.exists(chain_folder), f"Chain folder {chain_folder} does not exist"
+            assert len(os.listdir(chain_folder))  == 1, "We are expecting only one file per chain"
+            
+            downloaded_file = os.listdir(chain_folder)[0]
+            # validate that a file was created
+            detected_file_type = FileTypesFilters.get_type_from_file(downloaded_file.replace("NULL", ""))
         
-        downloaded_file = os.listdir(chain_folder)[0]
-        # validate that a file was created
-        detected_file_type = FileTypesFilters.get_type_from_file(downloaded_file.replace("NULL", ""))
-    
-        output_file = os.path.join(
-            outputs_folder,
-            f"{detected_file_type.name.lower()}_{scraper.lower()}.csv",
-        )
-        assert os.path.exists(output_file), f"Expected output file {output_file} does not exist. {downloaded_file}. {chain_folder}"
-
+            output_file = os.path.join(
+                outputs_folder,
+                f"{detected_file_type.name.lower()}_{scraper.lower()}.csv",
+            )
+            assert os.path.exists(output_file), f"Expected output file {output_file} does not exist. {downloaded_file}. {chain_folder}"
+        
 
 def validate_state_after_api_update(
     app_folder, data_folder, outputs_folder, enabled_scrapers, short_term_db_target

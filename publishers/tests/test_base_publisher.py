@@ -12,7 +12,6 @@ from utils import now
 from tests.validation_utils import (
     validate_scraper_output,
     validate_converting_output,
-    validate_state_after_deleted_dump_files,
     validate_state_after_api_update,
     validate_long_term_structure,
     validate_local_structure,
@@ -126,9 +125,12 @@ def test_dump_files_clean_integration():
         publisher._execute_converting()
         publisher._clean_all_dump_files()
 
-        validate_state_after_deleted_dump_files(
-            publisher.data_folder, publisher.outputs_folder, enabled_scrapers
+        validate_converting_output(
+            publisher.data_folder, publisher.outputs_folder, enabled_scrapers, dump_files_deleted=True
         )
+
+        # status didn't changed
+        validate_scraper_output(publisher.data_folder, enabled_scrapers, dump_files_deleted=True)
 
         # Check if the DummyDocumentDbUploader was updated
         # In a real implementation, we would need to check the actual database state
