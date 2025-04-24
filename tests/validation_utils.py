@@ -79,7 +79,7 @@ def validate_converting_output(data_folder, outputs_folder, enabled_scrapers, du
         
 
 def validate_state_after_api_update(
-    app_folder, data_folder, outputs_folder, enabled_scrapers, short_term_db_target
+    app_folder, outputs_folder, enabled_scrapers, short_term_db_target
 ):
     """
     Validate the state of the system after API update.
@@ -91,52 +91,33 @@ def validate_state_after_api_update(
         enabled_scrapers: List of enabled scrapers
         short_term_db_target: The short-term database target
     """
-    assert os.path.exists(app_folder), f"App folder {app_folder} does not exist"
-
-    # dump exist and empty
-    assert os.path.exists(data_folder), f"Data folder {data_folder} does not exist"
-    # status folder
-    assert len(os.listdir(data_folder)) == 1, f"Expected 1 item in data folder, found {len(os.listdir(data_folder))}"
-    assert os.path.exists(os.path.join(data_folder, "status")), f"Status folder does not exist in {data_folder}"
-    assert len(os.listdir(os.path.join(data_folder, "status"))) == 1, f"Expected 1 status file, found {len(os.listdir(os.path.join(data_folder, 'status')))}"
-    
-    status_file = os.path.join(
-        data_folder,
-        "status",
-        f"{DumpFolderNames[enabled_scrapers[0]].value.lower()}.json",
-    )
-    assert os.path.exists(status_file), f"Status file {status_file} does not exist"
-
-    # output folder
-    assert os.path.exists(outputs_folder), f"Outputs folder {outputs_folder} does not exist"
-    assert len(os.listdir(outputs_folder)) == 2, f"Expected 2 items in outputs folder, found {len(os.listdir(outputs_folder))}"
-    assert os.path.exists(os.path.join(outputs_folder, "parser-status.json")), f"parser-status.json not found in {outputs_folder}"
-    
-    # read the csv file
-    csv_files = glob.glob(os.path.join(outputs_folder, "*.csv"))
-    assert len(csv_files) > 0, f"No CSV files found in {outputs_folder}"
-    csv_file = csv_files[0]
-    df = pd.read_csv(csv_file)
-
     # document_db folder
     scraper_status_table = ScraperStatus.get_table_name()
-    scraper_status_count = len(short_term_db_target.get_table_content(scraper_status_table))
-    assert scraper_status_count == 4, f"Expected 4 documents in {scraper_status_table}, found {scraper_status_count}"
+    scraper_status_count = len(short_term_db_target.get_table_content(scraper_status_table)) 
+    assert scraper_status_count == 4 * len(enabled_scrapers), f"Expected 4 documents in {scraper_status_table}, found {scraper_status_count}"
     
     parser_status_table = ParserStatus.get_table_name()
     parser_status_count = len(short_term_db_target.get_table_content(parser_status_table))
-    expected_parser_count = len(FileTypesFilters) * 1  # limit
+    expected_parser_count = len(FileTypesFilters) * 1  * len(enabled_scrapers) # limit
     assert parser_status_count == expected_parser_count, f"Expected {expected_parser_count} documents in {parser_status_table}, found {parser_status_count}"
     
-    data_table = file_name_to_table(csv_file)
-    data_count = len(short_term_db_target.get_table_content(data_table))
-    assert data_count == df.shape[0], f"Expected {df.shape[0]} rows in {data_table}, found {data_count}"
+    
+    # read the csv file
+    csv_files = glob.glob(os.path.join(outputs_folder, "*.csv"))
+    assert len(csv_files) == len(enabled_scrapers), f"Expected {len(enabled_scrapers)} CSV files, found {len(csv_files)}"
+    assert len(csv_files) > 0, f"No CSV files found in {outputs_folder}"
+    for csv_file in csv_files:
+        df = pd.read_csv(csv_file)
+        
+        data_table = file_name_to_table(csv_file)
+        data_count = len(short_term_db_target.get_table_content(data_table))
+        assert data_count == df.shape[0], f"Expected {df.shape[0]} rows in {data_table}, found {data_count}"
 
-    # cache
-    with CacheManager(app_folder) as cache:
-        last_processed = cache.get_last_processed_row(csv_file)
-        expected_last_row = df.shape[0] - 1
-        assert last_processed == expected_last_row, f"Expected last processed row to be {expected_last_row}, found {last_processed}"
+        # cache
+        with CacheManager(app_folder) as cache:
+            last_processed = cache.get_last_processed_row(csv_file)
+            expected_last_row = df.shape[0] - 1
+            assert last_processed == expected_last_row, f"Expected last processed row to be {expected_last_row}, found {last_processed}"
 
 
 def validate_long_term_structure(long_term_db_target, stage_folder, enabled_scrapers):

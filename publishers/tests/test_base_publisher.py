@@ -170,10 +170,14 @@ def test_update_api_database_integration():
         publisher._execute_converting()
         publisher._clean_all_dump_files()
         publisher._update_api_database()
+        validate_converting_output(
+            publisher.data_folder, publisher.outputs_folder, enabled_scrapers, dump_files_deleted=True
+        )
 
+        # status didn't changed
+        validate_scraper_output(publisher.data_folder, enabled_scrapers, dump_files_deleted=True)
         validate_state_after_api_update(
             publisher.app_folder,
-            publisher.data_folder,
             publisher.outputs_folder,
             enabled_scrapers,
             short_term_db_target,
