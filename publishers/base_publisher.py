@@ -97,6 +97,8 @@ class BaseSupermarketDataPublisher:
             Exception: If an error occurs during scraping.
         """
         try:
+            os.makedirs(self.data_folder, exist_ok=True)
+            
             logging.info("Starting the scraping task")
             ScarpingTask(
                 enabled_scrapers=self.enabled_scrapers,
@@ -118,6 +120,8 @@ class BaseSupermarketDataPublisher:
         Execute the converting task to parse scraped data into structured format.
         """
         logging.info("Starting the converting task")
+        os.makedirs(self.outputs_folder, exist_ok=True)
+        
         ConvertingTask(
             enabled_parsers=self.enabled_scrapers,
             files_types=self.enabled_file_types,
