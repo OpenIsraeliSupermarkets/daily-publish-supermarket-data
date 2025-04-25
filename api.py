@@ -4,7 +4,7 @@ from access.access_layer import AccessLayer
 from typing import Optional
 from access.token_validator import TokenValidator, SupabaseTelemetry
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import ORJSONResponse, Response
 import os
 
 from datetime import datetime
@@ -33,6 +33,7 @@ app = FastAPI(
         {"name": "API", "description": "Main API endpoints"},
         {"name": "Health", "description": "Health check endpoints"},
     ],
+    default_response_class=ORJSONResponse,
 )
 app.add_middleware(AuthMiddleware)
 app.add_middleware(TelemetryMiddleware)
