@@ -195,13 +195,15 @@ def validate_short_term_structure(
     scraper_status_table = ScraperStatus.get_table_name()
     actual_scraper_status_count = len(short_term_db_target.get_table_content(scraper_status_table))
     assert actual_scraper_status_count == expected_scraper_status_count, f"Expected {expected_scraper_status_count} documents in {scraper_status_table}, found {actual_scraper_status_count}"
-    
+    assert short_term_db_target._is_collection_updated(scraper_status_table, seconds=60*60), f"Short-term database should be updated in the last hour"
+
+
     expected_parser_status_count = num_of_occasions * len(enabled_scrapers) * num_of_documents_in_parser_status_per_chain
     parser_status_table = ParserStatus.get_table_name()
     actual_parser_status_count = len(short_term_db_target.get_table_content(parser_status_table))
     assert actual_parser_status_count == expected_parser_status_count, f"Expected {expected_parser_status_count} documents in {parser_status_table}, found {actual_parser_status_count}"
+    assert short_term_db_target._is_collection_updated(parser_status_table, seconds=60*60), f"Short-term database should be updated in the last hour"
 
-    assert short_term_db_target.was_updated_in_last(seconds=60*60), f"Short-term database should be updated in the last hour"
     
     validate_api_scan(
         enabled_scrapers,
