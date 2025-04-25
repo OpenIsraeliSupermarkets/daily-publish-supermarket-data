@@ -43,7 +43,8 @@ async def run_validations():
     # Data kaggle validation task
     tasks.append(
         asyncio.create_task(
-            download_and_validate_kaggle_data(
+            asyncio.to_thread(
+                download_and_validate_kaggle_data,
                 os.getenv("KAGGLE_DATASET_REMOTE_NAME"),
                 os.getenv("ENABLED_SCRAPERS").split(","),
                 int(os.getenv("LIMIT")),
