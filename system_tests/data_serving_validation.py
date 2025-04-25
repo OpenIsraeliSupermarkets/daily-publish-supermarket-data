@@ -41,6 +41,33 @@ class ApiCallValidator:
         }
         self.semaphore = asyncio.Semaphore(rate_limit)  # Add rate limiting semaphore
 
+    async def check_health(self) -> Dict[str, Any]:
+        """Check the health of the API service"""
+        async with self.semaphore:
+            async with aiohttp.ClientSession(headers=self.headers) as session:
+                async with session.get(f"{self.host}/service_health") as response:
+                    if response.status != 200:
+                        raise Exception(f"Health check failed: {response.status}")
+                    return await response.json()
+
+    async def check_short_term_health(self) -> Dict[str, Any]:
+        """Check the health of the short-term database"""
+        async with self.semaphore:
+            async with aiohttp.ClientSession(headers=self.headers) as session:
+                async with session.get(f"{self.host}/short_term_health") as response:
+                    if response.status != 200:
+                        raise Exception(f"Short-term health check failed: {response.status}")
+                    return await response.json()
+
+    async def check_long_term_health(self) -> Dict[str, Any]:
+        """Check the health of the long-term database"""
+        async with self.semaphore:
+            async with aiohttp.ClientSession(headers=self.headers) as session:
+                async with session.get(f"{self.host}/long_term_health") as response:
+                    if response.status != 200:
+                        raise Exception(f"Long-term health check failed: {response.status}")
+                    return await response.json()
+
     async def fetch_chains(self) -> List[str]:
         """Fetch all available chains from the API"""
         async with self.semaphore:  # Add rate limiting
@@ -167,6 +194,27 @@ async def main(api_token, host, rate_limit):
 
     try:
         logging.info("Starting data validation process...")
+
+        # Check service health
+        logging.info("Checking service health...")
+        health_result = await validator.check_health()
+        logging.info(f"Service health: {health_result['status']}")
+        if health_result['status'] != 'healthy':
+            raise Exception(f"Service health is not healthy: {health_result['status']}")
+        
+        # Check short-term database health
+        logging.info("Checking short-term database health...")
+        short_term_health = await validator.check_short_term_health()
+        logging.info(f"Short-term database health: {short_term_health['status']}")
+        if short_term_health['status'] != 'healthy':
+            raise Exception(f"Short-term database health is not healthy: {short_term_health['status']}")
+        
+        # Check long-term database health
+        logging.info("Checking long-term database health...")
+        long_term_health = await validator.check_long_term_health()
+        logging.info(f"Long-term database health: {long_term_health['status']}")
+        if long_term_health['status'] != 'healthy':
+            raise Exception(f"Long-term database health is not healthy: {long_term_health['status']}")
 
         # Run validation
         results = await validator.validate_all_data()
