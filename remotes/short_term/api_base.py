@@ -53,10 +53,11 @@ class ShortTermDatabaseUploader:
             list: List of all items in the table/collection
         """
 
-    def _is_collection_updated(self, seconds: int = 10800) -> bool:
+    def _is_collection_updated(self, collection_name: str, seconds: int = 10800) -> bool:
         """Check if the parser was updated recently.
 
         Args:
+            collection_name (str): Name of the collection
             seconds (int, optional): Time window in seconds to check for updates.
                                    Defaults to 10800 (3 hours).
 

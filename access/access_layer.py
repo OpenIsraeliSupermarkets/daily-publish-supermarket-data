@@ -63,7 +63,7 @@ class AccessLayer:
         Returns:
             ShortTermDatabaseHealth: Object containing update status and timestamp
         """
-        is_updated = self.short_term_database_connector.was_updated_in_last()
+        is_updated = self.short_term_database_connector._is_collection_updated(ParserStatus.get_table_name(), seconds=60*60)
         return ShortTermDatabaseHealth(
             is_updated=is_updated, last_update=datetime.now().astimezone().isoformat()
         )
