@@ -17,8 +17,8 @@ else
     echo "Warning: $MONGO_DATA_PATH directory does not exist"
 fi
 
-
+docker compose stop
 docker compose build --no-cache
-docker compose up 
+docker compose up -d
 
 python3 system_tests/main.py
