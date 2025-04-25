@@ -14,7 +14,7 @@ from data_models.response import (
     LongTermDatabaseHealth,
     ShortTermDatabaseHealth,
 )
-from remotes import MongoDbUploader, KaggleUploader
+from remotes import LongTermDatabaseUploader, ShortTermDatabaseUploader
 
 
 class AccessLayer:
@@ -25,8 +25,8 @@ class AccessLayer:
 
     def __init__(
         self,
-        short_term_database_connector: MongoDbUploader,
-        long_term_database_connector: KaggleUploader,
+        short_term_database_connector: ShortTermDatabaseUploader,
+        long_term_database_connector: LongTermDatabaseUploader,
     ):
         """
         Initialize the AccessLayer with database connectors.
@@ -63,7 +63,7 @@ class AccessLayer:
         Returns:
             ShortTermDatabaseHealth: Object containing update status and timestamp
         """
-        is_updated = self.short_term_database_connector.is_parser_updated()
+        is_updated = self.short_term_database_connector.was_updated_in_last()
         return ShortTermDatabaseHealth(
             is_updated=is_updated, last_update=datetime.now().astimezone().isoformat()
         )
@@ -75,7 +75,7 @@ class AccessLayer:
         Returns:
             LongTermDatabaseHealth: Object containing update status and timestamp
         """
-        is_updated = self.long_term_database_connector.was_updated_in_last_24h()
+        is_updated = self.long_term_database_connector.was_updated_in_last(seconds=60*60*24)
         return LongTermDatabaseHealth(
             is_updated=is_updated, last_update=datetime.now().astimezone().isoformat()
         )

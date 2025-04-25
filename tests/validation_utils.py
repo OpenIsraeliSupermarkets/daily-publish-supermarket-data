@@ -201,6 +201,8 @@ def validate_short_term_structure(
     actual_parser_status_count = len(short_term_db_target.get_table_content(parser_status_table))
     assert actual_parser_status_count == expected_parser_status_count, f"Expected {expected_parser_status_count} documents in {parser_status_table}, found {actual_parser_status_count}"
 
+    assert short_term_db_target.was_updated_in_last(seconds=60*60), f"Short-term database should be updated in the last hour"
+    
     validate_api_scan(
         enabled_scrapers,
         short_term_db_target,
