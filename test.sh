@@ -1,5 +1,5 @@
 #!/bin/bash
-export $(cat .secrets | xargs)
+export $(cat .env.test | xargs)
 
 
 docker compose stop
@@ -20,9 +20,15 @@ else
     echo "Warning: $MONGO_DATA_PATH directory does not exist"
 fi
 
-
+# clean too
 docker compose build --no-cache
-docker compose up -d
+
+# start background
+docker compose up -d mongo,api
+
+# start data processor and wait for scraping to complete.
+docker compose up data_processor
+
 
 if ! python3 system_tests/main.py; then
     echo -e "\033[31mTest Failed\033[0m"
