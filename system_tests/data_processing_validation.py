@@ -5,6 +5,7 @@ import json
 from itertools import chain
 from il_supermarket_scarper import DumpFolderNames
 
+
 # פונקציות עזר
 def connect_to_mongodb(uri="mongodb://192.168.1.129:27017/"):
     """התחברות למסד הנתונים והגדרת האוספים"""
@@ -45,23 +46,25 @@ def get_scraper_status(scraper_status_collection, chain_name, timestamp):
 
     files_saw = [
         f.replace(".gz", "").replace(".xml", "")
-        for f in collected['status_data']["file_name_collected_from_site"]
+        for f in collected["status_data"]["file_name_collected_from_site"]
     ]
     downloaded_files_success = [
         f["file_name"].replace(".gz", "").replace(".xml", "")
-        for f in downloaded['status_data']["results"]
+        for f in downloaded["status_data"]["results"]
         if f["downloaded"] == True and f["extract_succefully"] == True
     ]
     downloaded_files_failed = {
-        f["file_name"].replace(".gz", "").replace(".xml", ""): f['error']
-        for f in downloaded['status_data']["results"]
+        f["file_name"].replace(".gz", "").replace(".xml", ""): f["error"]
+        for f in downloaded["status_data"]["results"]
         if not (f["downloaded"] == True and f["extract_succefully"] == True)
     }
 
     return files_saw, downloaded_files_success, downloaded_files_failed
 
 
-def match_parsing_timestamps(used_timestamp, parser_status_collection, sample_timestamp, chain_name):
+def match_parsing_timestamps(
+    used_timestamp, parser_status_collection, sample_timestamp, chain_name
+):
     """התאמת חותמות זמן של הפרסור"""
     all_parsing_timestamps = list(
         set(
@@ -72,7 +75,9 @@ def match_parsing_timestamps(used_timestamp, parser_status_collection, sample_ti
         )
     )
 
-    scraping_timestamp = datetime.datetime.strptime(sample_timestamp, "%Y-%m-%d %H:%M:%S")
+    scraping_timestamp = datetime.datetime.strptime(
+        sample_timestamp, "%Y-%m-%d %H:%M:%S"
+    )
 
     min_delta = None
     associated_stamp = None
@@ -81,13 +86,14 @@ def match_parsing_timestamps(used_timestamp, parser_status_collection, sample_ti
             parsing_timestamp.strip(), "%Y-%m-%d %H:%M:%S"
         )
         diff = parsing_timestamp_dt - scraping_timestamp
-        if parsing_timestamp_dt > scraping_timestamp and (
-            min_delta is None or diff < min_delta
-        ) and parsing_timestamp not in used_timestamp:
+        if (
+            parsing_timestamp_dt > scraping_timestamp
+            and (min_delta is None or diff < min_delta)
+            and parsing_timestamp not in used_timestamp
+        ):
             associated_stamp = parsing_timestamp
             min_delta = diff
     return associated_stamp, used_timestamp + [associated_stamp]
-
 
 
 def get_parsing_status(parser_status_collection, matched_chain_name, matched_timestamp):
@@ -124,7 +130,7 @@ def get_parsing_status(parser_status_collection, matched_chain_name, matched_tim
                     .replace(".xml", "")
                     .replace(".gz", "")
                     for log in x["response"]["execution_log"]
-                    if log.get("succusfull",False) == True
+                    if log.get("succusfull", False) == True
                 ],
                 parsing_results,
             )
@@ -135,12 +141,18 @@ def get_parsing_status(parser_status_collection, matched_chain_name, matched_tim
         chain.from_iterable(
             map(
                 lambda x: [
-                    (log["file_name"]
-                    .replace(".aspx", "")
-                    .replace(".xml", "")
-                    .replace(".gz", ""),log.get("error","empty file" if not log.get("loaded") else "unknown"))
+                    (
+                        log["file_name"]
+                        .replace(".aspx", "")
+                        .replace(".xml", "")
+                        .replace(".gz", ""),
+                        log.get(
+                            "error",
+                            "empty file" if not log.get("loaded") else "unknown",
+                        ),
+                    )
                     for log in x["response"]["execution_log"]
-                    if log.get("succusfull",False) != True
+                    if log.get("succusfull", False) != True
                 ],
                 parsing_results,
             )
@@ -185,7 +197,10 @@ def collect_validation_results(uri="mongodb://192.168.1.129:27017/"):
             )
             # התאמת נתוני פרסור
             matched_timestamp, used_timestamp = match_parsing_timestamps(
-                used_timestamp, parser_status_collection, itreation_timestamp, chain_name
+                used_timestamp,
+                parser_status_collection,
+                itreation_timestamp,
+                chain_name,
             )
 
             if not matched_timestamp:
@@ -228,16 +243,17 @@ def collect_validation_results(uri="mongodb://192.168.1.129:27017/"):
                     raise ValueError(f"file {file} is not in any of the lists")
             saw = set(files_saw) | set(saw)
             validation_results[chain_name][itreation_timestamp] = pipeline
-    
+
     with open("validation_results.json", "w") as f:
         json.dump(validation_results, f, indent=4)
     with open("aggregated_errors.json", "w") as f:
         json.dump(aggregated_errors, f, indent=4)
-    
-    if not all(list(map(lambda x:x == {},aggregated_errors.values()))):
+
+    if not all(list(map(lambda x: x == {}, aggregated_errors.values()))):
         raise ValueError("found errors in the data")
 
-    
-if __name__ == "__main__":
-    collect_validation_results(uri="mongodb://your_mongo_user:your_mongo_password@localhost:27017/")
 
+if __name__ == "__main__":
+    collect_validation_results(
+        uri="mongodb://your_mongo_user:your_mongo_password@localhost:27017/"
+    )
