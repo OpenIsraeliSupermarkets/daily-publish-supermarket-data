@@ -133,7 +133,8 @@ class KaggleUploader(LongTermDatabaseUploader):
         try:
             dataset_info = self.api.dataset_list(
                 user="erlichsefi", search=self.dataset_remote_name
-            )[0]
+            )
+            dataset_info = list(filter(lambda x: x.title == self.dataset_remote_name, dataset_info))[0]
             return (
                 datetime.now(tz=pytz.utc)
                 - dataset_info.lastUpdated.replace(tzinfo=pytz.utc)

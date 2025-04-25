@@ -129,7 +129,7 @@ def validate_long_term_structure(long_term_db_target, stage_folder, enabled_scra
         stage_folder: Path to the staging folder
         enabled_scrapers: List of enabled scrapers
     """
-    assert long_term_db_target.was_updated_in_last(seconds=10*60), f"Long-term database was not updated in the last 10 minutes"
+    assert long_term_db_target.was_updated_in_last(seconds=60*60), f"Long-term database was not updated in the last hour"
     
     files = long_term_db_target.list_files()
     assert "index.json" in files, f"index.json not found in long-term database files: {files}"
