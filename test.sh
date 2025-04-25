@@ -37,3 +37,5 @@ if ! python3 system_tests/main.py; then
     echo -e "\033[31mTest Failed\033[0m"
     exit 1
 fi
+
+docker compose stop
