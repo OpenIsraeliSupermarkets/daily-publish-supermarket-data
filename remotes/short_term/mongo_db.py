@@ -34,7 +34,18 @@ class MongoDbUploader(ShortTermDatabaseUploader):
         )
         self.client = pymongo.MongoClient(uri)
         self.db = self.client.supermarket_data
-
+        self._test_connection()
+        
+    def _test_connection(self):
+        """Test the connection to the MongoDB database.
+        """
+        try:
+            self.client.admin.command('ping')
+            logging.info("Successfully connected to MongoDB")   
+        except pymongo.errors.PyMongoError as e:
+            logging.error("Error connecting to MongoDB: %s", str(e))
+            raise e
+            
     def _insert_to_database(self, table_target_name, items):
         """Insert items into a MongoDB collection with error handling.
 

@@ -199,8 +199,8 @@ async def main(api_token,host,rate_limit):
 
 if __name__ == "__main__":
     # Get API token and host from environment variables
-    api_token = os.getenv("API_TOKEN","0f8698d8-db8f-46e7-b460-8e0a2f3abab9")
-    host = os.getenv("API_HOST", "http://localhost:8080")
+    api_token = os.getenv("API_TOKEN")
+    host = os.getenv("API_HOST")
     rate_limit = int(os.getenv("RATE_LIMIT", "3"))  # Add rate limit env var
     asyncio.run(main(api_token,host,rate_limit))
 

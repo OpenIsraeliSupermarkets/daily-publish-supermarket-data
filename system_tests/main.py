@@ -2,13 +2,9 @@ import asyncio
 import logging
 import traceback
 import json
-import importlib.util
 import sys
 import os
 
-def check_module_available(module_name):
-    """Check if a module is available without importing it directly."""
-    return importlib.util.find_spec(module_name) is not None
 
 async def run_validations():
     # Configure logging
@@ -27,7 +23,7 @@ async def run_validations():
         from data_processing_validation import collect_validation_results
         tasks.append(asyncio.create_task(
             asyncio.to_thread(collect_validation_results, 
-            uri="mongodb://your_mongo_user:your_mongo_password@localhost:27017/")
+            uri=os.getenv("MONGODB_URI"))
         ))
     except Exception as e:
         logging.error(f"Error in data processing validation: {str(e)}")
@@ -35,8 +31,8 @@ async def run_validations():
 
     # Data serving validation task  
     try:
-        api_token = os.getenv("API_TOKEN","0f8698d8-db8f-46e7-b460-8e0a2f3abab9")
-        host = os.getenv("API_HOST", "http://localhost:8080")
+        api_token = os.getenv("API_TOKEN")
+        host = os.getenv("API_HOST")
         rate_limit = int(os.getenv("RATE_LIMIT", "3"))
         from data_serving_validation import main
         tasks.append(asyncio.create_task(main(api_token,host,rate_limit)))
