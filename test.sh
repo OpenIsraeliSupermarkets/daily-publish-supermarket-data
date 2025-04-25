@@ -27,7 +27,7 @@ fi
 docker compose build --no-cache
 
 # start background services
-docker compose up -d mongodb,api
+docker compose up -d mongodb api
 
 # start data processor and wait for scraping to complete.
 docker compose up data_processor
