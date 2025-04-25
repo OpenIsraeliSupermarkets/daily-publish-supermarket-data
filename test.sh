@@ -3,6 +3,7 @@ export $(cat .env.test | xargs)
 
 
 docker compose stop
+docker compose rm -f
 
 # Clean the app data folder
 if [ -d "$APP_DATA_PATH" ]; then
@@ -24,7 +25,7 @@ fi
 docker compose build --no-cache
 
 # start background
-docker compose up -d mongo,api
+docker compose up -d mongodb,api
 
 # start data processor and wait for scraping to complete.
 docker compose up data_processor
