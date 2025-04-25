@@ -32,7 +32,7 @@ def download_and_validate_kaggle_data(dataset_remote_name, enabled_scrapers,file
 
     # Create temporary directories
     temp_dir = tempfile.mkdtemp(prefix="kaggle_validation_")
-    stage_folder = os.path.join(temp_dir, "stage")
+    stage_folder = os.path.join(temp_dir, "test_stage")
     os.makedirs(stage_folder, exist_ok=True)
 
     logging.info(f"Created temporary directory: {temp_dir}")
@@ -56,7 +56,7 @@ def download_and_validate_kaggle_data(dataset_remote_name, enabled_scrapers,file
             file_per_run
         )
         validate_long_term_structure(
-            long_term_db_target, stage_folder, enabled_scrapers
+            long_term_db_target, stage_folder, enabled_scrapers, in_app=False
         )
         
 

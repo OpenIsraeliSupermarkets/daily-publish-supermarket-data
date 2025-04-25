@@ -120,7 +120,7 @@ def validate_state_after_api_update(
             assert last_processed == expected_last_row, f"Expected last processed row to be {expected_last_row}, found {last_processed}"
 
 
-def validate_long_term_structure(long_term_db_target, stage_folder, enabled_scrapers):
+def validate_long_term_structure(long_term_db_target, stage_folder, enabled_scrapers, in_app=True):
     """
     Validate the structure of the long-term dataset.
     
@@ -151,7 +151,8 @@ def validate_long_term_structure(long_term_db_target, stage_folder, enabled_scra
                 break
         assert found_chain_file, f"No CSV files for chain {scraper} found in {csv_files}"
 
-    assert not os.path.exists(stage_folder), f"Stage folder {stage_folder} should not exist but does"
+    if in_app:
+        assert not os.path.exists(stage_folder), f"Stage folder {stage_folder} should not exist but does"
 
 
 def validate_local_structure_deleted(app_folder, data_folder, outputs_folder, status_folder):
