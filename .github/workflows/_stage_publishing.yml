@@ -13,7 +13,7 @@ jobs:
     uses: OpenIsraeliSupermarkets/daily-publish-supermarket-data/.github/workflows/template.yml@stage
     with:
       kaggle_dataset_remote_name: "test-super-dataset-2"
-      operation: "clean_all_source_data"
+      operation: "publishing,clean_all_source_data"
       branch: "stage"
       environment: "staging"
     secrets: inherit
