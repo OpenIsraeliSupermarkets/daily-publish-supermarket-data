@@ -230,6 +230,7 @@ def validate_api_scan(
         short_term_database_connector=short_term_database_connector,
         long_term_database_connector=long_term_database_connector,
     )
+    assert access_layer.is_short_term_updated(), f"Short-term database should be updated in the last hour"
     #
     for chain in enabled_scrapers:
         files = access_layer.list_files(chain=chain)
