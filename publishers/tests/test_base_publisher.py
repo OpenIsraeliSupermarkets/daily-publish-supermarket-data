@@ -14,7 +14,7 @@ from tests.validation_utils import (
     validate_converting_output,
     validate_state_after_api_update,
     validate_long_term_structure,
-    validate_local_structure,
+    validate_local_structure_deleted,
 )
 from publishers.base_publisher import BaseSupermarketDataPublisher
 
@@ -277,7 +277,7 @@ def test_clean_all_source_data_integration():
         publisher._clean_all_source_data()
 
         # Verify that directories are cleaned
-        validate_local_structure(
+        validate_local_structure_deleted(
             publisher.app_folder,
             publisher.data_folder,
             publisher.outputs_folder,

@@ -3,7 +3,7 @@ import logging
 import os
 from data_processing_validation import collect_validation_results
 from data_serving_validation import main
-from data_kaggle_validation import download_and_validate_kaggle_data
+from system_tests.static_validation import download_and_validate_kaggle_data
 
 
 async def run_validations():
@@ -41,6 +41,8 @@ async def run_validations():
             download_and_validate_kaggle_data(
                 os.getenv("KAGGLE_DATASET_NAME"),
                 os.getenv("ENABLED_SCRAPERS").split(","),
+                os.getenv("LIMIT"),
+                os.getenv("MONGODB_URI")
             )
         )
     )

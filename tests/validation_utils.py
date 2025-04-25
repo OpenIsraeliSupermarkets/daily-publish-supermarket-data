@@ -135,24 +135,26 @@ def validate_long_term_structure(long_term_db_target, stage_folder, enabled_scra
     assert "index.json" in files, f"index.json not found in long-term database files: {files}"
     assert "parser-status.json" in files, f"parser-status.json not found in long-term database files: {files}"
     
-    chain_status_file = f"{DumpFolderNames[enabled_scrapers[0]].value.lower()}.json"
-    assert chain_status_file in files, f"{chain_status_file} not found in long-term database files: {files}"
+    for scraper in enabled_scrapers:
+        chain_status_file = f"{DumpFolderNames[scraper].value.lower()}.json"
+        assert chain_status_file in files, f"{chain_status_file} not found in long-term database files: {files}"
 
     csv_files = long_term_db_target.list_files(extension="csv")
     assert len(csv_files) > 0, f"No CSV files found in long-term database"
     
-    chain_pattern = f"{enabled_scrapers[0].lower()}.csv"
-    found_chain_file = False
-    for csv_file in csv_files:
-        if chain_pattern in csv_file:
-            found_chain_file = True
-            break
-    assert found_chain_file, f"No CSV files for chain {enabled_scrapers[0]} found in {csv_files}"
+    for scraper in enabled_scrapers:
+        chain_pattern = f"{scraper.lower()}.csv"
+        found_chain_file = False
+        for csv_file in csv_files:
+            if chain_pattern in csv_file:
+                found_chain_file = True
+                break
+        assert found_chain_file, f"No CSV files for chain {scraper} found in {csv_files}"
 
     assert not os.path.exists(stage_folder), f"Stage folder {stage_folder} should not exist but does"
 
 
-def validate_local_structure(app_folder, data_folder, outputs_folder, status_folder):
+def validate_local_structure_deleted(app_folder, data_folder, outputs_folder, status_folder):
     """
     Validate that cleanup has been performed correctly.
     
@@ -172,8 +174,10 @@ def validate_local_structure(app_folder, data_folder, outputs_folder, status_fol
 
 def validate_short_term_structure(
     short_term_db_target,
+    long_term_db_target,
     enabled_scrapers,
-    num_of_occasions
+    num_of_occasions,
+    file_per_run
 ):
     """
     Validate the structure of the short-term database.
@@ -195,7 +199,13 @@ def validate_short_term_structure(
     parser_status_table = ParserStatus.get_table_name()
     actual_parser_status_count = len(short_term_db_target.get_table_content(parser_status_table))
     assert actual_parser_status_count == expected_parser_status_count, f"Expected {expected_parser_status_count} documents in {parser_status_table}, found {actual_parser_status_count}"
-    
+
+    validate_api_scan(
+        enabled_scrapers,
+        short_term_db_target,
+        long_term_db_target,
+        num_of_occasions * file_per_run,
+    )    
 
 def validate_api_scan(
     enabled_scrapers,

@@ -6,19 +6,17 @@ and validates the structure of the downloaded data.
 """
 
 import os
-import sys
 import tempfile
 import logging
-import argparse
 from datetime import datetime
 import pytz
 
 
-from remotes.long_term.kaggle import KaggleUploader
-from tests.validation_utils import validate_long_term_structure
+from remotes import KaggleUploader,MongoDbUploader
+from tests.validation_utils import validate_long_term_structure, validate_short_term_structure
 
 
-def download_and_validate_kaggle_data(dataset_remote_name, enabled_scrapers):
+def download_and_validate_kaggle_data(dataset_remote_name, enabled_scrapers,file_per_run, mongodb_uri):
     """
     Download data from Kaggle and validate its structure.
 
@@ -38,12 +36,26 @@ def download_and_validate_kaggle_data(dataset_remote_name, enabled_scrapers):
 
     try:
         # Initialize KaggleUploader
-        uploader = KaggleUploader(
+        long_term_db_target = KaggleUploader(
             dataset_path=stage_folder,
             dataset_remote_name=dataset_remote_name,
             when=datetime.now(tz=pytz.utc),
         )
-        validate_long_term_structure(uploader, stage_folder, enabled_scrapers)
+        
+        short_term_db_target = MongoDbUploader(
+            mongodb_uri=mongodb_uri
+        )
+        validate_short_term_structure(
+            short_term_db_target,
+            long_term_db_target,
+            enabled_scrapers,
+            1,
+            file_per_run
+        )
+        validate_long_term_structure(
+            long_term_db_target, stage_folder, enabled_scrapers
+        )
+        
 
     finally:
         # Clean up temporary files
