@@ -19,3 +19,4 @@ app_data/
 .env.unittest
 venv
 .venv
+.secrets
