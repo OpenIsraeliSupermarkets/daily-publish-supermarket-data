@@ -20,7 +20,7 @@ from publishers.base_publisher import BaseSupermarketDataPublisher
 
 
 
-@pytest.mark.integration
+
 def test_execute_scraping_integration():
     """
     Integration test for the scraping execution.
@@ -55,7 +55,7 @@ def test_execute_scraping_integration():
         shutil.rmtree(temp_dir)
 
 
-@pytest.mark.integration
+
 def test_execute_converting_integration():
     """
     Integration test for the converting execution.
@@ -98,7 +98,7 @@ def test_execute_converting_integration():
         shutil.rmtree(temp_dir)
 
 
-@pytest.mark.integration
+
 def test_dump_files_clean_integration():
     """
     Integration test for updating the API database.
@@ -141,7 +141,7 @@ def test_dump_files_clean_integration():
         shutil.rmtree(temp_dir)
 
 
-@pytest.mark.integration
+
 def test_update_api_database_integration():
     """
     Integration test for updating the API database.
@@ -188,7 +188,7 @@ def test_update_api_database_integration():
         shutil.rmtree(temp_dir)
 
 
-@pytest.mark.integration
+
 def test_upload_to_kaggle_integration():
     """
     Integration test for uploading to Kaggle.
@@ -247,7 +247,7 @@ def test_upload_to_kaggle_integration():
         shutil.rmtree(temp_dir)
 
 
-@pytest.mark.integration
+
 def test_clean_all_source_data_integration():
     """
     Integration test for uploading to Kaggle and cleaning up.

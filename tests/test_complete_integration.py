@@ -115,5 +115,6 @@ def test_full_dag_integration_real():
                 long_term_db_target,
                 short_term_db_target,
                 temp_dir,
+                enabled_scrapers=ScraperFactory.sample(n=1)
                 
             )
