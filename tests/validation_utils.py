@@ -228,22 +228,23 @@ def validate_api_scan(
         long_term_database_connector=long_term_database_connector,
     )
     #
-    files = access_layer.list_files(chain=enabled_scrapers[0])
-    assert len(files.processed_files) == num_of_expected_files, f"Expected {num_of_expected_files} processed files for chain {enabled_scrapers[0]}, found {len(files.processed_files)}"
+    for chain in enabled_scrapers:
+        files = access_layer.list_files(chain=chain)
+        assert len(files.processed_files) == num_of_expected_files, f"Expected {num_of_expected_files} processed files for chain {chain}, found {len(files.processed_files)}"
 
-    entries_in_short_term_db = 0
-    for file in files.processed_files:
-        content = access_layer.get_file_content(
-            chain=enabled_scrapers[0], file=file.file_name
-        )
-        entries_in_short_term_db += len(content.rows)
+        entries_in_short_term_db = 0
+        for file in files.processed_files:
+            content = access_layer.get_file_content(
+                chain=chain, file=file.file_name
+            )
+            entries_in_short_term_db += len(content.rows)
 
-    entries_in_long_term_db = 0
-    csv_file = long_term_database_connector.list_files(chain=enabled_scrapers[0].lower(), extension="csv") 
-    assert len(csv_file) > 0, f"No CSV files found for chain {enabled_scrapers[0].lower()} in long-term database"
-    
-    for file in csv_file:
-        df = long_term_database_connector.get_file_content(file)
-        entries_in_long_term_db += df.shape[0]
+        entries_in_long_term_db = 0
+        csv_file = long_term_database_connector.list_files(chain=chain.lower(), extension="csv")
+        assert len(csv_file) > 0, f"No CSV files found for chain {chain.lower()} in long-term database"
+        
+        for file in csv_file:
+            df = long_term_database_connector.get_file_content(file)
+            entries_in_long_term_db += df.shape[0]
 
-    assert entries_in_short_term_db == entries_in_long_term_db, f"Number of entries in short-term DB ({entries_in_short_term_db}) does not match long-term DB ({entries_in_long_term_db})"
+        assert entries_in_short_term_db == entries_in_long_term_db, f"Number of entries in short-term DB ({entries_in_short_term_db}) does not match long-term DB ({entries_in_long_term_db}) for chain {chain}"

@@ -10,7 +10,10 @@ import tempfile
 import logging
 from datetime import datetime
 import pytz
+import sys
 
+# Add parent directory to Python path so we can import modules from it
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from remotes import KaggleUploader,MongoDbUploader
 from tests.validation_utils import validate_long_term_structure, validate_short_term_structure

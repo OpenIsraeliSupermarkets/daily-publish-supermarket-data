@@ -1,9 +1,14 @@
 import asyncio
 import logging
 import os
+import sys
+
+# Add parent directory to Python path so we can import modules from it
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from data_processing_validation import collect_validation_results
 from data_serving_validation import main
-from system_tests.static_validation import download_and_validate_kaggle_data
+from static_validation import download_and_validate_kaggle_data
 
 
 async def run_validations():
@@ -39,9 +44,9 @@ async def run_validations():
     tasks.append(
         asyncio.create_task(
             download_and_validate_kaggle_data(
-                os.getenv("KAGGLE_DATASET_NAME"),
+                os.getenv("KAGGLE_DATASET_REMOTE_NAME"),
                 os.getenv("ENABLED_SCRAPERS").split(","),
-                os.getenv("LIMIT"),
+                int(os.getenv("LIMIT")),
                 os.getenv("MONGODB_URI")
             )
         )
