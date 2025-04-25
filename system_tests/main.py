@@ -1,11 +1,9 @@
 import asyncio
 import logging
-import traceback
-import json
-import sys
 import os
-
-
+from data_processing_validation import collect_validation_results
+from data_serving_validation import main
+from data_kaggle_validation import download_and_validate_kaggle_data
 async def run_validations():
     # Configure logging
     logging.basicConfig(
@@ -17,29 +15,20 @@ async def run_validations():
     # Run both validations concurrently
     tasks = []
     
-    # Data processing validation task
-    try:
-        logging.info("Starting data processing validation...")
-        from data_processing_validation import collect_validation_results
-        tasks.append(asyncio.create_task(
-            asyncio.to_thread(collect_validation_results, 
-            uri=os.getenv("MONGODB_URI"))
-        ))
-    except Exception as e:
-        logging.error(f"Error in data processing validation: {str(e)}")
-        logging.error(traceback.format_exc())
+    logging.info("Starting data processing validation...")
+    
+    tasks.append(asyncio.create_task(
+        asyncio.to_thread(collect_validation_results, 
+        uri=os.getenv("MONGODB_URI"))
+    ))
 
     # Data serving validation task  
-    try:
-        api_token = os.getenv("API_TOKEN")
-        host = os.getenv("API_HOST")
-        rate_limit = int(os.getenv("RATE_LIMIT", "3"))
-        from data_serving_validation import main
-        tasks.append(asyncio.create_task(main(api_token,host,rate_limit)))
-    except Exception as e:
-        logging.error(f"Error in data serving validation: {str(e)}")
-        logging.error(traceback.format_exc())
+    tasks.append(asyncio.create_task(main(os.getenv("API_TOKEN"),os.getenv("API_HOST"),int(os.getenv("RATE_LIMIT", "3")))))
 
+    # Data kaggle validation task
+    tasks.append(asyncio.create_task(download_and_validate_kaggle_data(os.getenv("KAGGLE_DATASET_NAME"),os.getenv("ENABLED_SCRAPERS").split(","))))
+
+    
     # Wait for both tasks to complete
     await asyncio.gather(*tasks)
 
