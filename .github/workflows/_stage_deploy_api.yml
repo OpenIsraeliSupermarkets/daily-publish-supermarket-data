@@ -36,7 +36,7 @@ jobs:
 
 
       - name: Stoping Old Container
-        run: docker compose down
+        run: docker compose down --remove-orphans
 
       - name: Make sure folders exists
         run: |-
