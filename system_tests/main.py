@@ -47,8 +47,8 @@ async def run_validations():
                 download_and_validate_kaggle_data,
                 os.getenv("KAGGLE_DATASET_REMOTE_NAME"),
                 os.getenv("ENABLED_SCRAPERS").split(","),
+                os.getenv("MONGODB_URI"),
                 int(os.getenv("LIMIT")),
-                os.getenv("MONGODB_URI")
             )
         )
     )

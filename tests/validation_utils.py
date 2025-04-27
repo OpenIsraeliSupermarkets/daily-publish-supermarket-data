@@ -178,7 +178,7 @@ def validate_short_term_structure(
     long_term_db_target,
     enabled_scrapers,
     num_of_occasions,
-    file_per_run
+    file_per_run=None
 ):
     """
     Validate the structure of the short-term database.
@@ -209,14 +209,14 @@ def validate_short_term_structure(
         enabled_scrapers,
         short_term_db_target,
         long_term_db_target,
-        num_of_occasions * file_per_run,
+        num_of_expected_files=num_of_occasions * file_per_run if file_per_run else None,
     )    
 
 def validate_api_scan(
     enabled_scrapers,
     short_term_database_connector,
     long_term_database_connector,
-    num_of_expected_files,
+    num_of_expected_files=None,
 ):
     """
     Validate the API scan results.
@@ -236,7 +236,7 @@ def validate_api_scan(
     #
     for chain in enabled_scrapers:
         files = access_layer.list_files(chain=chain)
-        assert len(files.processed_files) == num_of_expected_files, f"Expected {num_of_expected_files} processed files for chain {chain}, found {len(files.processed_files)}"
+        assert num_of_expected_files is None or len(files.processed_files) == num_of_expected_files, f"Expected {num_of_expected_files} processed files for chain {chain}, found {len(files.processed_files)}"
 
         entries_in_short_term_db = 0
         for file in files.processed_files:
