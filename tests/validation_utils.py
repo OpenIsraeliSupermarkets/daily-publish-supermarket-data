@@ -177,7 +177,7 @@ def validate_short_term_structure(
     short_term_db_target,
     long_term_db_target,
     enabled_scrapers,
-    num_of_occasions,
+    num_of_occasions=None,
     file_per_run=None
 ):
     """

@@ -19,7 +19,7 @@ from remotes import KaggleUploader,MongoDbUploader
 from tests.validation_utils import validate_long_term_structure, validate_short_term_structure
 
 
-def download_and_validate_kaggle_data(dataset_remote_name, enabled_scrapers, mongodb_uri, file_per_run=None):
+def download_and_validate_kaggle_data(dataset_remote_name, enabled_scrapers, mongodb_uri, file_per_run=None,num_of_occasions=None):
     """
     Download data from Kaggle and validate its structure.
 
@@ -52,7 +52,7 @@ def download_and_validate_kaggle_data(dataset_remote_name, enabled_scrapers, mon
             short_term_db_target,
             long_term_db_target,
             enabled_scrapers,
-            1,
+            num_of_occasions=num_of_occasions,
             file_per_run=file_per_run
         )
         validate_long_term_structure(
