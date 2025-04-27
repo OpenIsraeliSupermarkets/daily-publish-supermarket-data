@@ -191,17 +191,27 @@ def validate_short_term_structure(
     num_of_documents_in_scraper_status_per_chain = len([ScraperStatusReport.STARTED, ScraperStatusReport.COLLECTED, ScraperStatusReport.DOWNLOADED, ScraperStatusReport.ESTIMATED_SIZE])
     num_of_documents_in_parser_status_per_chain = len(FileTypesFilters)
     
-    expected_scraper_status_count = num_of_occasions * num_of_documents_in_scraper_status_per_chain * len(enabled_scrapers)
     scraper_status_table = ScraperStatus.get_table_name()
     actual_scraper_status_count = len(short_term_db_target.get_table_content(scraper_status_table))
-    assert actual_scraper_status_count == expected_scraper_status_count, f"Expected {expected_scraper_status_count} documents in {scraper_status_table}, found {actual_scraper_status_count}"
+    actual_no_of_occasions = actual_scraper_status_count / (num_of_documents_in_scraper_status_per_chain * len(enabled_scrapers)) 
+    
+    assert len(enabled_scrapers) > 0, f"Expected at least one enabled scraper"
+    if num_of_occasions is not None:
+        assert actual_no_of_occasions == num_of_occasions, f"Expected {num_of_occasions} occasions, found {actual_no_of_occasions}"
+    
+    assert int(actual_no_of_occasions) == actual_no_of_occasions, "Seems like scraper failed to run"
     assert short_term_db_target._is_collection_updated(scraper_status_table, seconds=60*60), f"Short-term database should be updated in the last hour"
 
 
-    expected_parser_status_count = num_of_occasions * len(enabled_scrapers) * num_of_documents_in_parser_status_per_chain
     parser_status_table = ParserStatus.get_table_name()
     actual_parser_status_count = len(short_term_db_target.get_table_content(parser_status_table))
-    assert actual_parser_status_count == expected_parser_status_count, f"Expected {expected_parser_status_count} documents in {parser_status_table}, found {actual_parser_status_count}"
+    assert actual_parser_status_count > 0, f"Expected at least one document in {parser_status_table}"
+    
+    actual_no_of_occasions = actual_parser_status_count / (num_of_documents_in_parser_status_per_chain * len(enabled_scrapers)) 
+    if num_of_occasions is not None:
+        assert actual_no_of_occasions == num_of_occasions, f"Expected {num_of_occasions} occasions, found {actual_no_of_occasions}"
+
+    assert int(actual_no_of_occasions) == actual_no_of_occasions, f"Expected completed batches documents in {parser_status_table}, found {actual_parser_status_count}"
     assert short_term_db_target._is_collection_updated(parser_status_table, seconds=60*60), f"Short-term database should be updated in the last hour"
 
     

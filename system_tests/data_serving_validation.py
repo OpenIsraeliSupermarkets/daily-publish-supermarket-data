@@ -206,13 +206,13 @@ async def main(api_token, host, rate_limit):
         logging.info("Checking short-term database health...")
         short_term_health = await validator.check_short_term_health()
         if not short_term_health['is_updated']:
-            raise Exception(f"Short-term database is not updated: {short_term_health['status']}")
+            raise Exception(f"Short-term database is not updated: {short_term_health['last_update']}")
         
         # Check long-term database health
         logging.info("Checking long-term database health...")
         long_term_health = await validator.check_long_term_health()
         if not long_term_health['is_updated']:
-            raise Exception(f"Long-term database is not updated: {long_term_health['status']}")
+            raise Exception(f"Long-term database is not updated: {long_term_health['last_update']}")
 
         # Run validation
         results = await validator.validate_all_data()

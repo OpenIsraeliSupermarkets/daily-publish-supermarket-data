@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from data_processing_validation import collect_validation_results
 from data_serving_validation import main
 from static_validation import download_and_validate_kaggle_data
+from il_supermarket_scarper import ScraperFactory
 
 
 async def run_validations():
@@ -46,10 +47,10 @@ async def run_validations():
             asyncio.to_thread(
                 download_and_validate_kaggle_data,
                 os.getenv("KAGGLE_DATASET_REMOTE_NAME"),
-                os.getenv("ENABLED_SCRAPERS").split(","),
+                os.getenv("ENABLED_SCRAPERS",",".join(ScraperFactory.all_scrapers_name())).split(","),
                 os.getenv("MONGODB_URI"),
-                file_per_run=int(os.getenv("LIMIT")),
-                num_of_occasions=int(os.getenv("NUM_OF_OCCASIONS")),
+                file_per_run=int(os.getenv("LIMIT")) if os.getenv("LIMIT") else None,
+                num_of_occasions=int(os.getenv("NUM_OF_OCCASIONS")) if os.getenv("NUM_OF_OCCASIONS") else None,
             )
         )
     )
