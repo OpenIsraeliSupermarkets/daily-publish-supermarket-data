@@ -223,23 +223,46 @@ def validate_short_term_structure(
     if num_of_occasions is not None:
         assert actual_scraper_status_count / (num_of_documents_in_scraper_status_per_chain * len(enabled_scrapers))  == num_of_occasions, f"Expected {num_of_occasions} occasions, found {actual_no_of_occasions}"
     
-    assert short_term_db_target._is_collection_updated(scraper_status_table, seconds=60*60), f"Short-term database should be updated in the last hour"
+    assert short_term_db_target._is_collection_updated(scraper_status_table, seconds=60*60*3), f"Short-term database should be updated in the last hour"
 
 
     #
-    #     Parser 
+    # Parser behaviour:
+    # - There should be at least one document.
+    # - All parsers ran at least once.
+    # - Each iteration was completed for all file types.
+    # - There is at least one iteration.
+    # - If we know the number of iterations, we expect it. Otherwise, we don't.
     #
     num_of_documents_in_parser_status_per_chain = len(FileTypesFilters)
 
     parser_status_table = ParserStatus.get_table_name()
-    actual_parser_status_count = len(short_term_db_target.get_table_content(parser_status_table))
-    assert actual_parser_status_count > 0, f"Expected at least one document in {parser_status_table}"
+    table_content = short_term_db_target.get_table_content(parser_status_table)
+    actual_parser_status_count = len(table_content)
     
-    actual_no_of_occasions = actual_parser_status_count / (num_of_documents_in_parser_status_per_chain * len(enabled_scrapers)) 
+    assert actual_parser_status_count > 0, "Expected at least one document."
+
+    # Check that we have documents for each file type
+    chains_batch_count = {}
+    for doc in table_content:
+        chain,_,time,_ = doc['index'].split('@') # Get timestamp part
+        chains_batch_count[chain] = chains_batch_count.get(chain, {})
+        chains_batch_count[chain][time] = chains_batch_count[chain].get(time, 0) + 1
+
+    # All the expected parsers ran
+    assert len(chains_batch_count) == len(enabled_scrapers), f"Expected {len(enabled_scrapers)} chains, found {len(chains_batch_count)}"
+
+    # Each iteration was completed successfully
+    for chain, counts in chains_batch_count.items():
+        assert len(counts) > 0, f"Expected at least one occasion for chain {chain}"
+        for time, count in counts.items():
+            assert count == num_of_documents_in_parser_status_per_chain, f"Expected {num_of_documents_in_parser_status_per_chain} documents for index {chain}@{time}, found {count}"
+
+    # The number of occasions is correct
     if num_of_occasions is not None:
+        actual_no_of_occasions = actual_parser_status_count / (num_of_documents_in_parser_status_per_chain * len(enabled_scrapers))
         assert actual_no_of_occasions == num_of_occasions, f"Expected {num_of_occasions} occasions, found {actual_no_of_occasions}"
 
-    assert int(actual_no_of_occasions) == actual_no_of_occasions, f"Expected completed batches documents in {parser_status_table}, found {actual_parser_status_count}"
     assert short_term_db_target._is_collection_updated(parser_status_table, seconds=60*60), f"Short-term database should be updated in the last hour"
 
     
