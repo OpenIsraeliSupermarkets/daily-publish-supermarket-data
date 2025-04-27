@@ -95,6 +95,14 @@ class ParserStatus(CommonModel):
         """
         return "index"
 
+class ScraperException(CommonModel):
+    """Exception model for a scraping operation.
+    
+    Records the details of an exception that occurred during a scraping operation.
+    """
+    execption: str
+    download_urls: List[str]
+    file_names: List[str]
 
 class ScraperStartedStatus(CommonModel):
     """Status model for the start of a scraping operation.
@@ -204,6 +212,7 @@ class ScraperStatus(CommonModel):
         ScraperCollectedStatus,
         ScraperDownloadedStatus,
         ScraperEstimatedSizeStatus,
+        ScraperException
     ]
 
     def to_dict(self) -> Dict[str, Any]:
