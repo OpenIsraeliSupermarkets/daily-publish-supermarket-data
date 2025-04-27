@@ -187,21 +187,49 @@ def validate_short_term_structure(
         short_term_db_target: The short-term database target
         enabled_scrapers: List of enabled scrapers
     """
-    
+    # Scraper behaviour: 
+    # - The should be at least one document. 
+    # - All scrapers ran at least once.
+    # - Each iteration was completed  all steps.
+    # - The is at least one itreaion.
+    # - If we know the number of itreations, we expect it. otherwise, we don't.
+    #
+    # Ignore: compraing the number of itreation across scrapers.
     num_of_documents_in_scraper_status_per_chain = len([ScraperStatusReport.STARTED, ScraperStatusReport.COLLECTED, ScraperStatusReport.DOWNLOADED, ScraperStatusReport.ESTIMATED_SIZE])
-    num_of_documents_in_parser_status_per_chain = len(FileTypesFilters)
     
     scraper_status_table = ScraperStatus.get_table_name()
-    actual_scraper_status_count = len(short_term_db_target.get_table_content(scraper_status_table))
-    actual_no_of_occasions = actual_scraper_status_count / (num_of_documents_in_scraper_status_per_chain * len(enabled_scrapers)) 
+    table_content = short_term_db_target.get_table_content(scraper_status_table)
+    actual_scraper_status_count = len(table_content)
     
-    assert len(enabled_scrapers) > 0, f"Expected at least one enabled scraper"
+    assert actual_scraper_status_count > 0, "Expected at least one document."
+
+    # Check that we have 4 documents for each index
+    chains_batch_count = {}
+    for doc in table_content:
+        chain,_,time,_ = doc['index'].split('@') # Get timestamp part
+        chains_batch_count[chain] = chains_batch_count.get(chain, {})
+        chains_batch_count[chain][time] = chains_batch_count[chain].get(time, 0) + 1
+    
+    # all the expected scraper was ran
+    assert len(chains_batch_count) == len(enabled_scrapers), f"Expected {len(enabled_scrapers)} chains, found {len(chains_batch_count)}"
+    
+    # each itreation was completed succsufll.
+    for chain, counts in chains_batch_count.items():
+        assert len(counts) > 0, f"Expected at least one occasion for chain {chain}"
+        for time, count in counts.items():
+            assert count == num_of_documents_in_scraper_status_per_chain, f"Expected {num_of_documents_in_scraper_status_per_chain} documents for index {chain}@{time}, found {count}"
+    
+    # the number of occasions is correct
     if num_of_occasions is not None:
-        assert actual_no_of_occasions == num_of_occasions, f"Expected {num_of_occasions} occasions, found {actual_no_of_occasions}"
+        assert actual_scraper_status_count / (num_of_documents_in_scraper_status_per_chain * len(enabled_scrapers))  == num_of_occasions, f"Expected {num_of_occasions} occasions, found {actual_no_of_occasions}"
     
-    assert int(actual_no_of_occasions) == actual_no_of_occasions, "Seems like scraper failed to run"
     assert short_term_db_target._is_collection_updated(scraper_status_table, seconds=60*60), f"Short-term database should be updated in the last hour"
 
+
+    #
+    #     Parser 
+    #
+    num_of_documents_in_parser_status_per_chain = len(FileTypesFilters)
 
     parser_status_table = ParserStatus.get_table_name()
     actual_parser_status_count = len(short_term_db_target.get_table_content(parser_status_table))
