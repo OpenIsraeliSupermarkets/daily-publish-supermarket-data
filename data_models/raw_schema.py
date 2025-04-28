@@ -21,8 +21,8 @@ class ExecutionLog(CommonModel):
     including extraction status, file metadata, and processing results.
     """
     loaded: bool
-    succusfull: bool
-    detected_num_rows: int
+    succusfull: bool = False
+    detected_num_rows: Optional[int] = None
     store_folder: str
     file_name: str
     prefix_file_name: str
