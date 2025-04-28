@@ -68,6 +68,15 @@
             "envFile": "${workspaceFolder}/.env.test",
         },
         {
+            "name": "System Tests (Stage)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/system_tests/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env.stage",
+        },
+        {
             "name": "FastAPI Test",
             "type": "debugpy",
             "request": "launch",
