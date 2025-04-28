@@ -33,6 +33,12 @@ class ExecutionLog(CommonModel):
     size: str
     is_expected_to_have_records: bool
 
+    @field_validator("extracted_store_number", mode="before")
+    @classmethod
+    def int_to_str(cls, v):
+        if isinstance(v, int):
+            return str(v)
+        return v
 
 class Response(CommonModel):
     """Response model containing the overall execution results.
