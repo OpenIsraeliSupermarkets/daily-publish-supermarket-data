@@ -130,20 +130,22 @@ class TestSupabaseTelemetry:
             msg = "SUPABASE_URL and SUPABASE_KEY environment variables must be set"
             assert msg in str(excinfo.value)
 
-    def test_send_telemetry_success(self, telemetry, mock_supabase):  # pylint: disable=unused-argument
+    @pytest.mark.asyncio
+    async def test_send_telemetry_success(self, telemetry, mock_supabase):  # pylint: disable=unused-argument
         """Test successful telemetry data transmission."""
         # Test data
         telemetry_data = {"endpoint": "/test", "method": "GET", "status_code": 200}
 
         # Call method
-        telemetry.send_telemetry(telemetry_data)
+        await telemetry.send_telemetry(telemetry_data)
 
         # Verify
         telemetry.supabase.table.assert_called_once_with("api_telemetry")
         telemetry.supabase.table().insert.assert_called_once_with(telemetry_data)
         telemetry.supabase.table().insert().execute.assert_called_once()
 
-    def test_send_telemetry_exception(self, telemetry, mock_supabase):  # pylint: disable=unused-argument
+    @pytest.mark.asyncio
+    async def test_send_telemetry_exception(self, telemetry, mock_supabase):  # pylint: disable=unused-argument
         """Test exception handling during telemetry transmission."""
         # Setup mock to raise exception
         telemetry.supabase.table.side_effect = Exception("Test exception")
@@ -153,7 +155,7 @@ class TestSupabaseTelemetry:
 
         # Call method with logging capture
         with patch("access.token_validator.logging") as mock_logging:
-            telemetry.send_telemetry(telemetry_data)
+            await telemetry.send_telemetry(telemetry_data)
 
             # Verify error was logged
             mock_logging.error.assert_called_once()
