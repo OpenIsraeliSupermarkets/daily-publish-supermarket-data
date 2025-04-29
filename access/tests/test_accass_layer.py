@@ -31,7 +31,7 @@ class TestAccessLayer(unittest.TestCase):
         )  # pylint: disable=protected-access
 
         self.long_term_db = MagicMock()
-        self.long_term_db.was_updated_in_last_24h = MagicMock(return_value=False)
+        self.long_term_db.was_updated_in_last = MagicMock(return_value=False)
 
         self.access_layer = AccessLayer(
             short_term_database_connector=self.short_term_db,

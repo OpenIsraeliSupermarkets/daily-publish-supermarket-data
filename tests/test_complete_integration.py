@@ -60,7 +60,7 @@ def run_full_dag_integration(remote_dataset_path, stage_folder, long_term_db_tar
         short_term_db_target,
         enabled_scrapers,
         num_of_occasions,
-        file_per_run
+        file_per_run=file_per_run
     )
     validate_long_term_structure(
         long_term_db_target, stage_folder, enabled_scrapers
