@@ -51,7 +51,7 @@ async def run_validations():
                 os.getenv("MONGODB_URI"),
                 file_per_run=int(os.getenv("LIMIT")) if os.getenv("LIMIT") else None,
                 num_of_occasions=int(os.getenv("NUM_OF_OCCASIONS")) if os.getenv("NUM_OF_OCCASIONS") else None,
-                upload_to_long_term_db=now().hour < 8
+                upload_to_long_term_db=True # assume running after the publish
             )
         )
     )
