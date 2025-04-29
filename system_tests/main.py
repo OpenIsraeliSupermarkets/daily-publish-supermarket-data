@@ -10,7 +10,7 @@ from data_processing_validation import validate_data_processing
 from data_serving_validation import main as full_data_scan
 from static_validation import validate_data_storage
 from il_supermarket_scarper import ScraperFactory
-
+from utils import now
 
 async def run_validations():
     # Configure logging
@@ -51,6 +51,7 @@ async def run_validations():
                 os.getenv("MONGODB_URI"),
                 file_per_run=int(os.getenv("LIMIT")) if os.getenv("LIMIT") else None,
                 num_of_occasions=int(os.getenv("NUM_OF_OCCASIONS")) if os.getenv("NUM_OF_OCCASIONS") else None,
+                upload_to_long_term_db=now().hour < 8
             )
         )
     )
