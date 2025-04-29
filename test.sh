@@ -1,5 +1,16 @@
 #!/bin/bash
-export $(cat .env.test | xargs)
+if [ -f .env.test ]; then
+    export $(cat .env.test | xargs)
+fi
+
+# override the kaggle dataset
+export KAGGLE_DATASET_REMOTE_NAME=test-super-dataset
+
+# limit the run time
+export ENABLED_SCRAPERS=BAREKET
+export LIMIT=10
+export NUM_OF_OCCASIONS=1
+export OPERATION=scraping,converting,clean_dump_files,api_update,publishing,clean_all_source_data
 
 
 docker compose stop
