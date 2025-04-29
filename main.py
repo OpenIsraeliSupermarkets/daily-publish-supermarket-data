@@ -37,8 +37,8 @@ if __name__ == "__main__":
     logging.info(f"When: {when}")
     
     publisher = SupermarketDataPublisherInterface(
-        number_of_scraping_processes=min(os.cpu_count(), 3),
-        number_of_parseing_processs=min(os.cpu_count(), 3),
+        number_of_scraping_processes=min(os.cpu_count(), 5),
+        number_of_parseing_processs=min(os.cpu_count(), 5),
         app_folder=os.environ["APP_DATA_PATH"],
         data_folder="dumps",
         outputs_folder="outputs",
