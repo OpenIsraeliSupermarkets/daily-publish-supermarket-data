@@ -22,6 +22,8 @@ RUN pip install -r requirements.txt
 FROM base as dev
 RUN pip install -r requirements-dev.txt
 
+FROM base as testing
+CMD pytest .
 
 FROM base as data_processing
 CMD python main.py
