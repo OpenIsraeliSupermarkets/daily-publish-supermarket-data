@@ -59,8 +59,7 @@ def run_full_dag_integration(remote_dataset_path, stage_folder, long_term_db_tar
     validate_short_term_structure(
         short_term_db_target,
         enabled_scrapers,
-        num_of_occasions,
-        file_per_run=file_per_run
+        num_of_occasions=num_of_occasions
     )
     validate_long_term_structure(
         long_term_db_target, stage_folder, enabled_scrapers
