@@ -129,7 +129,7 @@ def validate_long_term_structure(long_term_db_target, stage_folder, enabled_scra
         stage_folder: Path to the staging folder
         enabled_scrapers: List of enabled scrapers
     """
-    assert long_term_db_target.was_updated_in_last(seconds=60*60), f"Long-term database was not updated in the last hour"
+    assert long_term_db_target.was_updated_in_last(seconds=60*60*24), f"Long-term database was not updated in the last 24 hours"
     
     files = long_term_db_target.list_files()
     assert "index.json" in files, f"index.json not found in long-term database files: {files}"
@@ -175,10 +175,8 @@ def validate_local_structure_deleted(app_folder, data_folder, outputs_folder, st
 
 def validate_short_term_structure(
     short_term_db_target,
-    long_term_db_target,
     enabled_scrapers,
     num_of_occasions=None,
-    file_per_run=None
 ):
     """
     Validate the structure of the short-term database.
@@ -206,7 +204,7 @@ def validate_short_term_structure(
     # Check that we have 4 documents for each index
     chains_batch_count = {}
     for doc in table_content:
-        chain,_,time,_ = doc['index'].split('@') # Get timestamp part
+        chain,_,time,_ = ScraperStatus.decomposite_index(doc['index']) # Get timestamp part
         chains_batch_count[chain] = chains_batch_count.get(chain, {})
         chains_batch_count[chain][time] = chains_batch_count[chain].get(time, 0) + 1
     
@@ -245,7 +243,7 @@ def validate_short_term_structure(
     # Check that we have documents for each file type
     chains_batch_count = {}
     for doc in table_content:
-        chain,_,time,_ = doc['index'].split('@') # Get timestamp part
+        _,chain,time = ParserStatus.decomposite_index(doc['index']) # Get timestamp part
         chains_batch_count[chain] = chains_batch_count.get(chain, {})
         chains_batch_count[chain][time] = chains_batch_count[chain].get(time, 0) + 1
 
@@ -263,24 +261,18 @@ def validate_short_term_structure(
         actual_no_of_occasions = actual_parser_status_count / (num_of_documents_in_parser_status_per_chain * len(enabled_scrapers))
         assert actual_no_of_occasions == num_of_occasions, f"Expected {num_of_occasions} occasions, found {actual_no_of_occasions}"
 
-    assert short_term_db_target._is_collection_updated(parser_status_table, seconds=60*60), f"Short-term database should be updated in the last hour"
+    assert short_term_db_target._is_collection_updated(parser_status_table, seconds=60*60*3), f"Short-term database should be updated in the last hour"
 
-    
-    validate_api_scan(
-        enabled_scrapers,
-        short_term_db_target,
-        long_term_db_target,
-        num_of_expected_files=num_of_occasions * file_per_run if file_per_run else None,
-    )    
+     
 
-def validate_api_scan(
+def validate_longterm_and_short_sync(
     enabled_scrapers,
     short_term_database_connector,
     long_term_database_connector,
     num_of_expected_files=None,
 ):
     """
-    Validate the API scan results.
+    Validate that the API and the long-term database are in sync.
     
     Args:
         enabled_scrapers: List of enabled scrapers

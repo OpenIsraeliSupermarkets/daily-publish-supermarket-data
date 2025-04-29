@@ -1,5 +1,5 @@
 from pydantic import BaseModel, field_validator
-from typing import Optional, Dict, Any, List, Union
+from typing import Optional, Dict, Any, List, Union, Tuple
 from il_supermarket_scarper import FileTypesFilters, ScraperFactory
 from datetime import datetime
 import json
@@ -73,6 +73,14 @@ class ParserStatus(CommonModel):
     status: bool
     response: Response
 
+    @classmethod
+    def to_index(cls, file_type: str, store_enum: str, when_date: str) -> str:
+        return f"{file_type}@{store_enum}@{when_date}"
+        
+    @classmethod
+    def decomposite_index(cls, index: str) -> Tuple[str, str, str]:
+        return index.split("@")
+    
     def to_dict(self) -> Dict[str, Any]:
         """Convert the model to a dictionary.
         
@@ -220,6 +228,14 @@ class ScraperStatus(CommonModel):
         ScraperEstimatedSizeStatus,
         ScraperException
     ]
+    
+    @classmethod
+    def to_index(cls, file_name: str, status: str, timestamp: str, index: str) -> str:
+        return f"{file_name}@{status}@{timestamp}@{index}"
+        
+    @classmethod
+    def decomposite_index(cls, index: str) -> Tuple[str, str, str, str]:
+        return index.split("@")
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert the model to a dictionary.

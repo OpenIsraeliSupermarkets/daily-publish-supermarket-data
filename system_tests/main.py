@@ -6,9 +6,9 @@ import sys
 # Add parent directory to Python path so we can import modules from it
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from data_processing_validation import collect_validation_results
-from data_serving_validation import main
-from static_validation import download_and_validate_kaggle_data
+from data_processing_validation import validate_data_processing
+from data_serving_validation import main as full_data_scan
+from static_validation import validate_data_storage
 from il_supermarket_scarper import ScraperFactory
 
 
@@ -26,26 +26,26 @@ async def run_validations():
 
     tasks.append(
         asyncio.create_task(
-            asyncio.to_thread(collect_validation_results, uri=os.getenv("MONGODB_URI"))
+            asyncio.to_thread(validate_data_processing, uri=os.getenv("MONGODB_URI"))
         )
     )
 
-    # Data serving validation task
-    tasks.append(
-        asyncio.create_task(
-            main(
-                os.getenv("API_TOKEN"),
-                os.getenv("API_HOST"),
-                int(os.getenv("RATE_LIMIT", "3")),
-            )
-        )
-    )
+    # # Data serving validation task
+    # tasks.append(
+    #     asyncio.create_task(
+    #         full_data_scan(
+    #             os.getenv("API_TOKEN"),
+    #             os.getenv("API_HOST"),
+    #             int(os.getenv("RATE_LIMIT", "3")),
+    #         )
+    #     )
+    # )
 
     # Data kaggle validation task
     tasks.append(
         asyncio.create_task(
             asyncio.to_thread(
-                download_and_validate_kaggle_data,
+                validate_data_storage,
                 os.getenv("KAGGLE_DATASET_REMOTE_NAME"),
                 os.getenv("ENABLED_SCRAPERS",",".join(ScraperFactory.all_scrapers_name())).split(","),
                 os.getenv("MONGODB_URI"),

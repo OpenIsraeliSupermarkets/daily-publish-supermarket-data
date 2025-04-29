@@ -33,7 +33,7 @@ class ShortTermDBDatasetManager:
         for record in records:
             if record["when_date"] not in pushed_timestamps:
                 processed_records.append(ParserStatus(
-                    index=record["file_type"] + "@" + record["store_enum"] + "@" + record["when_date"],
+                    index=ParserStatus.to_index(record["file_type"], record["store_enum"], record["when_date"]),
                     when_date=record["when_date"],
                     requested_limit=record["limit"],
                     requested_store_enum=record["store_enum"],
@@ -84,13 +84,11 @@ class ShortTermDBDatasetManager:
             for action in actions:
                 records.append(
                     ScraperStatus(
-                        index=file_name.split(".")[0]
-                        + "@"
-                        + action["status"]
-                        + "@"
-                        + timestamp
-                        + "@"
-                        + str(index),
+                        index=ScraperStatus.to_index(
+                        file_name.split(".")[0],
+                        action["status"],
+                        timestamp,
+                        str(index)),
                         file_name=file_name.split(".")[0],
                         timestamp=datetime.strptime(timestamp, "%Y%m%d%H%M%S").strftime(
                             "%Y-%m-%d %H:%M:%S.%f%z"

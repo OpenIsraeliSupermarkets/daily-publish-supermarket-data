@@ -11,7 +11,8 @@ from publishers.dag_simulator import SupermarketDataPublisher
 from tests.validation_utils import (
     validate_local_structure_deleted,
     validate_long_term_structure,
-    validate_short_term_structure
+    validate_short_term_structure,
+    validate_longterm_and_short_sync
 )
 from remotes import DummyFileStorage, DummyDocumentDbUploader,KaggleUploader, MongoDbUploader
 from utils import now
@@ -57,7 +58,6 @@ def run_full_dag_integration(remote_dataset_path, stage_folder, long_term_db_tar
 
     validate_short_term_structure(
         short_term_db_target,
-        long_term_db_target,
         enabled_scrapers,
         num_of_occasions,
         file_per_run
@@ -65,6 +65,12 @@ def run_full_dag_integration(remote_dataset_path, stage_folder, long_term_db_tar
     validate_long_term_structure(
         long_term_db_target, stage_folder, enabled_scrapers
     )
+    validate_longterm_and_short_sync(
+        enabled_scrapers,
+        short_term_db_target,
+        long_term_db_target,
+        num_of_expected_files=num_of_occasions * file_per_run if file_per_run else None,
+    )   
 
     # validate the output
     validate_local_structure_deleted(app_folder, data_folder, outputs_folder, status_folder)

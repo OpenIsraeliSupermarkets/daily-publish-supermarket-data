@@ -162,7 +162,7 @@ def get_parsing_status(parser_status_collection, matched_chain_name, matched_tim
     return files_to_parse, parsing_results_success, parsing_results_failed
 
 
-def collect_validation_results(uri="mongodb://192.168.1.129:27017/"):
+def validate_data_processing(uri="mongodb://192.168.1.129:27017/"):
     """פונקציה ראשית"""
     scraper_status_collection, parser_status_collection = connect_to_mongodb(uri)
 
@@ -254,6 +254,6 @@ def collect_validation_results(uri="mongodb://192.168.1.129:27017/"):
 
 
 if __name__ == "__main__":
-    collect_validation_results(
+    validate_data_processing(
         uri="mongodb://your_mongo_user:your_mongo_password@localhost:27017/"
     )

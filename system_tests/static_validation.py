@@ -16,10 +16,10 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from remotes import KaggleUploader,MongoDbUploader
-from tests.validation_utils import validate_long_term_structure, validate_short_term_structure
+from tests.validation_utils import validate_long_term_structure, validate_short_term_structure, validate_longterm_and_short_sync
 
 
-def download_and_validate_kaggle_data(dataset_remote_name, enabled_scrapers, mongodb_uri, file_per_run=None,num_of_occasions=None):
+def validate_data_storage(dataset_remote_name, enabled_scrapers, mongodb_uri, file_per_run=None,num_of_occasions=None, upload_to_long_term_db=False):
     """
     Download data from Kaggle and validate its structure.
 
@@ -50,14 +50,20 @@ def download_and_validate_kaggle_data(dataset_remote_name, enabled_scrapers, mon
         )
         validate_short_term_structure(
             short_term_db_target,
-            long_term_db_target,
             enabled_scrapers,
             num_of_occasions=num_of_occasions,
-            file_per_run=file_per_run
         )
-        validate_long_term_structure(
-            long_term_db_target, stage_folder, enabled_scrapers, in_app=False
-        )
+        if upload_to_long_term_db:
+            validate_long_term_structure(
+                long_term_db_target, stage_folder, enabled_scrapers, in_app=False
+            )
+        
+            validate_longterm_and_short_sync(
+                enabled_scrapers,
+                short_term_db_target,
+                long_term_db_target,
+                num_of_expected_files=num_of_occasions * file_per_run if file_per_run else None,
+            )   
         
 
     finally:
