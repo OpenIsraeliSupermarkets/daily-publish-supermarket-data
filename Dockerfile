@@ -23,7 +23,7 @@ FROM base as dev
 RUN pip install -r requirements-dev.txt
 
 FROM dev as testing
-CMD python -m pytest . && python system_tests/main.py
+CMD python system_tests/main.py && python -m pytest .
 
 FROM base as data_processing
 CMD python main.py
