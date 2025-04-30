@@ -13,7 +13,7 @@ API_IP="${3:-host.docker.internal}"
 docker build --target testing -t supermarket-testing .
 docker run \
     --network=daily-publish-supermarket-data_mongo-network \
-    -e API_HOST=http://${API_IP}:8080/ \
+    -e API_HOST=http://${API_IP}:8000/ \
     -e MONGODB_URI=mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_IP}:${MONGO_PORT} \
     -e API_TOKEN=${API_TOKEN} \
     -e KAGGLE_USERNAME=${KAGGLE_USERNAME} \
