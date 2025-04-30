@@ -13,8 +13,8 @@ export NUM_OF_OCCASIONS=1
 export OPERATION=scraping,converting,clean_dump_files,api_update,publishing,clean_all_source_data
 
 
-# docker compose stop
-# docker compose rm -f
+docker compose stop
+docker compose rm -f
 
 # Clean the app data folder
 if [ -d "$APP_DATA_PATH" ]; then
@@ -35,13 +35,13 @@ else
 fi
 
 # clean too
-# docker compose build --no-cache
+docker compose build --no-cache
 
-# # start background services
-# docker compose up -d mongodb api
+# start background services
+docker compose up -d mongodb api
 
-# # start data processor and wait for scraping to complete.
-# docker compose up data_processor
+# start data processor and wait for scraping to complete.
+docker compose up data_processor
 
 
 if ! ./system_test.sh "${KAGGLE_DATASET_REMOTE_NAME}"; then
@@ -49,4 +49,4 @@ if ! ./system_test.sh "${KAGGLE_DATASET_REMOTE_NAME}"; then
     exit 1
 fi
 
-# docker compose stop
+docker compose stop
