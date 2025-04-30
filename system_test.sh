@@ -23,4 +23,6 @@ docker run \
     -e ENABLED_FILE_TYPES=${ENABLED_FILE_TYPES} \
     -e LIMIT=${LIMIT} \
     -e NUM_OF_OCCASIONS=${NUM_OF_OCCASIONS} \
+    -e SUPABASE_KEY=${SUPABASE_KEY} \
+    -e SUPABASE_URL=${SUPABASE_URL} \
     supermarket-testing
