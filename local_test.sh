@@ -1,6 +1,6 @@
 #!/bin/bash
-if [ -f .env.test ]; then
-    export $(cat .env.test | xargs)
+if [ -f .env.prod ]; then
+    export $(cat .env.prod | xargs)
 fi
 
 # override the kaggle dataset
@@ -13,8 +13,8 @@ export NUM_OF_OCCASIONS=1
 export OPERATION=scraping,converting,clean_dump_files,api_update,publishing,clean_all_source_data
 
 
-docker compose stop
-docker compose rm -f
+# docker compose stop
+# docker compose rm -f
 
 # Clean the app data folder
 if [ -d "$APP_DATA_PATH" ]; then
@@ -35,18 +35,18 @@ else
 fi
 
 # clean too
-docker compose build --no-cache
+# docker compose build --no-cache
 
-# start background services
-docker compose up -d mongodb api
+# # start background services
+# docker compose up -d mongodb api
 
-# start data processor and wait for scraping to complete.
-docker compose up data_processor
+# # start data processor and wait for scraping to complete.
+# docker compose up data_processor
 
 
-if ! python3 system_tests/main.py; then
+if ! ./system_test.sh "${KAGGLE_DATASET_REMOTE_NAME}"; then
     echo -e "\033[31mTest Failed\033[0m"
     exit 1
 fi
 
-docker compose stop
+# docker compose stop

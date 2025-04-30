@@ -22,13 +22,12 @@ RUN pip install -r requirements.txt
 FROM base as dev
 RUN pip install -r requirements-dev.txt
 
-FROM base as testing
-CMD pytest .
+FROM dev as testing
+CMD python -m pytest . && python system_tests/main.py
 
 FROM base as data_processing
 CMD python main.py
 
-# Serving
-# api.py
+# Serving: api.py
 FROM base as serving
 CMD uvicorn api:app --host 0.0.0.0 --port 8000 --proxy-headers
