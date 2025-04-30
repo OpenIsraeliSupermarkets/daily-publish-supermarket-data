@@ -20,3 +20,5 @@ app_data/
 venv
 .venv
 .secrets
+.env.stage
+.secrets
