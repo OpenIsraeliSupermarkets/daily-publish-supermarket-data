@@ -8,7 +8,7 @@ fi
 echo "Step 2: Setting up test environment variables"
 # override the kaggle dataset
 export KAGGLE_DATASET_REMOTE_NAME=test-super-dataset
-export DOCKER_IP=localhost
+export DOCKER_IP=host.docker.internal
 # limit the run time
 export ENABLED_SCRAPERS=BAREKET
 export LIMIT=10
