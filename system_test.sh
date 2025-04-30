@@ -11,7 +11,7 @@ DOCKER_IP="${2:-host.docker.internal}"
 
 docker build --target testing -t supermarket-testing .
 docker run \
-    --network=mongo-network \
+    --network=daily-publish-supermarket-data_mongo-network \
     -e API_HOST=http://${DOCKER_IP}:8080/ \
     -e MONGODB_URI=mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@${DOCKER_IP}:${MONGO_PORT} \
     -e API_TOKEN=${API_TOKEN} \
