@@ -14,4 +14,4 @@ jobs:
         with:
           ref: ${{ github.head_ref }}
       - name: Run system test
-        run: ./system_test.sh "test-super-dataset-2" 
+        run: ./local_test.sh "test-super-dataset-2" 
