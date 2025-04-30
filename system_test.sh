@@ -8,7 +8,7 @@ if [ -z "$TEST_DB_NAME" ]; then
 fi
 
 MONGO_IP="${2:-host.docker.internal}"
-API_IP="${3:-supermarket-api}"
+API_IP="${3:-host.docker.internal}"
 
 docker build --target testing -t supermarket-testing .
 docker run \
