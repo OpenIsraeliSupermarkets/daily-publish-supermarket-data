@@ -1,0 +1,17 @@
+name: System Test on PR to Main
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  system-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.head_ref }}
+      - name: Run system test
+        run: ./system_test.sh "test-super-dataset-2" 
