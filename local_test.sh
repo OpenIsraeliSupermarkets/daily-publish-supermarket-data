@@ -8,7 +8,8 @@ fi
 echo "Step 2: Setting up test environment variables"
 # override the kaggle dataset
 export KAGGLE_DATASET_REMOTE_NAME=test-super-dataset
-export DOCKER_IP=host.docker.internal
+export MONGO_IP=mongodb
+export API_IP=supermarket-api
 # limit the run time
 export ENABLED_SCRAPERS=BAREKET
 export LIMIT=10
@@ -55,7 +56,7 @@ docker logs supermarket-api
 
 
 echo "Step 10: Running system tests"
-if ! ./system_test.sh "${KAGGLE_DATASET_REMOTE_NAME}" "${DOCKER_IP}"; then
+if ! ./system_test.sh "${KAGGLE_DATASET_REMOTE_NAME}" "${MONGO_IP}" "${API_IP}" ; then
     echo -e "\033[31mTest Failed\033[0m"
     exit 1
 fi
