@@ -51,7 +51,7 @@ echo "Step 9: print networks and running containers"
 docker network ls
 docker ps
 echo "Step 9.1: Print API container logs"
-docker logs daily-publish-supermarket-data-api
+docker logs supermarket-api
 
 
 echo "Step 10: Running system tests"
