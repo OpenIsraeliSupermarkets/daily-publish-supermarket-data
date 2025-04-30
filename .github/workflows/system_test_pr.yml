@@ -13,5 +13,21 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: ${{ github.head_ref }}
+
+      - name: Adding env variables
+        run: |
+          echo "ENABLED_SCRAPERS=${{ secrets.ENABLED_SCRAPERS }}" >> $GITHUB_ENV
+          echo "ENABLED_FILE_TYPES=${{ secrets.ENABLED_FILE_TYPES }}" >> $GITHUB_ENV
+          echo "LIMIT=${{ secrets.LIMIT }}" >> $GITHUB_ENV
+          echo "APP_DATA_PATH=${{ runner.workspace }}/app_data" >> $GITHUB_ENV
+          echo "MONGO_DATA_PATH=${{ runner.workspace }}/mongo_data" >> $GITHUB_ENV
+          echo "MONGO_URL=${{ secrets.MONGO_URL }}" >> $GITHUB_ENV
+          echo "MONGO_PORT=${{ secrets.MONGO_PORT }}" >> $GITHUB_ENV
+          echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> $GITHUB_ENV
+          echo "KAGGLE_USERNAME=${{ secrets.KAGGLE_USERNAME }}" >> $GITHUB_ENV
+          echo "KAGGLE_KEY=${{ secrets.KAGGLE_KEY }}" >> $GITHUB_ENV
+          echo "MONGO_USERNAME=${{ secrets.MONGO_USERNAME }}" >> $GITHUB_ENV
+          echo "MONGO_PASSWORD=${{ secrets.MONGO_PASSWORD }}" >> $GITHUB_ENV
+
       - name: Run system test
         run: ./local_test.sh "test-super-dataset-2" 
