@@ -1,16 +1,18 @@
 #!/bin/bash
 
 # Usage: ./system_test.sh <database_name>
-TEST_DB_NAME="$1"
+TEST_DB_NAME="$1" 
 if [ -z "$TEST_DB_NAME" ]; then
   echo "Usage: $0 <database_name>"
   exit 1
 fi
 
+DOCKER_HOST="${2:-host.docker.internal}"
+
 docker build --target testing -t supermarket-testing .
 docker run \
-    -e API_HOST=http://host.docker.internal:8080/ \
-    -e MONGODB_URI=mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@host.docker.internal:${MONGO_PORT} \
+    -e API_HOST=http://${DOCKER_HOST}:8080/ \
+    -e MONGODB_URI=mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@${DOCKER_HOST}:${MONGO_PORT} \
     -e API_TOKEN=${API_TOKEN} \
     -e KAGGLE_USERNAME=${KAGGLE_USERNAME} \
     -e KAGGLE_KEY=${KAGGLE_KEY} \

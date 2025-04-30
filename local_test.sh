@@ -8,7 +8,7 @@ fi
 echo "Step 2: Setting up test environment variables"
 # override the kaggle dataset
 export KAGGLE_DATASET_REMOTE_NAME=test-super-dataset
-
+export DOCKER_HOST=172.17.0.1
 # limit the run time
 export ENABLED_SCRAPERS=BAREKET
 export LIMIT=10
@@ -48,7 +48,7 @@ echo "Step 8: Starting data processor and waiting for scraping to complete"
 docker compose up data_processor
 
 echo "Step 9: Running system tests"
-if ! ./system_test.sh "${KAGGLE_DATASET_REMOTE_NAME}"; then
+if ! ./system_test.sh "${KAGGLE_DATASET_REMOTE_NAME}" "${DOCKER_HOST}"; then
     echo -e "\033[31mTest Failed\033[0m"
     exit 1
 fi
