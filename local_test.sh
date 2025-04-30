@@ -47,7 +47,11 @@ docker compose up -d mongodb api
 echo "Step 8: Starting data processor and waiting for scraping to complete"
 docker compose up data_processor
 
-echo "Step 9: Running system tests"
+echo "Step 9: print networks and running containers"
+docker network ls
+docker ps
+
+echo "Step 10: Running system tests"
 if ! ./system_test.sh "${KAGGLE_DATASET_REMOTE_NAME}" "${DOCKER_IP}"; then
     echo -e "\033[31mTest Failed\033[0m"
     exit 1
