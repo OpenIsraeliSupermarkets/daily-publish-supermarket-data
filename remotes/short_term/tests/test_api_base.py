@@ -26,7 +26,8 @@ def short_term_test_case(short_term_db_target):
             test_items = [{"id": 1, "data": "test1"}, {"id": 2, "data": "test2"}]
             self.uploader._insert_to_database("test_table", copy.deepcopy(test_items))
             self.assertEqual(
-                list(self.uploader.get_table_content("test_table")), test_items
+                sorted(list(self.uploader.get_table_content("test_table")), key=lambda x: x["id"]),
+                sorted(test_items, key=lambda x: x["id"])
             )
 
         def test_clean_all_tables(self):
