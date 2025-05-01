@@ -7,7 +7,6 @@ import shutil
 import pytest
 import tempfile
 from remotes import DummyFileStorage, DummyDocumentDbUploader
-from il_supermarket_scarper import ScraperFactory
 from utils import now
 from tests.validation_utils import (
     validate_scraper_output,
@@ -15,21 +14,13 @@ from tests.validation_utils import (
     validate_state_after_api_update,
     validate_long_term_structure,
     validate_local_structure_deleted,
+    scrapers_to_test
 )
 from publishers.base_publisher import BaseSupermarketDataPublisher
 
 
 
-def scrapers_to_test():
-    """
-    Since the system test is running externally to israel, some scrapers are not available.
-    This function returns the list of scrapers to test that should be available.
-    """
-    return [
-        ScraperFactory.BAREKET.name,
-        ScraperFactory.YAYNO_BITAN.name,
-        ScraperFactory.COFIX.name,
-    ]
+
 
 def test_execute_scraping_integration():
     """

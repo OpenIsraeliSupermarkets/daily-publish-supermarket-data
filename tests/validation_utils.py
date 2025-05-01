@@ -10,7 +10,18 @@ from access.access_layer import AccessLayer
 import os
 import glob
 import pandas as pd
+from il_supermarket_scarper import ScraperFactory
 
+def scrapers_to_test():
+    """
+    Since the system test is running externally to israel, some scrapers are not available.
+    This function returns the list of scrapers to test that should be available.
+    """
+    return [
+        ScraperFactory.BAREKET.name,
+        ScraperFactory.YAYNO_BITAN.name,
+        ScraperFactory.COFIX.name,
+    ]
 
 def validate_scraper_output(data_folder, enabled_scrapers, dump_files_deleted=False):
     """

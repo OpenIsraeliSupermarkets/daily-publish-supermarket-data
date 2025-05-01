@@ -5,6 +5,7 @@ Tests the full DAG execution pipeline from disk.
 import os
 import tempfile
 import mongomock
+import random
 from unittest.mock import patch
 from il_supermarket_scarper.scrappers_factory import ScraperFactory
 from publishers.dag_simulator import SupermarketDataPublisher
@@ -12,7 +13,8 @@ from tests.validation_utils import (
     validate_local_structure_deleted,
     validate_long_term_structure,
     validate_short_term_structure,
-    validate_longterm_and_short_sync
+    validate_longterm_and_short_sync,
+    scrapers_to_test
 )
 from remotes import DummyFileStorage, DummyDocumentDbUploader,KaggleUploader, MongoDbUploader
 from utils import now
@@ -96,7 +98,7 @@ def test_full_dag_integration_from_disk():
             long_term_db_target,
             short_term_db_target,
             temp_dir,
-            enabled_scrapers=ScraperFactory.sample(n=1)
+            enabled_scrapers=random.sample(scrapers_to_test(), 1)
         )
         
 def test_full_dag_integration_real():
@@ -120,6 +122,6 @@ def test_full_dag_integration_real():
                 long_term_db_target,
                 short_term_db_target,
                 temp_dir,
-                enabled_scrapers=ScraperFactory.sample(n=1)
+                enabled_scrapers=random.sample(scrapers_to_test(), 1)
                 
             )
