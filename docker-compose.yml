@@ -8,6 +8,9 @@ services:
       - mongo-data:/data/db
     networks:
       - mongo-network
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD}
     restart: unless-stopped
     deploy:
       resources:
@@ -25,33 +28,38 @@ services:
     depends_on:
       - mongodb
     environment:
-      - MONGODB_URI=mongodb://${MONGO_URL}:${MONGO_PORT}/
+      - MONGODB_URI=mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_URL}:${MONGO_PORT}/
       - SUPABASE_KEY=${SUPABASE_KEY}
       - SUPABASE_URL=${SUPABASE_URL}
       - KAGGLE_KEY=${KAGGLE_KEY}
       - KAGGLE_USERNAME=${KAGGLE_USERNAME}
-      - LONG_TERM_MEMORY=${LONG_TERM_MEMORY}
-      - SHORT_TERM_MEMORY=${SHORT_TERM_MEMORY}
+      - KAGGLE_DATASET_REMOTE_NAME=${KAGGLE_DATASET_REMOTE_NAME}
+      - APP_DATA_PATH=app_data
+      - ENABLED_SCRAPERS=${ENABLED_SCRAPERS}
+      - ENABLED_FILE_TYPES=${ENABLED_FILE_TYPES}
+
     networks:
       - mongo-network
     restart: unless-stopped
 
-  publisher:
+  data_processor:
     build:
       context: .
       dockerfile: Dockerfile
       target: data_processing
-    container_name: data-publisher
+    container_name: data-processor
     depends_on:
       - mongodb
     environment:
-      - MONGODB_URI=mongodb://${MONGO_URL}:${MONGO_PORT}/
-      - OPREATION=${OPREATION}
+      - MONGODB_URI=mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_URL}:${MONGO_PORT}/
+      - OPERATION=${OPERATION}
       - KAGGLE_KEY=${KAGGLE_KEY}
       - KAGGLE_USERNAME=${KAGGLE_USERNAME}
-      - LONG_TERM_MEMORY=${LONG_TERM_MEMORY}
-      - SHORT_TERM_MEMORY=${SHORT_TERM_MEMORY}
+      - KAGGLE_DATASET_REMOTE_NAME=${KAGGLE_DATASET_REMOTE_NAME}
+      - APP_DATA_PATH=app_data
       - LIMIT=${LIMIT}
+      - ENABLED_SCRAPERS=${ENABLED_SCRAPERS}
+      - ENABLED_FILE_TYPES=${ENABLED_FILE_TYPES}
     volumes:
       - app_data:/usr/src/app/app_data
     networks:

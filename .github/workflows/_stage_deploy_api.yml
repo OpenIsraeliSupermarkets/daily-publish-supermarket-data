@@ -22,7 +22,7 @@ jobs:
       - name: Adding env variables    
         run: |
           echo "APP_DATA_PATH=${{ runner.workspace }}/app_data" >> $GITHUB_ENV
-          echo "MONGO_DATA_PATH=${{ runner.workspace}}/mongo_data" >> $GITHUB_ENV
+          echo "MONGO_DATA_PATH=${{ runner.workspace }}/mongo_data" >> $GITHUB_ENV
           echo "MONGO_URL=${{ secrets.MONGO_URL }}" >> $GITHUB_ENV
           echo "MONGO_PORT=${{ secrets.MONGO_PORT }}" >> $GITHUB_ENV
           echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> $GITHUB_ENV
@@ -30,9 +30,13 @@ jobs:
           echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> $GITHUB_ENV
           echo "KAGGLE_USERNAME=${{ secrets.KAGGLE_USERNAME }}" >> $GITHUB_ENV
           echo "KAGGLE_KEY=${{ secrets.KAGGLE_KEY }}" >> $GITHUB_ENV
+          echo "MONGO_USERNAME=${{ secrets.MONGO_USERNAME }}" >> $GITHUB_ENV
+          echo "MONGO_PASSWORD=${{ secrets.MONGO_PASSWORD }}" >> $GITHUB_ENV
+          echo "KAGGLE_DATASET_REMOTE_NAME=test-super-dataset-2" >> $GITHUB_ENV
+
 
       - name: Stoping Old Container
-        run: docker compose down
+        run: docker compose down --remove-orphans
 
       - name: Make sure folders exists
         run: |-

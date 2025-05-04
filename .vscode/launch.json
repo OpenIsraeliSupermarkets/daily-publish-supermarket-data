@@ -4,7 +4,20 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-
+        {
+            "name": "Data Validation",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "data_validation/data_serving_validation.py",
+            "console": "integratedTerminal",
+        },
+        {
+            "name": "Data Processing Validation",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "data_validation/data_processing_validation.py",
+            "console": "integratedTerminal",
+        },
         {
             "name": "Test Daliy Raw Dump",
             "type": "debugpy",
@@ -23,7 +36,7 @@
             "justMyCode": false,
             "envFile": "${workspaceFolder}/.env.test",
             "env": {
-                "OPREATION":"scraping,converting,api_update,clean_dump_files"
+                "OPERATION":"scraping,converting,api_update,clean_dump_files"
             }
         },
         {
@@ -34,9 +47,7 @@
             "purpose": ["debug-test"],
             "console": "integratedTerminal",
             "justMyCode": false,
-            "presentation": {
-                "hidden": true, // keep original launch order in 'run and debug' tab
-            }
+            
         },
         {
             "name": "Access Layer",
@@ -46,6 +57,24 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "envFile": "${workspaceFolder}/.env.test",
+        },
+        {
+            "name": "System Tests",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/system_tests/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env.test",
+        },
+        {
+            "name": "System Tests (Stage)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/system_tests/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env.stage",
         },
         {
             "name": "FastAPI Test",

@@ -12,7 +12,18 @@ jobs:
   call-workflow:
     uses: OpenIsraeliSupermarkets/daily-publish-supermarket-data/.github/workflows/template.yml@stage
     with:
-      operation: "clean_all_source_data"
+      kaggle_dataset_remote_name: "test-super-dataset-2"
+      operation: "publishing,clean_all_source_data"
       branch: "stage"
       environment: "staging"
     secrets: inherit
+
+  # testing:
+  #   runs-on: 
+  #     - self-hosted
+  #     - staging
+  #   needs: call-workflow
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Build and run tests
+  #       run: ./system_test.sh "test-super-dataset-2"
