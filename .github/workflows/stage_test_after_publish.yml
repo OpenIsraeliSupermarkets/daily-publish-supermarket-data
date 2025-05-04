@@ -1,0 +1,18 @@
+name: Staging | Test After Publish
+
+on:
+  workflow_run:
+    workflows: ["Staging | Publishing"]
+    types:
+      - completed
+
+jobs:
+  test-staging:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on:
+      - self-hosted
+      - staging
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and run staging system tests
+        run: ./system_test.sh "test-super-dataset-2" "mongodb" "supermarket-api" 
