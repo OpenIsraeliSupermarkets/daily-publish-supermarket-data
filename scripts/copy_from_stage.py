@@ -5,7 +5,7 @@ from remotes.long_term.kaggle import KaggleUploader
 
 # Set dataset names
 SRC_DATASET = "test-super-dataset-2"
-DST_DATASET = "israeli-supermarkets-2024"
+DST_DATASET = "test-super-dataset"
 
 # Use a temp directory for staging
 with tempfile.TemporaryDirectory() as temp_dir:
@@ -25,7 +25,12 @@ with tempfile.TemporaryDirectory() as temp_dir:
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 zip_ref.extractall(temp_dir)
             os.remove(zip_path)
-
+    # Delete index.json if it exists
+    index_path = os.path.join(temp_dir, "index.json")
+    if os.path.exists(index_path):
+        print(f"Removing {index_path}...")
+        os.remove(index_path)
+        
     # Upload to destination
     dst_uploader = KaggleUploader(temp_dir, DST_DATASET, datetime.now())
     print(f"Uploading all files to {DST_DATASET}...")
