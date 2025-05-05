@@ -1,0 +1,19 @@
+name: Production | Restart Mongo
+
+on:
+  workflow_dispatch:
+
+
+jobs:
+  clean:
+    runs-on: self-hosted
+
+    steps:
+      - name: Restart Mongo
+        run: |
+          echo "Removing mongo data"
+          docker compose down mongodb
+          rm -rf "${{ runner.workspace }}/mongo_data"
+          mkdir -p "${{ runner.workspace }}/mongo_data"
+          docker compose up -d mongodb
+          echo "Mongo restarted"s
