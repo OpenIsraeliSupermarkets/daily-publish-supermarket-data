@@ -7,7 +7,9 @@ on:
 
 jobs:
   clean:
-    runs-on: self-hosted
+    runs-on: 
+      - self-hosted
+      - production
 
     steps:
       - name: Clean Docker system
