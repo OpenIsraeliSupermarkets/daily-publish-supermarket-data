@@ -47,7 +47,7 @@ async def run_validations():
             asyncio.to_thread(
                 validate_data_storage,
                 os.getenv("KAGGLE_DATASET_REMOTE_NAME"),
-                os.getenv("ENABLED_SCRAPERS",",".join(ScraperFactory.all_scrapers_name())).split(","),
+                os.getenv("ENABLED_SCRAPERS") or ",".join(ScraperFactory.all_scrapers_name()).split(","),
                 os.getenv("MONGODB_URI"),
                 file_per_run=int(os.getenv("LIMIT")) if os.getenv("LIMIT") else None,
                 num_of_occasions=int(os.getenv("NUM_OF_OCCASIONS")) if os.getenv("NUM_OF_OCCASIONS") else None,
