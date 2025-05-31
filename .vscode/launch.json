@@ -28,15 +28,16 @@
             "envFile": "${workspaceFolder}/.env.test",
         },
         {
-            "name": "Daliy Raw Dump",
+            "name": "DEBUG: Daliy Raw Dump",
             "type": "debugpy",
             "request": "launch",
-            "program": "daily_raw_dump.py",
+            "program": "main.py",
             "console": "integratedTerminal",
             "justMyCode": false,
             "envFile": "${workspaceFolder}/.env.test",
             "env": {
-                "OPERATION":"scraping,converting,api_update,clean_dump_files"
+                "OPERATION":"scraping,converting",
+                "ENABLED_SCRAPERS":"SHUFERSAL"
             }
         },
         {
@@ -105,6 +106,18 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "envFile": "${workspaceFolder}/.env.prod"
+        },
+        {
+            "name": "Copy Dump From Stage To Prod",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "scripts/copy_from_stage.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env.prod",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
         }
     ]
 }
