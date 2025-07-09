@@ -7,19 +7,21 @@ import json
 
 class CommonModel(BaseModel):
     """Base model class that defines common configuration settings.
-    
+
     Provides standard JSON encoding behavior for datetime objects.
     """
+
     class Config:
         json_encoders = {datetime: lambda dt: dt.strftime("%Y-%m-%d %H:%M:%S")}
 
 
 class ExecutionLog(CommonModel):
     """Log entry for a single file execution process.
-    
+
     Contains detailed information about the processing of a specific supermarket data file,
     including extraction status, file metadata, and processing results.
     """
+
     loaded: bool
     succusfull: bool = False
     detected_num_rows: Optional[int] = None
@@ -40,12 +42,14 @@ class ExecutionLog(CommonModel):
             return str(v)
         return v
 
+
 class Response(CommonModel):
     """Response model containing the overall execution results.
-    
+
     Provides a summary of the file processing operation, including which files were
     processed, any errors encountered, and execution logs for each file.
     """
+
     status: bool
     store_name: str
     files_types: str
@@ -59,10 +63,11 @@ class Response(CommonModel):
 
 class ParserStatus(CommonModel):
     """Status model for a parser execution.
-    
+
     Records the results and configuration of a parsing operation, including the store,
     file type, and execution response details.
     """
+
     index: str
     when_date: str
     requested_limit: Optional[str] = None
@@ -76,14 +81,14 @@ class ParserStatus(CommonModel):
     @classmethod
     def to_index(cls, file_type: str, store_enum: str, when_date: str) -> str:
         return f"{file_type}@{store_enum}@{when_date}"
-        
+
     @classmethod
     def decomposite_index(cls, index: str) -> Tuple[str, str, str]:
         return index.split("@")
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert the model to a dictionary.
-        
+
         Returns:
             Dict[str, Any]: Model data as a dictionary
         """
@@ -92,7 +97,7 @@ class ParserStatus(CommonModel):
     @classmethod
     def get_table_name(cls) -> str:
         """Get the database table name for this model.
-        
+
         Returns:
             str: Table name from Config or class name
         """
@@ -103,26 +108,30 @@ class ParserStatus(CommonModel):
     @classmethod
     def get_index(cls) -> str:
         """Get the index field name.
-        
+
         Returns:
             str: Name of the index field
         """
         return "index"
 
+
 class ScraperException(CommonModel):
     """Exception model for a scraping operation.
-    
+
     Records the details of an exception that occurred during a scraping operation.
     """
+
     execption: str
     download_urls: List[str]
     file_names: List[str]
 
+
 class ScraperStartedStatus(CommonModel):
     """Status model for the start of a scraping operation.
-    
+
     Contains the initial configuration and parameters for the scraper.
     """
+
     limit: int
     files_requested: Optional[Dict[str, Any]] = None
     store_id: Optional[str] = None
@@ -136,10 +145,10 @@ class ScraperStartedStatus(CommonModel):
     @classmethod
     def all_empty(cls, v):
         """Convert empty string to -1.
-        
+
         Args:
             v: Value to validate
-            
+
         Returns:
             List: Empty list if input is empty string, otherwise original value
         """
@@ -147,11 +156,13 @@ class ScraperStartedStatus(CommonModel):
             return -1
         return v
 
+
 class ScraperCollectedStatus(CommonModel):
     """Status model for the file collection phase of scraping.
-    
+
     Records the files and links that were collected from the supermarket website.
     """
+
     file_name_collected_from_site: List[str]
     links_collected_from_site: List[str]
 
@@ -159,10 +170,10 @@ class ScraperCollectedStatus(CommonModel):
     @classmethod
     def all_empty(cls, v):
         """Convert empty string to empty list.
-        
+
         Args:
             v: Value to validate
-            
+
         Returns:
             List: Empty list if input is empty string, otherwise original value
         """
@@ -173,9 +184,10 @@ class ScraperCollectedStatus(CommonModel):
 
 class DownloadedStatus(CommonModel):
     """Status model for a single downloaded file.
-    
+
     Tracks the result of downloading and extracting a specific file.
     """
+
     file_name: str
     downloaded: bool
     extract_succefully: bool
@@ -185,17 +197,19 @@ class DownloadedStatus(CommonModel):
 
 class ScraperDownloadedStatus(CommonModel):
     """Status model for all downloaded files in a scraping operation.
-    
+
     Contains a list of download results for each file.
     """
+
     results: List[DownloadedStatus]
 
 
 class FolderSize(CommonModel):
     """Model for folder size information.
-    
+
     Records the size and contents of a folder.
     """
+
     size: float
     unit: str
     folder: str
@@ -204,18 +218,20 @@ class FolderSize(CommonModel):
 
 class ScraperEstimatedSizeStatus(CommonModel):
     """Status model for the estimated size of scraped data.
-    
+
     Provides information about the storage requirements for the scraped data.
     """
+
     folder_size: FolderSize
     completed_successfully: bool
 
 
 class ScraperStatus(CommonModel):
     """Status model for the overall scraping process.
-    
+
     Tracks the state and results of a scraping operation at different stages.
     """
+
     index: str
     file_name: str
     timestamp: datetime
@@ -226,20 +242,20 @@ class ScraperStatus(CommonModel):
         ScraperCollectedStatus,
         ScraperDownloadedStatus,
         ScraperEstimatedSizeStatus,
-        ScraperException
+        ScraperException,
     ]
-    
+
     @classmethod
     def to_index(cls, file_name: str, status: str, timestamp: str, index: str) -> str:
         return f"{file_name}@{status}@{timestamp}@{index}"
-        
+
     @classmethod
     def decomposite_index(cls, index: str) -> Tuple[str, str, str, str]:
         return index.split("@")
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert the model to a dictionary.
-        
+
         Returns:
             Dict[str, Any]: Model data as a dictionary
         """
@@ -248,7 +264,7 @@ class ScraperStatus(CommonModel):
     @classmethod
     def get_table_name(cls) -> str:
         """Get the database table name for this model.
-        
+
         Returns:
             str: Table name from Config or class name
         """
@@ -259,7 +275,7 @@ class ScraperStatus(CommonModel):
     @classmethod
     def get_index(cls) -> str:
         """Get the index field name.
-        
+
         Returns:
             str: Name of the index field
         """
@@ -268,9 +284,10 @@ class ScraperStatus(CommonModel):
 
 class DataTable(CommonModel):
     """Base model for data table entries.
-    
+
     Represents a row of data extracted from a supermarket file.
     """
+
     row_index: int
     found_folder: str
     file_name: str
@@ -278,7 +295,7 @@ class DataTable(CommonModel):
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert the model to a dictionary.
-        
+
         Returns:
             Dict[str, Any]: Model data as a dictionary
         """
@@ -287,10 +304,10 @@ class DataTable(CommonModel):
     @classmethod
     def by_file_name(cls, file_name: str):
         """Create a filter condition for querying by file name.
-        
+
         Args:
             file_name (str): Name of the file to filter by
-            
+
         Returns:
             dict: Query filter condition
         """
@@ -299,7 +316,7 @@ class DataTable(CommonModel):
     @classmethod
     def get_table_name(cls) -> str:
         """Get the database table name for this model.
-        
+
         Returns:
             str: Table name from Config or class name
         """
@@ -310,7 +327,7 @@ class DataTable(CommonModel):
     @classmethod
     def get_index(cls) -> str:
         """Get the index field name.
-        
+
         Returns:
             str: Name of the index field
         """
@@ -336,11 +353,11 @@ def create_dynamic_table_class(create_table_name: str) -> type:
 
 def get_table_name(file_type: str, chain: str):
     """Generate a standardized table name based on file type and chain.
-    
+
     Args:
         file_type (str): Type of the file
         chain (str): Name of the supermarket chain
-        
+
     Returns:
         str: Combined table name in lowercase
     """
@@ -349,10 +366,10 @@ def get_table_name(file_type: str, chain: str):
 
 def file_name_to_table(filename):
     """Extract table name from a filename.
-    
+
     Args:
         filename (str): Full file path
-        
+
     Returns:
         str: Table name derived from the filename
     """

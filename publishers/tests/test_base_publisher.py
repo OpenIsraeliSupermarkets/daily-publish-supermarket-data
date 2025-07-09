@@ -2,6 +2,7 @@
 Integration tests for the BaseSupermarketDataPublisher class.
 Tests the various operations of the publisher including scraping, converting, and uploading data.
 """
+
 import os
 import shutil
 import pytest
@@ -14,12 +15,9 @@ from tests.validation_utils import (
     validate_state_after_api_update,
     validate_long_term_structure,
     validate_local_structure_deleted,
-    scrapers_to_test
+    scrapers_to_test,
 )
 from publishers.base_publisher import BaseSupermarketDataPublisher
-
-
-
 
 
 def test_execute_scraping_integration():
@@ -54,7 +52,6 @@ def test_execute_scraping_integration():
     finally:
         # Clean up
         shutil.rmtree(temp_dir)
-
 
 
 def test_execute_converting_integration():
@@ -99,7 +96,6 @@ def test_execute_converting_integration():
         shutil.rmtree(temp_dir)
 
 
-
 def test_dump_files_clean_integration():
     """
     Integration test for updating the API database.
@@ -127,11 +123,16 @@ def test_dump_files_clean_integration():
         publisher._clean_all_dump_files()
 
         validate_converting_output(
-            publisher.data_folder, publisher.outputs_folder, enabled_scrapers, dump_files_deleted=True
+            publisher.data_folder,
+            publisher.outputs_folder,
+            enabled_scrapers,
+            dump_files_deleted=True,
         )
 
         # status didn't changed
-        validate_scraper_output(publisher.data_folder, enabled_scrapers, dump_files_deleted=True)
+        validate_scraper_output(
+            publisher.data_folder, enabled_scrapers, dump_files_deleted=True
+        )
 
         # Check if the DummyDocumentDbUploader was updated
         # In a real implementation, we would need to check the actual database state
@@ -140,7 +141,6 @@ def test_dump_files_clean_integration():
     finally:
         # Clean up
         shutil.rmtree(temp_dir)
-
 
 
 def test_update_api_database_integration():
@@ -172,11 +172,16 @@ def test_update_api_database_integration():
         publisher._clean_all_dump_files()
         publisher._update_api_database()
         validate_converting_output(
-            publisher.data_folder, publisher.outputs_folder, enabled_scrapers, dump_files_deleted=True
+            publisher.data_folder,
+            publisher.outputs_folder,
+            enabled_scrapers,
+            dump_files_deleted=True,
         )
 
         # status didn't changed
-        validate_scraper_output(publisher.data_folder, enabled_scrapers, dump_files_deleted=True)
+        validate_scraper_output(
+            publisher.data_folder, enabled_scrapers, dump_files_deleted=True
+        )
         validate_state_after_api_update(
             publisher.app_folder,
             publisher.outputs_folder,
@@ -187,7 +192,6 @@ def test_update_api_database_integration():
     finally:
         # Clean up
         shutil.rmtree(temp_dir)
-
 
 
 def test_upload_to_kaggle_integration():
@@ -206,12 +210,12 @@ def test_upload_to_kaggle_integration():
         stage_folder = os.path.join(temp_dir, "stage")
 
         long_term_db_target = DummyFileStorage(
-                dataset_remote_path=remote_dataset_path,
-                dataset_path=stage_folder,
-                when=now(),
-            )
+            dataset_remote_path=remote_dataset_path,
+            dataset_path=stage_folder,
+            when=now(),
+        )
         enabled_scrapers = scrapers_to_test()
-        
+
         publisher = BaseSupermarketDataPublisher(
             app_folder=temp_dir,
             number_of_scraping_processes=5,
@@ -246,7 +250,6 @@ def test_upload_to_kaggle_integration():
     finally:
         # Clean up
         shutil.rmtree(temp_dir)
-
 
 
 def test_clean_all_source_data_integration():

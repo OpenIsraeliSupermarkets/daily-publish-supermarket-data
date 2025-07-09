@@ -2,6 +2,7 @@
 Module for simulating DAG-based execution of supermarket data publishing tasks.
 Provides scheduling and execution of tasks at specified times.
 """
+
 import logging
 import time
 import datetime
@@ -116,8 +117,10 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
 
         Note:
             This method overrides the parent class run method with different parameters.
-        """        
-        logging.info(f"Executing operations with {self.wait_time_seconds}s wait time between runs")
+        """
+        logging.info(
+            f"Executing operations with {self.wait_time_seconds}s wait time between runs"
+        )
         for i in range(self.num_of_occasions):
             logging.info(f"Starting execution {i+1}/{self.num_of_occasions}")
             self._execute_operations(operations)

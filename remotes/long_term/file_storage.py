@@ -13,6 +13,8 @@ from .base import LongTermDatabaseUploader
 import json
 import pandas as pd
 from il_supermarket_scarper import DumpFolderNames
+
+
 class DummyFileStorage(LongTermDatabaseUploader):
     """A dummy implementation of remote storage using local file system.
 
@@ -91,15 +93,19 @@ class DummyFileStorage(LongTermDatabaseUploader):
         """
         return was_updated_within_seconds(self.dataset_remote_path, seconds)
 
-
     def list_files(self, chain=None, extension=None):
-        files = glob.glob(os.path.join(self.dataset_remote_path, self._build_pattern(chain, extension)))
+        files = glob.glob(
+            os.path.join(
+                self.dataset_remote_path, self._build_pattern(chain, extension)
+            )
+        )
         return [os.path.basename(f) for f in files]
-    
-    
+
     def get_file_content(self, file_name):
         if file_name.endswith(".json"):
-            with open(os.path.join(self.dataset_remote_path, file_name), "r", encoding="utf-8") as file:
+            with open(
+                os.path.join(self.dataset_remote_path, file_name), "r", encoding="utf-8"
+            ) as file:
                 return json.load(file)
         elif file_name.endswith(".csv"):
             # Read and return the CSV file as a DataFrame

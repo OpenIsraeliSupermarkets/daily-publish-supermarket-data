@@ -63,7 +63,6 @@ __all__ = [
     "get_table_name",
     "file_name_to_table",
     "list_all_dynamic_tables",
-    
     # From response
     "ScrapedFile",
     "ScrapedFiles",
@@ -74,4 +73,4 @@ __all__ = [
     "ServiceHealth",
     "LongTermDatabaseHealth",
     "ShortTermDatabaseHealth",
-] 
+]

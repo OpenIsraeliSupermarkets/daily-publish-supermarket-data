@@ -26,8 +26,11 @@ def short_term_test_case(short_term_db_target):
             test_items = [{"id": 1, "data": "test1"}, {"id": 2, "data": "test2"}]
             self.uploader._insert_to_database("test_table", copy.deepcopy(test_items))
             self.assertEqual(
-                sorted(list(self.uploader.get_table_content("test_table")), key=lambda x: x["id"]),
-                sorted(test_items, key=lambda x: x["id"])
+                sorted(
+                    list(self.uploader.get_table_content("test_table")),
+                    key=lambda x: x["id"],
+                ),
+                sorted(test_items, key=lambda x: x["id"]),
             )
 
         def test_clean_all_tables(self):
@@ -70,12 +73,18 @@ def short_term_test_case(short_term_db_target):
 
     return TestShortTermDatabaseUploader
 
+
 with patch("pymongo.MongoClient", mongomock.MongoClient):
-    class MongoTestCase(short_term_test_case(MongoDbUploader(mongodb_uri="mongodb://localhost:27017"))):
+
+    class MongoTestCase(
+        short_term_test_case(MongoDbUploader(mongodb_uri="mongodb://localhost:27017"))
+    ):
         pass
 
 
-class DummyTestCase(short_term_test_case(DummyDocumentDbUploader(db_path="./document_db"))):
+class DummyTestCase(
+    short_term_test_case(DummyDocumentDbUploader(db_path="./document_db"))
+):
 
     def tearDown(self):
         # Clean up the database file after each test

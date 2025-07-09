@@ -10,6 +10,7 @@ from managers.cache_manager import CacheState
 from remotes import ShortTermDatabaseUploader
 from typing import List, Dict
 
+
 class TestLargeFilePushManager:
     @pytest.fixture
     def temp_dir(self):
@@ -259,36 +260,32 @@ class TestLargeFilePushManager:
 
     def test_last_row_saw_no_nulls(self, temp_dir, mock_database_manager, cache_state):
         """Test that last_row_saw doesn't contain null values."""
-        
+
         test_file = "test_file.csv"
         file_path = os.path.join(temp_dir, test_file)
         # Create test data with one chunk containing null values and another with valid data
         test_data = pd.DataFrame(
             {
                 "found_folder": ["test_folder"] + [np.nan for i in range(9)],
-                "file_name": ["test_file_"] +  [np.nan for i in range(9)],
-                "more_data": ["test_data_" ]+  [np.nan for i in range(9)],
+                "file_name": ["test_file_"] + [np.nan for i in range(9)],
+                "more_data": ["test_data_"] + [np.nan for i in range(9)],
             }
         )
         test_data.to_csv(file_path, index=False)
-        
-        
+
         manager = LargeFilePushManager(temp_dir, mock_database_manager, 3)
- 
-        
+
         def mock_insert(table_name, items: List[Dict]):
-            # Accessing private attribute for testing purposes            
+            # Accessing private attribute for testing purposes
             # Assert last_row_saw does not contain nulls after ffill operation
             for item in items:
                 for key, value in item.items():
-                    assert value is not None and not pd.isna(value), f"Key {key} contains NaN value"
-        
+                    assert value is not None and not pd.isna(
+                        value
+                    ), f"Key {key} contains NaN value"
+
         # Replace the method with our mock
         manager.database_manager._insert_to_database = mock_insert
-        
-            
+
         # Process the file
         manager.process_file(test_file, cache_state)
-
-
-    

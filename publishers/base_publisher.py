@@ -2,6 +2,7 @@
 Base module for supermarket data publishing.
 Provides the core functionality for scraping, converting, and uploading supermarket data.
 """
+
 import logging
 import datetime
 import os
@@ -13,6 +14,7 @@ from managers.short_term_database_manager import ShortTermDBDatasetManager
 from managers.cache_manager import CacheManager
 from remotes import KaggleUploader, MongoDbUploader
 from utils import now
+
 
 class BaseSupermarketDataPublisher:
     """
@@ -92,7 +94,7 @@ class BaseSupermarketDataPublisher:
         """
         try:
             os.makedirs(self.data_folder, exist_ok=True)
-            
+
             logging.info("Starting the scraping task")
             ScarpingTask(
                 enabled_scrapers=self.enabled_scrapers,
@@ -115,7 +117,7 @@ class BaseSupermarketDataPublisher:
         """
         logging.info("Starting the converting task")
         os.makedirs(self.outputs_folder, exist_ok=True)
-        
+
         ConvertingTask(
             enabled_parsers=self.enabled_scrapers,
             files_types=self.enabled_file_types,

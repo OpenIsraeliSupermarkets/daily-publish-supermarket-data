@@ -41,7 +41,9 @@ class TestTokenValidator:
                 TokenValidator()
                 mock_create_client.assert_called_once_with("test_url", "test_key")
 
-    def test_validate_token_valid(self, token_validator, mock_supabase):  # pylint: disable=unused-argument
+    def test_validate_token_valid(
+        self, token_validator, mock_supabase
+    ):  # pylint: disable=unused-argument
         """Test validating a valid token."""
         # Setup mock response
         mock_result = MagicMock()
@@ -60,7 +62,9 @@ class TestTokenValidator:
             "update_token_last_used", {"token_id": "test_token_id"}
         )
 
-    def test_validate_token_invalid(self, token_validator, mock_supabase):  # pylint: disable=unused-argument
+    def test_validate_token_invalid(
+        self, token_validator, mock_supabase
+    ):  # pylint: disable=unused-argument
         """Test validating an invalid token."""
         # Setup mock response
         mock_result = MagicMock()
@@ -77,7 +81,9 @@ class TestTokenValidator:
             "validate_token", {"input_token": "invalid_token"}
         )
 
-    def test_validate_token_exception(self, token_validator, mock_supabase):  # pylint: disable=unused-argument
+    def test_validate_token_exception(
+        self, token_validator, mock_supabase
+    ):  # pylint: disable=unused-argument
         """Test exception handling during token validation."""
         # Setup mock to raise exception
         token_validator.supabase.rpc.side_effect = Exception("Test exception")
@@ -131,7 +137,9 @@ class TestSupabaseTelemetry:
             assert msg in str(excinfo.value)
 
     @pytest.mark.asyncio
-    async def test_send_telemetry_success(self, telemetry, mock_supabase):  # pylint: disable=unused-argument
+    async def test_send_telemetry_success(
+        self, telemetry, mock_supabase
+    ):  # pylint: disable=unused-argument
         """Test successful telemetry data transmission."""
         # Test data
         telemetry_data = {"endpoint": "/test", "method": "GET", "status_code": 200}
@@ -145,7 +153,9 @@ class TestSupabaseTelemetry:
         telemetry.supabase.table().insert().execute.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_send_telemetry_exception(self, telemetry, mock_supabase):  # pylint: disable=unused-argument
+    async def test_send_telemetry_exception(
+        self, telemetry, mock_supabase
+    ):  # pylint: disable=unused-argument
         """Test exception handling during telemetry transmission."""
         # Setup mock to raise exception
         telemetry.supabase.table.side_effect = Exception("Test exception")
