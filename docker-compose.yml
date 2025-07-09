@@ -37,6 +37,7 @@ services:
       - APP_DATA_PATH=app_data
       - ENABLED_SCRAPERS=${ENABLED_SCRAPERS}
       - ENABLED_FILE_TYPES=${ENABLED_FILE_TYPES}
+      - LOG_LEVEL=${LOG_LEVEL:-WARNING}
 
     networks:
       - mongo-network
@@ -60,6 +61,7 @@ services:
       - LIMIT=${LIMIT}
       - ENABLED_SCRAPERS=${ENABLED_SCRAPERS}
       - ENABLED_FILE_TYPES=${ENABLED_FILE_TYPES}
+      - LOG_LEVEL=${LOG_LEVEL:-WARNING}
     volumes:
       - app_data:/usr/src/app/app_data
     networks:

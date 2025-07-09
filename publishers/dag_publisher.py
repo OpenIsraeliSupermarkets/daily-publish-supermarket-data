@@ -6,12 +6,6 @@ import logging
 from publishers.base_publisher import BaseSupermarketDataPublisher
 
 
-logging.getLogger("Logger").setLevel(logging.INFO)
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
-
-
 class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
     """
     Interface for executing DAG-like operations for supermarket data publishing.

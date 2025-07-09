@@ -11,12 +11,11 @@ from data_serving_validation import main as full_data_scan
 from static_validation import validate_data_storage
 from il_supermarket_scarper import ScraperFactory
 from utils import now
+from utils.logging_config import configure_logging
 
 async def run_validations():
     # Configure logging
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-    )
+    configure_logging()
 
     # Run data processing validation
     # Run both validations concurrently

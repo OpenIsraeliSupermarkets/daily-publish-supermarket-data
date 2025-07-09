@@ -2,14 +2,11 @@ from remotes import KaggleUploader, MongoDbUploader
 from publishers.dag_publisher import SupermarketDataPublisherInterface
 import os
 from utils import now
+from utils.logging_config import configure_logging
 import logging
 
 if __name__ == "__main__":
-
-    logging.getLogger("Logger").setLevel(logging.INFO)
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-    )
+    configure_logging()
 
     when = now()
     

@@ -12,6 +12,7 @@ import multiprocessing
 from functools import partial
 from tqdm import tqdm
 from tqdm.asyncio import tqdm as async_tqdm
+from utils.logging_config import configure_logging
 
 
 @dataclass
@@ -180,9 +181,7 @@ class ApiCallValidator:
 
 async def main(api_token, host, rate_limit):
     # Configure logging
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-    )
+    configure_logging()
 
     if not api_token:
         raise ValueError("API_TOKEN environment variable is not set")

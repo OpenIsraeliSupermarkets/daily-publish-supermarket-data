@@ -14,12 +14,6 @@ from managers.cache_manager import CacheManager
 from remotes import KaggleUploader, MongoDbUploader
 from utils import now
 
-logging.getLogger("Logger").setLevel(logging.INFO)
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
-
-
 class BaseSupermarketDataPublisher:
     """
     Base class for publishing supermarket data to various destinations.

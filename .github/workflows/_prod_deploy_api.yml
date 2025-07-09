@@ -33,6 +33,7 @@ jobs:
           echo "MONGO_USERNAME=${{ secrets.MONGO_USERNAME }}" >> $GITHUB_ENV
           echo "MONGO_PASSWORD=${{ secrets.MONGO_PASSWORD }}" >> $GITHUB_ENV
           echo "KAGGLE_DATASET_REMOTE_NAME=israeli-supermarkets-2024" >> $GITHUB_ENV
+          echo "LOG_LEVEL=WARNING" >> $GITHUB_ENV
 
           
       - name: Stoping Old Container
