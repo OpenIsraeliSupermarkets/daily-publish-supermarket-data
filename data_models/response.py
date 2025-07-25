@@ -79,6 +79,42 @@ class FileContent(BaseModel):
         super().__init__(rows=processed_rows)
 
 
+class PaginatedFileContent(BaseModel):
+    """Paginated file content with metadata.
+
+    Contains file content rows with pagination information for efficient data retrieval.
+    """
+
+    rows: list[RawFileContent]
+    total_count: int
+    has_more: bool
+    offset: int
+    chunk_size: int
+
+    def __init__(self, rows: list[dict[str, str]], total_count: int, has_more: bool, offset: int, chunk_size: int) -> None:
+        """Initialize the paginated file content from raw row data.
+
+        Transforms raw dictionary rows into RawFileContent objects with pagination metadata.
+
+        Args:
+            rows (list[dict[str, str]]): List of raw row data dictionaries
+            total_count (int): Total number of records available
+            has_more (bool): Whether there are more records available
+            offset (int): Current offset for pagination
+            chunk_size (int): Size of the current chunk
+        """
+        processed_rows = [
+            RawFileContent(
+                found_folder=row["found_folder"],
+                file_name=row["file_name"],
+                row_index=row["row_index"],
+                row_content=row["content"],
+            )
+            for row in rows
+        ]
+        super().__init__(rows=processed_rows, total_count=total_count, has_more=has_more, offset=offset, chunk_size=chunk_size)
+
+
 class ServiceHealth(BaseModel):
     """Model for service health status.
 

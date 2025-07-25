@@ -15,6 +15,7 @@ from data_models.response import (
     TypeOfFileScraped,
     AvailableChains,
     FileContent,
+    PaginatedFileContent,
     ServiceHealth,
     LongTermDatabaseHealth,
     ShortTermDatabaseHealth,
@@ -70,10 +71,27 @@ async def list_file_types(
 async def read_files(
     chain: str,
     file_type: Optional[str] = None,
+    store_number: Optional[str] = None,
+    after_extracted_date: Optional[str] = None,
+    only_latest: bool = False,
     credentials: HTTPAuthorizationCredentials = Security(security),
 ) -> ScrapedFiles:
     try:
-        return access_layer.list_files(chain=chain, file_type=file_type)
+        # Parse the date string if provided
+        parsed_date = None
+        if after_extracted_date:
+            try:
+                parsed_date = datetime.fromisoformat(after_extracted_date.replace('Z', '+00:00'))
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid date format. Use ISO format (YYYY-MM-DDTHH:MM:SS)")
+        
+        return access_layer.list_files_with_filters(
+            chain=chain, 
+            file_type=file_type,
+            store_number=store_number,
+            after_extracted_date=parsed_date,
+            only_latest=only_latest
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -82,10 +100,17 @@ async def read_files(
 async def file_content(
     chain: str,
     file: str,
+    chunk_size: int = 100,
+    offset: int = 0,
     credentials: HTTPAuthorizationCredentials = Security(security),
-) -> FileContent:
+) -> PaginatedFileContent:
     try:
-        return access_layer.get_file_content(chain=chain, file=file)
+        return access_layer.get_file_content_paginated(
+            chain=chain, 
+            file=file, 
+            chunk_size=chunk_size, 
+            offset=offset
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
