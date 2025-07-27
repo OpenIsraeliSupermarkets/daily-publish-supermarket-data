@@ -102,14 +102,17 @@ async def file_content(
     file: str,
     chunk_size: int = 100,
     offset: int = 0,
+    limit: Optional[int] = None,
+    cursor: Optional[str] = None,
     credentials: HTTPAuthorizationCredentials = Security(security),
 ) -> PaginatedFileContent:
     try:
-        return access_layer.get_file_content_paginated(
+        actual_limit = limit if limit is not None else chunk_size
+        return access_layer.get_file_content_with_cursor_pagination(
             chain=chain, 
             file=file, 
-            chunk_size=chunk_size, 
-            offset=offset
+            limit=actual_limit, 
+            cursor=cursor
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

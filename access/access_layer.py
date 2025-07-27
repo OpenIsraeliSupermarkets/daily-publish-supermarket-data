@@ -310,10 +310,99 @@ class AccessLayer:
         paginated_rows = all_rows[offset:offset + chunk_size]
         has_more = offset + chunk_size < total_count
         
+        # Generate cursors for cursor-based pagination
+        next_cursor = None
+        prev_cursor = None
+        
+        if has_more:
+            next_cursor = str(offset + chunk_size)
+        
+        if offset > 0:
+            prev_cursor = str(max(0, offset - chunk_size))
+        
         return PaginatedFileContent(
             rows=paginated_rows,
             total_count=total_count,
             has_more=has_more,
             offset=offset,
-            chunk_size=chunk_size
+            chunk_size=chunk_size,
+            next_cursor=next_cursor,
+            prev_cursor=prev_cursor
+        )
+
+    def get_file_content_with_cursor_pagination(
+        self, 
+        chain: str, 
+        file: str, 
+        limit: int = 100, 
+        cursor: Optional[str] = None
+    ) -> PaginatedFileContent:
+        """
+        Get paginated content of a specific file from a specific chain using cursor-based pagination.
+
+        Args:
+            chain: Name of the supermarket chain
+            file: Name of the file to retrieve
+            limit: Number of records to return per page
+            cursor: Optional cursor for pagination (offset as string)
+
+        Returns:
+            PaginatedFileContent: Object containing the file content with pagination metadata
+
+        Raises:
+            ValueError: If chain or file parameters are missing or invalid
+        """
+        if not chain:
+            raise ValueError("chain parameter is required")
+        if not file:
+            raise ValueError("file parameter is required")
+
+        scraper = ScraperFactory.get(chain)
+        if not scraper:
+            valid_chains = ScraperFactory.all_scrapers_name()
+            raise ValueError(f"chain '{chain}' is not a valid chain {valid_chains}")
+
+        file_type = FileTypesFilters.get_type_from_file(file.replace("NULL", ""))
+        if not file_type:
+            raise ValueError(f"file {file} doesn't follow the correct pattern.")
+
+        table_name = get_table_name(file_type.name, chain)
+        
+        # Get all rows for the file
+        all_rows = self.short_term_database_connector.get_table_content(
+            table_name, DataTable.by_file_name(file)
+        )
+        
+        total_count = len(all_rows)
+        
+        # Convert cursor to offset
+        offset = 0
+        if cursor:
+            try:
+                offset = int(cursor)
+            except ValueError:
+                raise ValueError("Invalid cursor format")
+        
+        # Apply pagination
+        paginated_rows = all_rows[offset:offset + limit]
+        has_more = offset + limit < total_count
+        
+        # Generate cursors for cursor-based pagination
+        next_cursor = None
+        prev_cursor = None
+        
+        if has_more:
+            next_cursor = str(offset + limit)
+        
+        if offset > 0:
+            prev_cursor = str(max(0, offset - limit))
+        
+        return PaginatedFileContent(
+            rows=paginated_rows,
+            total_count=total_count,
+            has_more=has_more,
+            offset=offset,
+            chunk_size=limit,
+            next_cursor=next_cursor,
+            prev_cursor=prev_cursor
         )
