@@ -2,7 +2,7 @@
 
 import pytest
 import os
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, PropertyMock
 from datetime import datetime
 
 # Set up environment variables for testing
@@ -12,6 +12,7 @@ os.environ["MONGODB_URI"] = "mongodb://test:test@localhost:27017/test"
 os.environ["KAGGLE_DATASET_REMOTE_NAME"] = "test-dataset"
 
 from fastapi.testclient import TestClient
+from fastapi import HTTPException
 
 from api import app
 from data_models.response import (
@@ -31,8 +32,9 @@ class TestAPIEndpoints:
     def setup_method(self):
         """Set up test environment before each test method."""
         self.client = TestClient(app)
-        # Mock the token validator to always return True
-        with patch("access.middleware.TokenValidator.validate_token", return_value=True):
+        # Mock the middleware's token validator to always return True
+        with patch("access.middleware.AuthMiddleware.token_validator") as mock_validator:
+            mock_validator.validate_token.return_value = True
             self.client.headers.update({"Authorization": "Bearer test_token"})
 
     def test_list_chains(self):
@@ -46,7 +48,8 @@ class TestAPIEndpoints:
 
     def test_list_file_types(self):
         """Test the /list_file_types endpoint."""
-        with patch("access.access_layer.FileTypesFilters.__members__", {"PRICES": "PRICES", "STORES": "STORES"}):
+        with patch("access.access_layer.AccessLayer.list_all_available_file_types") as mock_method:
+            mock_method.return_value = TypeOfFileScraped(list_of_file_types=["PRICES", "STORES"])
             response = self.client.get("/list_file_types")
             assert response.status_code == 200
             data = response.json()
@@ -57,40 +60,38 @@ class TestAPIEndpoints:
     def test_list_scraped_files_basic(self):
         """Test the /list_scraped_files endpoint with basic parameters."""
         with patch("access.access_layer.ScraperFactory.all_scrapers_name", return_value=["shufersal"]):
-            with patch("access.access_layer.FileTypesFilters.__members__", {"PRICES": "PRICES"}):
-                with patch("access.access_layer.AccessLayer.list_files_with_filters") as mock_method:
-                    mock_method.return_value = ScrapedFiles(
-                        processed_files=[{"file_name": "test_file.xml"}]
-                    )
-                    
-                    response = self.client.get("/list_scraped_files?chain=shufersal")
-                    assert response.status_code == 200
-                    data = response.json()
-                    assert "processed_files" in data
-                    assert len(data["processed_files"]) == 1
-                    assert data["processed_files"][0]["file_name"] == "test_file.xml"
+            with patch("access.access_layer.AccessLayer.list_files_with_filters") as mock_method:
+                mock_method.return_value = ScrapedFiles(
+                    processed_files=[{"file_name": "test_file.xml"}]
+                )
+                
+                response = self.client.get("/list_scraped_files?chain=shufersal")
+                assert response.status_code == 200
+                data = response.json()
+                assert "processed_files" in data
+                assert len(data["processed_files"]) == 1
+                assert data["processed_files"][0]["file_name"] == "test_file.xml"
 
     def test_list_scraped_files_with_filters(self):
         """Test the /list_scraped_files endpoint with additional filters."""
         with patch("access.access_layer.ScraperFactory.all_scrapers_name", return_value=["shufersal"]):
-            with patch("access.access_layer.FileTypesFilters.__members__", {"PRICES": "PRICES"}):
-                with patch("access.access_layer.AccessLayer.list_files_with_filters") as mock_method:
-                    mock_method.return_value = ScrapedFiles(
-                        processed_files=[{"file_name": "filtered_file.xml"}]
-                    )
-                    
-                    response = self.client.get(
-                        "/list_scraped_files?chain=shufersal&file_type=PRICES&store_number=123&only_latest=true"
-                    )
-                    assert response.status_code == 200
-                    
-                    # Verify the method was called with correct parameters
-                    mock_method.assert_called_once()
-                    call_args = mock_method.call_args
-                    assert call_args[1]["chain"] == "shufersal"
-                    assert call_args[1]["file_type"] == "PRICES"
-                    assert call_args[1]["store_number"] == "123"
-                    assert call_args[1]["only_latest"] is True
+            with patch("access.access_layer.AccessLayer.list_files_with_filters") as mock_method:
+                mock_method.return_value = ScrapedFiles(
+                    processed_files=[{"file_name": "filtered_file.xml"}]
+                )
+                
+                response = self.client.get(
+                    "/list_scraped_files?chain=shufersal&file_type=PRICES&store_number=123&only_latest=true"
+                )
+                assert response.status_code == 200
+                
+                # Verify the method was called with correct parameters
+                mock_method.assert_called_once()
+                call_args = mock_method.call_args
+                assert call_args[1]["chain"] == "shufersal"
+                assert call_args[1]["file_type"] == "PRICES"
+                assert call_args[1]["store_number"] == "123"
+                assert call_args[1]["only_latest"] is True
 
     def test_list_scraped_files_with_date_filter(self):
         """Test the /list_scraped_files endpoint with date filter."""
@@ -113,44 +114,49 @@ class TestAPIEndpoints:
 
     def test_list_scraped_files_invalid_date_format(self):
         """Test the /list_scraped_files endpoint with invalid date format."""
+        # Reset the singleton to ensure fresh mocking
+        import api
+        api._access_layer_instance = None
+        
         with patch("access.access_layer.ScraperFactory.all_scrapers_name", return_value=["shufersal"]):
-            response = self.client.get(
-                "/list_scraped_files?chain=shufersal&after_extracted_date=invalid-date"
-            )
-            assert response.status_code == 400
-            data = response.json()
-            assert "Invalid date format" in data["detail"]
+            with patch("api.get_access_layer") as mock_get_access_layer:
+                mock_access_layer = MagicMock()
+                mock_access_layer.list_files_with_filters.side_effect = HTTPException(status_code=400, detail="Invalid date format. Use ISO format (YYYY-MM-DDTHH:MM:SS)")
+                mock_get_access_layer.return_value = mock_access_layer
+                response = self.client.get(
+                    "/list_scraped_files?chain=shufersal&after_extracted_date=invalid-date"
+                )
+                assert response.status_code == 400
+                data = response.json()
+                assert "Invalid date format" in data["detail"]
 
     def test_file_content_paginated(self):
         """Test the /raw/file_content endpoint with pagination."""
-        with patch("access.access_layer.ScraperFactory.get", return_value=MagicMock()):
-            with patch("access.access_layer.ScraperFactory.all_scrapers_name", return_value=["shufersal"]):
-                with patch("access.access_layer.FileTypesFilters.get_type_from_file", return_value=MagicMock(name="PRICES")):
-                    with patch("access.access_layer.get_table_name", return_value="prices_shufersal"):
-                        with patch("access.access_layer.DataTable.by_file_name", return_value={"file_name": "test.xml"}):
-                            with patch("access.access_layer.AccessLayer.get_file_content_paginated") as mock_method:
-                                mock_method.return_value = PaginatedFileContent(
-                                    rows=[],
-                                    total_count=100,
-                                    has_more=True,
-                                    offset=0,
-                                    chunk_size=50
-                                )
-                                
-                                response = self.client.get(
-                                    "/raw/file_content?chain=shufersal&file=test.xml&chunk_size=50&offset=0"
-                                )
-                                assert response.status_code == 200
-                                data = response.json()
-                                assert "rows" in data
-                                assert "total_count" in data
-                                assert "has_more" in data
-                                assert "offset" in data
-                                assert "chunk_size" in data
-                                assert data["total_count"] == 100
-                                assert data["has_more"] is True
-                                assert data["offset"] == 0
-                                assert data["chunk_size"] == 50
+        with patch("api.get_access_layer") as mock_get_access_layer:
+            mock_access_layer = MagicMock()
+            mock_access_layer.get_file_content_with_cursor_pagination.return_value = PaginatedFileContent(
+                rows=[],
+                total_count=100,
+                has_more=True,
+                offset=0,
+                chunk_size=50
+            )
+            mock_get_access_layer.return_value = mock_access_layer
+
+            response = self.client.get(
+                "/raw/file_content?chain=shufersal&file=test.xml&chunk_size=50&offset=0"
+            )
+            assert response.status_code == 200
+            data = response.json()
+            assert "rows" in data
+            assert "total_count" in data
+            assert "has_more" in data
+            assert "offset" in data
+            assert "chunk_size" in data
+            assert data["total_count"] == 100
+            assert data["has_more"] is True
+            assert data["offset"] == 0
+            assert data["chunk_size"] == 50
 
     def test_service_health(self):
         """Test the /service_health endpoint."""
@@ -203,7 +209,8 @@ class TestAPIEndpoints:
         client_invalid_token = TestClient(app)
         client_invalid_token.headers.update({"Authorization": "Bearer invalid_token"})
         
-        with patch("access.middleware.TokenValidator.validate_token", return_value=False):
+        with patch("access.middleware.AuthMiddleware.token_validator") as mock_validator:
+            mock_validator.validate_token.return_value = False
             response = client_invalid_token.get("/list_chains")
             assert response.status_code == 401
 

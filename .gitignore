@@ -22,3 +22,4 @@ venv
 .secrets
 .env.stage
 .secrets
+mongo-data

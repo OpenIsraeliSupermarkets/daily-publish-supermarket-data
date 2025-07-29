@@ -74,7 +74,17 @@ class TelemetryMiddleware(BaseHTTPMiddleware):  # pylint: disable=too-few-public
 class AuthMiddleware(BaseHTTPMiddleware):  # pylint: disable=too-few-public-methods
     """Middleware for API authentication using token validation."""
 
-    token_validator = TokenValidator()
+    def __init__(self, app):
+        """Initialize the middleware with lazy token validator."""
+        super().__init__(app)
+        self._token_validator = None
+
+    @property
+    def token_validator(self):
+        """Lazy initialization of token validator."""
+        if self._token_validator is None:
+            self._token_validator = TokenValidator()
+        return self._token_validator
 
     # pylint: disable=too-many-return-statements
     async def dispatch(self, request: Request, call_next):
