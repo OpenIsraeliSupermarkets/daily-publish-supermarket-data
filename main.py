@@ -1,4 +1,4 @@
-from remotes import KaggleUploader, MongoDbUploader
+from remotes import KaggleUploader, KafkaDbUploader
 from publishers.dag_publisher import SupermarketDataPublisherInterface
 import os
 import datetime
@@ -75,7 +75,7 @@ if __name__ == "__main__":
             dataset_remote_name=os.environ["KAGGLE_DATASET_REMOTE_NAME"],
             when=when,
         ),
-        short_term_db_target=MongoDbUploader(mongodb_uri=os.environ["MONGODB_URI"]),
+        short_term_db_target=KafkaDbUploader(kafka_bootstrap_servers=os.environ["KAFKA_BOOTSTRAP_SERVERS"]),
         limit=limit,
         when_date=when,
     )

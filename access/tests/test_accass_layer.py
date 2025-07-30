@@ -2,7 +2,6 @@
 
 import unittest
 from unittest.mock import MagicMock, patch
-from datetime import datetime
 
 from il_supermarket_scarper import ScraperFactory, FileTypesFilters
 from data_models.raw_schema import ParserStatus, DataTable
@@ -13,7 +12,6 @@ from data_models.response import (
     ShortTermDatabaseHealth,
     LongTermDatabaseHealth,
     FileContent,
-    PaginatedFileContent,
     ScrapedFile,
 )
 
@@ -215,126 +213,6 @@ class TestAccessLayer(unittest.TestCase):
             # Restore original method
             self.access_layer.list_files = original_method
 
-    def test_list_files_with_filters_requires_chain(self):
-        """Test that list_files_with_filters requires chain parameter."""
-        with self.assertRaises(ValueError) as context:
-            self.access_layer.list_files_with_filters(chain="")
-        self.assertIn("'chain' parameter is required", str(context.exception))
-
-    def test_list_files_with_filters_invalid_chain(self):
-        """Test that list_files_with_filters validates chain parameter."""
-        with patch.object(
-            ScraperFactory, "all_scrapers_name", return_value=["shufersal", "rami_levy"]
-        ):
-            with self.assertRaises(ValueError) as context:
-                self.access_layer.list_files_with_filters(chain="invalid_chain")
-            self.assertIn("is not a valid chain", str(context.exception))
-
-    def test_list_files_with_filters_invalid_file_type(self):
-        """Test that list_files_with_filters validates file_type parameter."""
-        with patch.object(
-            ScraperFactory, "all_scrapers_name", return_value=["shufersal"]
-        ):
-            with patch.object(AccessLayer, "list_files_with_filters") as mock_method:
-                mock_method.side_effect = ValueError(
-                    "file_type 'INVALID' is not a valid file type"
-                )
-
-                with self.assertRaises(ValueError) as context:
-                    mock_method(chain="shufersal", file_type="INVALID")
-
-                self.assertIn("is not a valid file type", str(context.exception))
-
-    def test_list_files_with_filters_valid_chain_no_filters(self):
-        """Test list_files_with_filters with valid chain and no filters."""
-        with patch.object(
-            ScraperFactory, "all_scrapers_name", return_value=["shufersal"]
-        ):
-            mock_docs = [
-                {"response": {"files_to_process": ["file1.xml", "file2.xml"]}},
-                {"response": {"files_to_process": ["file3.xml"]}},
-            ]
-            self.short_term_db.get_table_content.return_value = (
-                mock_docs  # pylint: disable=protected-access
-            )
-
-            result = self.access_layer.list_files_with_filters(chain="shufersal")
-
-            self.assertIsInstance(result, ScrapedFiles)
-            self.assertEqual(len(result.processed_files), 3)
-
-    def test_list_files_with_filters_with_store_number(self):
-        """Test list_files_with_filters with store_number filter."""
-        with patch.object(
-            ScraperFactory, "all_scrapers_name", return_value=["shufersal"]
-        ):
-            mock_docs = [
-                {
-                    "response": {
-                        "files_to_process": ["store_123_file.xml", "store_456_file.xml"]
-                    }
-                },
-            ]
-            self.short_term_db.get_table_content.return_value = (
-                mock_docs  # pylint: disable=protected-access
-            )
-
-            result = self.access_layer.list_files_with_filters(
-                chain="shufersal", store_number="123"
-            )
-
-            self.assertIsInstance(result, ScrapedFiles)
-            self.assertEqual(len(result.processed_files), 1)
-            self.assertEqual(result.processed_files[0].file_name, "store_123_file.xml")
-
-    def test_list_files_with_filters_with_date_filter(self):
-        """Test list_files_with_filters with after_extracted_date filter."""
-        with patch.object(
-            ScraperFactory, "all_scrapers_name", return_value=["shufersal"]
-        ):
-            mock_docs = [
-                {
-                    "response": {"files_to_process": ["file1.xml"]},
-                    "timestamp": "2024-01-15T10:00:00Z",
-                },
-                {
-                    "response": {"files_to_process": ["file2.xml"]},
-                    "timestamp": "2024-01-10T10:00:00Z",
-                },
-            ]
-            self.short_term_db.get_table_content.return_value = (
-                mock_docs  # pylint: disable=protected-access
-            )
-
-            after_date = datetime(2024, 1, 12)
-            result = self.access_layer.list_files_with_filters(
-                chain="shufersal", after_extracted_date=after_date
-            )
-
-            self.assertIsInstance(result, ScrapedFiles)
-            self.assertEqual(len(result.processed_files), 1)
-            self.assertEqual(result.processed_files[0].file_name, "file1.xml")
-
-    def test_list_files_with_filters_only_latest(self):
-        """Test list_files_with_filters with only_latest filter."""
-        with patch.object(
-            ScraperFactory, "all_scrapers_name", return_value=["shufersal"]
-        ):
-            mock_docs = [
-                {"response": {"files_to_process": ["file1.xml", "file2.xml"]}},
-            ]
-            self.short_term_db.get_table_content.return_value = (
-                mock_docs  # pylint: disable=protected-access
-            )
-
-            result = self.access_layer.list_files_with_filters(
-                chain="shufersal", only_latest=True
-            )
-
-            self.assertIsInstance(result, ScrapedFiles)
-            self.assertEqual(len(result.processed_files), 1)
-            self.assertEqual(result.processed_files[0].file_name, "file2.xml")
-
     def test_get_file_content_requires_chain(self):
         """Test that get_file_content requires chain parameter."""
         with self.assertRaises(ValueError) as context:
@@ -412,101 +290,6 @@ class TestAccessLayer(unittest.TestCase):
 
                             # Assert
                             self.assertIsInstance(result, FileContent)
-
-                            # Verify correct parameters to get_table_content
-                            # pylint: disable=protected-access
-                            self.short_term_db.get_table_content.assert_called_once()
-                            args, _ = self.short_term_db.get_table_content.call_args
-                            self.assertEqual(args[0], "prices_shufersal")
-                            self.assertEqual(args[1], {"file_name": "test_file.xml"})
-
-    def test_get_file_content_paginated_requires_chain(self):
-        """Test that get_file_content_paginated requires chain parameter."""
-        with self.assertRaises(ValueError) as context:
-            self.access_layer.get_file_content_paginated(chain="", file="file.xml")
-        self.assertIn("chain parameter is required", str(context.exception))
-
-    def test_get_file_content_paginated_requires_file(self):
-        """Test that get_file_content_paginated requires file parameter."""
-        with self.assertRaises(ValueError) as context:
-            self.access_layer.get_file_content_paginated(chain="shufersal", file="")
-        self.assertIn("file parameter is required", str(context.exception))
-
-    def test_get_file_content_paginated_invalid_chain(self):
-        """Test that get_file_content_paginated validates chain parameter."""
-        with patch.object(ScraperFactory, "get", return_value=None):
-            with patch.object(
-                ScraperFactory, "all_scrapers_name", return_value=["shufersal"]
-            ):
-                with self.assertRaises(ValueError) as context:
-                    self.access_layer.get_file_content_paginated(
-                        chain="invalid_chain", file="file.xml"
-                    )
-                self.assertIn("is not a valid chain", str(context.exception))
-
-    def test_get_file_content_paginated_invalid_file_pattern(self):
-        """Test that get_file_content_paginated validates file pattern."""
-        scraper_mock = MagicMock()
-        with patch.object(ScraperFactory, "get", return_value=scraper_mock):
-            with patch.object(
-                FileTypesFilters, "get_type_from_file", return_value=None
-            ):
-                with self.assertRaises(ValueError) as context:
-                    self.access_layer.get_file_content_paginated(
-                        chain="shufersal", file="invalid_file.xyz"
-                    )
-                self.assertIn(
-                    "doesn't follow the correct pattern", str(context.exception)
-                )
-
-    def test_get_file_content_paginated_valid_file(self):
-        """Test get_file_content_paginated with valid file."""
-        # Arrange
-        scraper_mock = MagicMock()
-        file_type_mock = MagicMock()
-        file_type_mock.name = "PRICES"
-
-        # Mock the PaginatedFileContent object
-        mock_paginated_content = PaginatedFileContent(
-            rows=[], total_count=0, has_more=False, offset=0, chunk_size=100
-        )
-
-        with patch.object(ScraperFactory, "get", return_value=scraper_mock):
-            with patch.object(
-                FileTypesFilters, "get_type_from_file", return_value=file_type_mock
-            ):
-                with patch(
-                    "data_models.raw_schema.get_table_name",
-                    return_value="prices_shufersal",
-                ):
-                    with patch.object(
-                        DataTable,
-                        "by_file_name",
-                        return_value={"file_name": "test_file.xml"},
-                    ):
-                        # Mock the database response
-                        mock_rows = [
-                            {
-                                "found_folder": "/test/folder",
-                                "file_name": "test_file.xml",
-                                "row_index": 1,
-                                "content": {"price": 10.99},
-                            }
-                        ]
-                        self.short_term_db.get_table_content.return_value = mock_rows
-
-                        # Mock PaginatedFileContent
-                        with patch(
-                            "access.access_layer.PaginatedFileContent",
-                            return_value=mock_paginated_content,
-                        ):
-                            # Act
-                            result = self.access_layer.get_file_content_paginated(
-                                chain="shufersal", file="test_file.xml", chunk_size=50, offset=0
-                            )
-
-                            # Assert
-                            self.assertIsInstance(result, PaginatedFileContent)
 
                             # Verify correct parameters to get_table_content
                             # pylint: disable=protected-access

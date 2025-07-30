@@ -29,38 +29,23 @@ class MongoDbUploader(ShortTermDatabaseUploader):
             mongodb_uri (str, optional): MongoDB connection URI. If not provided,
                                        uses environment variable or default.
         """
-        self.uri = mongodb_uri or os.getenv(
+        uri = mongodb_uri or os.getenv(
             "MONGODB_URI", "mongodb://host.docker.internal:27017"
         )
-        self.client = None
-        self.db = None
-        self._connection_tested = False
-
-    def _ensure_connection(self):
-        """Ensure MongoDB connection is established."""
-        if self.client is None:
-            self.client = pymongo.MongoClient(self.uri)
-            self.db = self.client.supermarket_data
-            self._test_connection()
-
+        self.client = pymongo.MongoClient(uri)
+        self.db = self.client.supermarket_data
+        self._test_connection()
+        
     def _test_connection(self):
-        """Test the connection to the MongoDB database."""
-        if self._connection_tested:
-            return
-            
+        """Test the connection to the MongoDB database.
+        """
         try:
-            self.client.admin.command("ping")
-            logging.info("Successfully connected to MongoDB")
-            self._connection_tested = True
+            self.client.admin.command('ping')
+            logging.info("Successfully connected to MongoDB")   
         except pymongo.errors.PyMongoError as e:
             logging.error("Error connecting to MongoDB: %s", str(e))
-            # For testing, don't raise the exception
-            if "test" in self.uri or "localhost" in self.uri:
-                logging.warning("MongoDB connection failed in test mode, continuing...")
-                self._connection_tested = True
-            else:
-                raise e
-
+            raise e
+            
     def _insert_to_database(self, table_target_name, items):
         """Insert items into a MongoDB collection with error handling.
 
@@ -71,7 +56,6 @@ class MongoDbUploader(ShortTermDatabaseUploader):
         if not items:
             return
 
-        self._ensure_connection()
         logging.info("Pushing to table %s, %d items", table_target_name, len(items))
         collection = self.db[table_target_name]
 
@@ -101,7 +85,6 @@ class MongoDbUploader(ShortTermDatabaseUploader):
             partition_id (str): Field to use as partition key
             table_name (str): Name of the collection to create
         """
-        self._ensure_connection()
         logging.info("Creating collection: %s", table_name)
         try:
             self.db.create_collection(table_name)
@@ -113,7 +96,6 @@ class MongoDbUploader(ShortTermDatabaseUploader):
 
     def _clean_all_tables(self):
         """Drop all collections in the database."""
-        self._ensure_connection()
         for collection in self.db.list_collection_names():
             self.db[collection].drop()
         logging.info("All collections deleted successfully!")
@@ -130,7 +112,6 @@ class MongoDbUploader(ShortTermDatabaseUploader):
             bool: True if parser was updated within specified time window, False otherwise
         """
         try:
-            self._ensure_connection()
             collection = self.db[collection_name]
             latest_doc = collection.find_one(sort=[("_id", pymongo.DESCENDING)])
 
@@ -152,7 +133,6 @@ class MongoDbUploader(ShortTermDatabaseUploader):
         Returns:
             list[str]: List of table/collection names in the database
         """
-        self._ensure_connection()
         return self.db.list_collection_names()
 
     def get_table_content(self, table_name, filter=None):
@@ -165,7 +145,6 @@ class MongoDbUploader(ShortTermDatabaseUploader):
             list: List of all documents in the collection
         """
         try:
-            self._ensure_connection()
             return list(self.db[table_name].find(filter, {"_id": 0}))
         except pymongo.errors.PyMongoError as e:
             logging.error(

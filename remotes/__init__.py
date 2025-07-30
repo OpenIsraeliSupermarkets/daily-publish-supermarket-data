@@ -9,6 +9,7 @@ from .long_term.kaggle import KaggleUploader
 from .short_term.api_base import ShortTermDatabaseUploader
 from .short_term.mongo_db import MongoDbUploader
 from .short_term.file_db import DummyDocumentDbUploader
+from .short_term.kafka_db import KafkaDbUploader
 
 # from .exceptions import RemoteError, ConnectionError, CommandError
 

@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from remotes.short_term.api_base import ShortTermDatabaseUploader
 from remotes.short_term.mongo_db import MongoDbUploader
 from remotes.short_term.file_db import DummyDocumentDbUploader
+from remotes.short_term.kafka_db import KafkaDbUploader
 from unittest.mock import patch, MagicMock
 import mongomock
 import os
@@ -93,6 +94,12 @@ class DummyTestCase(
             shutil.rmtree("./document_db")
         super().tearDown()
 
+
+
+class KafkaTestCase(
+    short_term_test_case(KafkaDbUploader(kafka_bootstrap_servers="localhost:9092"))
+):
+    pass
 
 if __name__ == "__main__":
     unittest.main()
