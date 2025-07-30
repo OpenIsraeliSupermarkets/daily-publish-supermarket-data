@@ -23,7 +23,7 @@ class ShortTermDatabaseUploader:
             *_: Variable arguments (unused in base class)
         """
 
-    def _insert_to_database(self, table_target_name, items):
+    def _insert_to_destinations(self, table_target_name, items):
         """Insert items into the database.
 
         Args:
@@ -31,7 +31,7 @@ class ShortTermDatabaseUploader:
             items (list): List of items to insert
         """
 
-    def _create_table(self, partition_id, table_name):
+    def _create_destinations(self, partition_id, table_name):
         """Create a new table/collection in the database.
 
         Args:
@@ -39,10 +39,10 @@ class ShortTermDatabaseUploader:
             table_name (str): Name of the table/collection to create
         """
 
-    def _clean_all_tables(self):
+    def _clean_all_destinations(self):
         """Delete all tables/collections in the database."""
 
-    def get_table_content(self, table_name, filter=None):
+    def get_destinations_content(self, table_name, filter=None):
         """Get all content of all tables/collections in the database.
 
         Args:
@@ -67,7 +67,7 @@ class ShortTermDatabaseUploader:
             bool: True if parser was updated within specified time window, False otherwise
         """
 
-    def _list_tables(self):
+    def _list_destinations(self):
         """List all tables/collections in the database.
 
         Returns:
@@ -76,7 +76,7 @@ class ShortTermDatabaseUploader:
         Raises:
             NotImplementedError: This is an abstract method that must be implemented by subclasses
         """
-        raise NotImplementedError("Subclasses must implement _list_tables()")
+        raise NotImplementedError("Subclasses must implement _list_destinations()")
 
     def restart_database(self):
         """Clean and recreate all tables in the database.
@@ -84,13 +84,13 @@ class ShortTermDatabaseUploader:
         This function drops all existing tables and recreates them with their original structure.
         """
         try:
-            self._clean_all_tables()
+            self._clean_all_destinations()
             #
-            self._create_table(ParserStatus.get_index(), ParserStatus.get_table_name())
-            self._create_table(
+            self._create_destinations(ParserStatus.get_index(), ParserStatus.get_table_name())
+            self._create_destinations(
                 ScraperStatus.get_index(), ScraperStatus.get_table_name()
             )
             for table in list_all_dynamic_tables():
-                self._create_table(table.get_index(), table.get_table_name())
+                self._create_destinations(table.get_index(), table.get_table_name())
         except Exception as e:
             raise

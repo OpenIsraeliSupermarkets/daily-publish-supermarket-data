@@ -46,7 +46,7 @@ class MongoDbUploader(ShortTermDatabaseUploader):
             logging.error("Error connecting to MongoDB: %s", str(e))
             raise e
             
-    def _insert_to_database(self, table_target_name, items):
+    def _insert_to_destinations(self, table_target_name, items):
         """Insert items into a MongoDB collection with error handling.
 
         Args:
@@ -78,7 +78,7 @@ class MongoDbUploader(ShortTermDatabaseUploader):
                 len(items),
             )
 
-    def _create_table(self, partition_id, table_name):
+    def _create_destinations(self, partition_id, table_name):
         """Create a new collection with an index.
 
         Args:
@@ -94,7 +94,7 @@ class MongoDbUploader(ShortTermDatabaseUploader):
         except pymongo.errors.PyMongoError as e:
             logging.error("Error creating collection: %s", str(e))
 
-    def _clean_all_tables(self):
+    def _clean_all_destinations(self):
         """Drop all collections in the database."""
         for collection in self.db.list_collection_names():
             self.db[collection].drop()
@@ -127,7 +127,7 @@ class MongoDbUploader(ShortTermDatabaseUploader):
             logging.error("Error checking MongoDB ParserStatus update time: %s", str(e))
             return False
 
-    def _list_tables(self):
+    def _list_destinations(self):
         """List all tables/collections in the database.
 
         Returns:
@@ -135,7 +135,7 @@ class MongoDbUploader(ShortTermDatabaseUploader):
         """
         return self.db.list_collection_names()
 
-    def get_table_content(self, table_name, filter=None):
+    def get_destinations_content(self, table_name, filter=None):
         """Get all content of a specific table.
 
         Args:

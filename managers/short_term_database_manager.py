@@ -51,7 +51,7 @@ class ShortTermDBDatasetManager:
                 )
                 added_timestamps.append(record["when_date"])
 
-        self.uploader._insert_to_database(
+        self.uploader._insert_to_destinations(
             ParserStatus.get_table_name(), processed_records
         )
 
@@ -116,7 +116,7 @@ class ShortTermDBDatasetManager:
 
         local_cahce.update_pushed_timestamps(file_name, pushed_timestamp)
 
-        self.uploader._insert_to_database(ScraperStatus.get_table_name(), records)
+        self.uploader._insert_to_destinations(ScraperStatus.get_table_name(), records)
 
     def _push_files_data(self, local_cahce: CacheState):
         #

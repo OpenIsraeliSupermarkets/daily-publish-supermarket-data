@@ -7,7 +7,7 @@ from managers.short_term_database_manager import ShortTermDBDatasetManager
 
 
 class DummyUploader:
-    def _insert_to_database(self, table_name, records):
+    def _insert_to_destinations(self, table_name, records):
         self.last_table = table_name
         self.last_records = records
 

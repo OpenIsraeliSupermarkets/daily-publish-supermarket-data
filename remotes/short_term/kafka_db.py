@@ -8,12 +8,11 @@ import logging
 import os
 import json
 import asyncio
-from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 
-from aiokafka import AIOKafkaProducer
+from aiokafka import AIOKafkaProducer, AIOKafkaConsumer
 from aiokafka.errors import KafkaError
-
+from kafka import KafkaAdminClient
 from .api_base import ShortTermDatabaseUploader
 
 
@@ -36,8 +35,10 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
             "KAFKA_BOOTSTRAP_SERVERS", "localhost:9092"
         )
         self.producer: Optional[AIOKafkaProducer] = None
+        self.admin_client: Optional[KafkaAdminClient] = None
         self._connection_tested = False
         self._loop = None
+        self._cleaned = False
 
     def _ensure_connection(self):
         """Ensure Kafka connection is established."""
@@ -60,6 +61,13 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
                 value_serializer=lambda v: json.dumps(v).encode('utf-8'),
             )
             await self.producer.start()
+            
+            # Initialize admin client
+            self.admin_client = KafkaAdminClient(
+                bootstrap_servers=self.bootstrap_servers,
+                client_id="supermarket_data_admin"
+            )
+            
             logging.info(f"Successfully connected to Kafka: {self.bootstrap_servers}")
             self._connection_tested = True
         except KafkaError as e:
@@ -76,9 +84,9 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
         Generate Kafka topic name based on table name.
         Format: supermarket_data_{table_target_name}
         """
-        return f"supermarket_data_{table_target_name}"
+        return f"{table_target_name}"
 
-    def _insert_to_database(self, table_target_name, items):
+    def _insert_to_destinations(self, table_target_name, items):
         """Insert items into a Kafka topic with error handling.
 
         Args:
@@ -126,7 +134,7 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
                 len(items),
             )
 
-    def _create_table(self, partition_id, table_name):
+    def _create_destinations(self, partition_id, table_name):
         """Create a new topic (Kafka doesn't require explicit topic creation).
 
         Args:
@@ -137,12 +145,29 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
         logging.info("Topic %s will be created automatically when first message is sent", table_name)
         # Kafka creates topics automatically when first message is sent
         # No explicit creation needed
+        self._insert_to_destinations(table_name, [{"partition_id": partition_id, "warmup": "true"}])
+        
 
-    def _clean_all_tables(self):
+    def _clean_all_destinations(self):
         """Clean all topics in the Kafka cluster (not implemented for safety)."""
         logging.warning("Kafka topic deletion not implemented for safety reasons")
         logging.info("Kafka topics will persist until manually deleted")
-
+        self._ensure_connection()
+        try:
+            # Get list of all topics
+            topics = self._list_destinations()
+            
+            try:
+                self.admin_client.delete_topics(topics)
+                logging.info("Successfully deleted topic: %s", topics)
+            except KafkaError as e:
+                logging.error("Failed to delete topic %s: %s", topics, str(e))
+                    
+            logging.info("Completed topic cleanup attempt")
+            
+        except Exception as e:
+            logging.error("Error during topic cleanup: %s", str(e))
+            
     def _is_collection_updated(
         self, collection_name: str, seconds: int = 10800
     ) -> bool:
@@ -156,23 +181,22 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
             bool: True if topic has recent messages, False otherwise
         """
         try:
-            self._ensure_connection()
-            topic_name = self._get_topic_name(collection_name)
+            self._ensure_connection()            
+            # Check if the topic has any non-warmup messages
+            messages = self.get_destinations_content(collection_name)
+            # Filter out warmup messages
+            non_warmup_messages = [
+                msg for msg in messages 
+                if not (isinstance(msg, dict) and msg.get('warmup') == 'true')
+            ]
             
-            # For Kafka, we can't easily check last message time without a consumer
-            # This is a simplified implementation that assumes recent activity
-            # In a real implementation, you might want to use a consumer to check timestamps
-            
-            # For now, return True to indicate recent activity
-            # This could be enhanced with actual consumer-based timestamp checking
-            logging.info("Kafka topic activity check - assuming recent activity for %s", topic_name)
-            return True
+            return len(non_warmup_messages) > 0
 
         except KafkaError as e:
             logging.error("Error checking Kafka topic activity: %s", str(e))
             return False
 
-    def _list_tables(self):
+    def _list_destinations(self):
         """List all topics in the Kafka cluster.
 
         Returns:
@@ -180,26 +204,85 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
         """
         self._ensure_connection()
         try:
-            # This would require admin client to list topics
-            # For now, return empty list as this is not easily accessible
-            logging.info("Kafka topic listing not implemented - would require admin client")
-            return []
+            # Get cluster metadata which includes topic list
+            cluster_metadata = self.admin_client.list_topics()
+            topic_names = list(cluster_metadata)
+            logging.info("Found %d Kafka topics", len(topic_names))
+            return topic_names
         except Exception as e:
             logging.error("Error listing Kafka topics: %s", str(e))
             return []
 
-    def get_table_content(self, table_name, filter=None):
-        """Get content of a specific topic (not implemented for Kafka).
+    def get_destinations_content(self, table_name, filter=None):
+        """Get content of a specific topic from Kafka.
 
         Args:
             table_name (str): Name of the topic
             filter: Not used in Kafka implementation
 
         Returns:
-            list: Empty list as Kafka doesn't support direct content retrieval
+            list: List of messages from the topic
         """
-        logging.warning("Kafka doesn't support direct content retrieval - would require consumer")
-        return []
+        if filter is not None:
+            raise NotImplementedError("Filtering is not supported in Kafka implementation")
+        
+        try:
+            self._ensure_connection()
+            topic_name = self._get_topic_name(table_name)
+            
+            async def _get_messages():
+                consumer = AIOKafkaConsumer(
+                    topic_name,
+                    bootstrap_servers=self.bootstrap_servers,
+                    auto_offset_reset='earliest',
+                    enable_auto_commit=False,
+                    group_id=f"test_consumer_{topic_name}_{id(self)}"  # Unique group ID
+                )
+                
+                await consumer.start()
+                messages = []
+                
+                try:
+                    # Use getmany with timeout to avoid infinite loop
+                    msg_set = await consumer.getmany(timeout_ms=2000, max_records=100)
+                    
+                    seen_messages = set()  # For deduplication
+                    
+                    for partition, msg_list in msg_set.items():
+                        for msg in msg_list:
+                            # Deserialize the JSON value
+                            if isinstance(msg.value, bytes):
+                                try:
+                                    deserialized_value = json.loads(msg.value.decode('utf-8'))
+                                    # Filter out warmup messages
+                                    if not (isinstance(deserialized_value, dict) and deserialized_value.get('warmup') == 'true'):
+                                        # Create a hash for deduplication
+                                        msg_hash = json.dumps(deserialized_value, sort_keys=True)
+                                        if msg_hash not in seen_messages:
+                                            seen_messages.add(msg_hash)
+                                            messages.append(deserialized_value)
+                                except (json.JSONDecodeError, UnicodeDecodeError):
+                                    # If deserialization fails, add the raw value
+                                    messages.append(msg.value)
+                            else:
+                                # Filter out warmup messages for non-bytes values too
+                                if not (isinstance(msg.value, dict) and msg.value.get('warmup') == 'true'):
+                                    # Create a hash for deduplication
+                                    msg_hash = json.dumps(msg.value, sort_keys=True)
+                                    if msg_hash not in seen_messages:
+                                        seen_messages.add(msg_hash)
+                                        messages.append(msg.value)
+                        
+                finally:
+                    await consumer.stop()
+                    
+                return messages
+            
+            return self._loop.run_until_complete(_get_messages())
+            
+        except KafkaError as e:
+            logging.error("Error reading from Kafka topic: %s", str(e))
+            return []
 
     async def send_message(
         self,
@@ -288,4 +371,6 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
         """Async context manager exit"""
         if self.producer:
             await self.producer.stop()
-            logging.info("Disconnected from Kafka") 
+        if self.admin_client:
+            self.admin_client.close()
+        logging.info("Disconnected from Kafka") 

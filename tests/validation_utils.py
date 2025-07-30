@@ -137,7 +137,7 @@ def validate_state_after_api_update(
     # document_db folder
     scraper_status_table = ScraperStatus.get_table_name()
     scraper_status_count = len(
-        short_term_db_target.get_table_content(scraper_status_table)
+        short_term_db_target.get_destinations_content(scraper_status_table)
     )
     assert scraper_status_count == 4 * len(
         enabled_scrapers
@@ -145,7 +145,7 @@ def validate_state_after_api_update(
 
     parser_status_table = ParserStatus.get_table_name()
     parser_status_count = len(
-        short_term_db_target.get_table_content(parser_status_table)
+        short_term_db_target.get_destinations_content(parser_status_table)
     )
     expected_parser_count = len(FileTypesFilters) * 1 * len(enabled_scrapers)  # limit
     assert (
@@ -162,7 +162,7 @@ def validate_state_after_api_update(
         df = pd.read_csv(csv_file)
 
         data_table = file_name_to_table(csv_file)
-        data_count = len(short_term_db_target.get_table_content(data_table))
+        data_count = len(short_term_db_target.get_destinations_content(data_table))
         assert (
             data_count == df.shape[0]
         ), f"Expected {df.shape[0]} rows in {data_table}, found {data_count}"
@@ -281,7 +281,7 @@ def validate_short_term_structure(
     )
 
     scraper_status_table = ScraperStatus.get_table_name()
-    table_content = short_term_db_target.get_table_content(scraper_status_table)
+    table_content = short_term_db_target.get_destinations_content(scraper_status_table)
     actual_scraper_status_count = len(table_content)
 
     assert actual_scraper_status_count > 0, "Expected at least one document."
@@ -331,7 +331,7 @@ def validate_short_term_structure(
     num_of_documents_in_parser_status_per_chain = len(FileTypesFilters)
 
     parser_status_table = ParserStatus.get_table_name()
-    table_content = short_term_db_target.get_table_content(parser_status_table)
+    table_content = short_term_db_target.get_destinations_content(parser_status_table)
     actual_parser_status_count = len(table_content)
 
     assert actual_parser_status_count > 0, "Expected at least one document."

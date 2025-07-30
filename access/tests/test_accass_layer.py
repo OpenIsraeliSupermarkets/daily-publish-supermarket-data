@@ -26,7 +26,7 @@ class TestAccessLayer(unittest.TestCase):
         # Create mocks directly with the required methods instead of using spec
         self.short_term_db = MagicMock()
         self.short_term_db.is_parser_updated = MagicMock(return_value=True)
-        self.short_term_db.get_table_content = (
+        self.short_term_db.get_destinations_content = (
             MagicMock()
         )  # pylint: disable=protected-access
 
@@ -123,7 +123,7 @@ class TestAccessLayer(unittest.TestCase):
                 {"response": {"files_to_process": ["file1.xml", "file2.xml"]}},
                 {"response": {"files_to_process": ["file3.xml"]}},
             ]
-            self.short_term_db.get_table_content.return_value = (
+            self.short_term_db.get_destinations_content.return_value = (
                 mock_docs  # pylint: disable=protected-access
             )
 
@@ -136,9 +136,9 @@ class TestAccessLayer(unittest.TestCase):
             self.assertEqual(result.processed_files[2].file_name, "file3.xml")
 
             # Verify the filter condition
-            self.short_term_db.get_table_content.assert_called_once()  # pylint: disable=protected-access
+            self.short_term_db.get_destinations_content.assert_called_once()  # pylint: disable=protected-access
             args, _ = (
-                self.short_term_db.get_table_content.call_args
+                self.short_term_db.get_destinations_content.call_args
             )  # pylint: disable=protected-access
             self.assertIn({"index": {"$regex": ".*shufersal.*"}}, args)
 
@@ -156,7 +156,7 @@ class TestAccessLayer(unittest.TestCase):
                     }
                 },
             ]
-            self.short_term_db.get_table_content.return_value = (
+            self.short_term_db.get_destinations_content.return_value = (
                 mock_docs  # pylint: disable=protected-access
             )
 
@@ -184,7 +184,7 @@ class TestAccessLayer(unittest.TestCase):
                 processed_files = []
                 for (
                     doc
-                ) in self.short_term_db.get_table_content(  # pylint: disable=protected-access
+                ) in self.short_term_db.get_destinations_content(  # pylint: disable=protected-access
                     ParserStatus.get_table_name(),
                     {"index": {"$regex": filter_condition}},
                 ):
@@ -204,9 +204,9 @@ class TestAccessLayer(unittest.TestCase):
             self.assertEqual(len(result.processed_files), 2)
 
             # Verify the filter condition
-            self.short_term_db.get_table_content.assert_called_once()  # pylint: disable=protected-access
+            self.short_term_db.get_destinations_content.assert_called_once()  # pylint: disable=protected-access
             args, _ = (
-                self.short_term_db.get_table_content.call_args
+                self.short_term_db.get_destinations_content.call_args
             )  # pylint: disable=protected-access
             self.assertIn({"index": {"$regex": ".*PRICES.*shufersal.*"}}, args)
 
@@ -254,7 +254,7 @@ class TestAccessLayer(unittest.TestCase):
 
     def test_get_file_content_valid_file(self):
         """Test get_file_content with valid file."""
-        # Test function until it calls get_table_content which is where it's failing
+        # Test function until it calls get_destinations_content which is where it's failing
 
         # Arrange
         scraper_mock = MagicMock()
@@ -291,10 +291,10 @@ class TestAccessLayer(unittest.TestCase):
                             # Assert
                             self.assertIsInstance(result, FileContent)
 
-                            # Verify correct parameters to get_table_content
+                            # Verify correct parameters to get_destinations_content
                             # pylint: disable=protected-access
-                            self.short_term_db.get_table_content.assert_called_once()
-                            args, _ = self.short_term_db.get_table_content.call_args
+                            self.short_term_db.get_destinations_content.assert_called_once()
+                            args, _ = self.short_term_db.get_destinations_content.call_args
                             self.assertEqual(args[0], "prices_shufersal")
                             self.assertEqual(args[1], {"file_name": "test_file.xml"})
 
