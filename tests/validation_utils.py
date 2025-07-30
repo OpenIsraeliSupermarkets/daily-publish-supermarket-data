@@ -21,7 +21,7 @@ def scrapers_to_test():
     """
     return [
         ScraperFactory.BAREKET.name,
-        ScraperFactory.YAYNO_BITAN_AND_CARREFOUR.name,
+        ScraperFactory.WOLT.name,
         ScraperFactory.COFIX.name,
     ]
 

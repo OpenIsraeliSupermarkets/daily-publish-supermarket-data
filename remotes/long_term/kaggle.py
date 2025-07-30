@@ -50,6 +50,8 @@ class KaggleUploader(LongTermDatabaseUploader):
         if not os.getenv("KAGGLE_USERNAME") or not os.getenv("KAGGLE_KEY"):
             raise ValueError("KAGGLE_USERNAME and KAGGLE_KEY environment variables must be set")
 
+        logging.info(f"Kaggle username: {os.getenv('KAGGLE_USERNAME')}")
+        logging.info(f"Kaggle key: ...{os.getenv('KAGGLE_KEY')[-5:]}")
         self.api = KaggleApi()
         self.api.authenticate()
 

@@ -118,6 +118,20 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}"
             }
-        }
+        },
+        {
+            "name": "PRODUCTION: Daliy Raw Dump",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env.prod",
+            "env": {
+                "WHEN":"2025-07-29T10:30:00+03:00",
+                "OPERATION":"scraping,converting,publishing,clean_all_source_data",
+                "NUM_OF_PROCESSES":""
+            }
+        },
     ]
 }
