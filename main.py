@@ -1,8 +1,11 @@
 from remotes import KaggleUploader, MongoDbUploader
 from publishers.dag_publisher import SupermarketDataPublisherInterface
 import os
+import datetime
 from utils import now
 import logging
+import datetime
+import pytz
 
 if __name__ == "__main__":
 
@@ -11,7 +14,25 @@ if __name__ == "__main__":
         level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
     )
 
-    when = now()
+    # Allow providing when from environment variable, otherwise use current time
+    when_str = os.environ.get("WHEN", None)
+    if when_str:
+        # Parse the datetime string from environment variable
+        when = datetime.datetime.fromisoformat(when_str.replace('Z', '+00:00'))
+        if when.tzinfo is None:
+            # If no timezone info, assume Jerusalem timezone
+            import pytz
+            when = pytz.timezone("Asia/Jerusalem").localize(when)
+    else:
+        when = now()
+    
+    
+    num_of_processes = os.environ.get("NUM_OF_PROCESSES", 5)
+    try:
+        num_of_processes = int(num_of_processes)
+    except ValueError:
+        num_of_processes = os.cpu_count()
+    
     
     limit = os.environ.get("LIMIT", None)
     if limit:
@@ -30,15 +51,17 @@ if __name__ == "__main__":
     else:
         enabled_file_types = enabled_file_types.split(",")
     
-    
+    logging.info(f"Number of processes: {num_of_processes}")
     logging.info(f"Enabled scrapers: {enabled_scrapers}")
     logging.info(f"Enabled file types: {enabled_file_types}")
     logging.info(f"Limit: {limit}")
     logging.info(f"When: {when}")
     
+    
+
     publisher = SupermarketDataPublisherInterface(
-        number_of_scraping_processes=min(os.cpu_count(), 5),
-        number_of_parseing_processs=min(os.cpu_count(), 5),
+        number_of_scraping_processes=num_of_processes,
+        number_of_parseing_processs=num_of_processes,
         app_folder=os.environ["APP_DATA_PATH"],
         data_folder="dumps",
         outputs_folder="outputs",
