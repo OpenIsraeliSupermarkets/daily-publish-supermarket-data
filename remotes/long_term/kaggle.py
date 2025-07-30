@@ -20,7 +20,7 @@ KAGGLE_API_AVAILABLE = None
 try:
     from kaggle.api.kaggle_api_extended import KaggleApi
     from kaggle.rest import ApiException
-except IOError as e:
+except Exception as e:
     KAGGLE_API_AVAILABLE = e
 
 
@@ -47,6 +47,8 @@ class KaggleUploader(LongTermDatabaseUploader):
             raise ImportError(
                 "Fail to use kaggle api, message: \n%s" % KAGGLE_API_AVAILABLE
             )
+        if not os.getenv("KAGGLE_USERNAME") or not os.getenv("KAGGLE_KEY"):
+            raise ValueError("KAGGLE_USERNAME and KAGGLE_KEY environment variables must be set")
 
         self.api = KaggleApi()
         self.api.authenticate()

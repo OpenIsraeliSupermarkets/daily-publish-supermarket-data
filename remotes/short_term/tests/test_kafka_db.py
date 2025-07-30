@@ -5,7 +5,7 @@ import asyncio
 from unittest.mock import Mock, patch, AsyncMock
 from datetime import datetime
 
-from ..kafka_db import KafkaDbUploader
+from remotes.short_term.kafka_db import KafkaDbUploader
 
 
 class TestKafkaDbUploader:
