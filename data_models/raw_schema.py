@@ -141,9 +141,9 @@ class ScraperStartedStatus(CommonModel):
     """
 
     limit: Optional[int] = None
-    files_requested: Optional[Dict[str, Any]] = None
+    files_requested: Optional[List[str]] = None
     store_id: Optional[str] = None
-    files_names_to_scrape: Optional[Dict[str, Any]] = None
+    files_names_to_scrape: Optional[List[str]] = None
     when_date: Optional[datetime] = None
     filter_nul: bool
     filter_zero: bool
@@ -385,15 +385,15 @@ def file_name_to_table(filename):
     return filename.split("/")[-1].split(".")[0]
 
 
-def list_all_dynamic_tables():
+def list_all_dynamic_tables(enabled_scrapers: list[str], enabled_file_types: list[str]):
     """Initialize dynamic table models based on parser status file.
 
     Returns:
         list: List of Pydantic model classes for all tables
     """
     table_models = []
-    for file_type in FileTypesFilters.__members__.values():
-        for chain in ScraperFactory.all_scrapers_name():
-            table_name = get_table_name(file_type.name, chain)
+    for file_type in enabled_file_types:
+        for chain in enabled_scrapers:
+            table_name = get_table_name(file_type.lower(), chain.lower())
             table_models.append(create_dynamic_table_class(table_name))
     return table_models

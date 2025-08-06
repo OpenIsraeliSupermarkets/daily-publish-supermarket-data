@@ -7,8 +7,8 @@ import logging
 import datetime
 import os
 import shutil
-from il_supermarket_scarper import ScarpingTask
-from il_supermarket_parsers import ConvertingTask
+from il_supermarket_scarper import ScarpingTask, ScraperFactory
+from il_supermarket_parsers import ConvertingTask, FileTypesFilters
 from managers.long_term_database_manager import LongTermDatasetManager
 from managers.short_term_database_manager import ShortTermDBDatasetManager
 from managers.cache_manager import CacheManager
@@ -68,8 +68,8 @@ class BaseSupermarketDataPublisher:
         self.data_folder = os.path.join(app_folder, data_folder)
         self.outputs_folder = os.path.join(app_folder, outputs_folder)
         self.status_folder = os.path.join(app_folder, data_folder, status_folder)
-        self.enabled_scrapers = enabled_scrapers
-        self.enabled_file_types = enabled_file_types
+        self.enabled_scrapers = enabled_scrapers if enabled_scrapers else ScraperFactory.all_scrapers_name()
+        self.enabled_file_types = enabled_file_types if enabled_file_types else FileTypesFilters.all_types()
         self.limit = limit
 
         logging.info("app_folder=%s", app_folder)
@@ -142,6 +142,8 @@ class BaseSupermarketDataPublisher:
             app_folder=self.app_folder,
             outputs_folder=self.outputs_folder,
             status_folder=self.status_folder,
+            enabled_scrapers=self.enabled_scrapers,
+            enabled_file_types=self.enabled_file_types,
         )
         database.upload(force_restart=reset_cache)
 

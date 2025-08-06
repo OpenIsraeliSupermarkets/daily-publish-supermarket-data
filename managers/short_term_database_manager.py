@@ -16,11 +16,15 @@ class ShortTermDBDatasetManager:
         outputs_folder,
         status_folder,
         short_term_db_target: ShortTermDatabaseUploader,
+        enabled_scrapers: list[str],
+        enabled_file_types: list[str],
     ):
         self.app_folder = app_folder
         self.uploader = short_term_db_target
         self.outputs_folder = outputs_folder
         self.status_folder = status_folder
+        self.enabled_scrapers = enabled_scrapers
+        self.enabled_file_types = enabled_file_types
 
     def _push_parser_status(self, local_cahce: CacheState):
         with open(f"{self.outputs_folder}/parser-status.json", "r") as file:
@@ -136,7 +140,7 @@ class ShortTermDBDatasetManager:
         """
         with CacheManager(self.app_folder) as local_cache:
             if local_cache.is_empty() or force_restart:
-                self.uploader.restart_database()
+                self.uploader.restart_database(self.enabled_scrapers, self.enabled_file_types)
 
             # push
             self._push_status_files(local_cache)

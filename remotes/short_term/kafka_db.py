@@ -9,6 +9,7 @@ import os
 import json
 import asyncio
 from typing import Dict, Any, Optional, List
+from data_models.raw_schema import ParserStatus, ScraperStatus, list_all_dynamic_tables
 
 from aiokafka import AIOKafkaProducer, AIOKafkaConsumer
 from aiokafka.errors import KafkaError
@@ -374,3 +375,21 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
         if self.admin_client:
             self.admin_client.close()
         logging.info("Disconnected from Kafka") 
+
+
+    def restart_database(self, enabled_scrapers: list[str], enabled_file_types: list[str]):
+        """Clean and recreate all tables in the database.
+
+        This function drops all existing tables and recreates them with their original structure.
+        """
+        try:
+            self._clean_all_destinations()
+            #
+            self._create_destinations(ParserStatus.get_index(), ParserStatus.get_table_name())
+            self._create_destinations(
+                ScraperStatus.get_index(), ScraperStatus.get_table_name()
+            )
+            for table in list_all_dynamic_tables(enabled_scrapers, enabled_file_types):
+                self._create_destinations(table.get_index(), table.get_table_name())
+        except Exception as e:
+            raise
