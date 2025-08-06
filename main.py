@@ -99,7 +99,7 @@ if __name__ == "__main__":
         limit=limit,
         when_date=when,
         wait_time_seconds=wait_time_seconds,
-        should_execute_final_operations=os.environ.get("STOP", "EOW"),
+        should_execute_final_operations=os.environ.get("STOP", "EOD"),
         should_stop_dag=os.environ.get("REPEAT", "NEVER")
     )
     publisher.run(
