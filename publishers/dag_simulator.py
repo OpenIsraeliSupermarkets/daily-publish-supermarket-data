@@ -106,9 +106,14 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
         )
 
         while not self._should_stop_dag():
+
             while not self._should_execute_final_operations():
+                logging.info(f"Executing operations")
                 self._execute_operations(operations)
+
+                logging.info(f"Waiting {self.wait_time_seconds} seconds before next run")
                 time.sleep(self.wait_time_seconds)
 
+            logging.info(f"Executing final operations")
             if final_operations:
                 super().run(operations=final_operations)

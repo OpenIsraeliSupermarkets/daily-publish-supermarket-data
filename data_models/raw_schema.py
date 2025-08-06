@@ -140,7 +140,7 @@ class ScraperStartedStatus(CommonModel):
     Contains the initial configuration and parameters for the scraper.
     """
 
-    limit: int
+    limit: Optional[int] = None
     files_requested: Optional[Dict[str, Any]] = None
     store_id: Optional[str] = None
     files_names_to_scrape: Optional[Dict[str, Any]] = None
