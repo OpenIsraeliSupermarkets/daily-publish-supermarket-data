@@ -1,8 +1,8 @@
 #!/bin/bash
 
 echo "Step 1: Loading environment variables from .env.prod if exists"
-if [ -f .env.prod ]; then
-    export $(cat .env.prod | xargs)
+if [ -f .env.test ]; then
+    export $(cat .env.test | xargs)
 fi
 
 echo "Step 2: Setting up test environment variables"
@@ -13,8 +13,10 @@ export API_IP=supermarket-api
 # limit the run time
 export ENABLED_SCRAPERS=BAREKET
 export LIMIT=10
-export NUM_OF_OCCASIONS=1
-export OPERATION=scraping,converting,clean_dump_files,api_update,publishing,clean_all_source_data
+# export NUM_OF_OCCASIONS=1
+# export OPERATION=scraping,converting,clean_dump_files,api_update,publishing,clean_all_source_data
+export REPEAT=ONCE
+export STOP=ONCE
 
 echo "Step 3: Stopping and removing existing Docker containers"
 docker compose stop

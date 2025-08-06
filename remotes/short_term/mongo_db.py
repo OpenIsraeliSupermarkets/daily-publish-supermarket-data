@@ -22,7 +22,7 @@ class MongoDbUploader(ShortTermDatabaseUploader):
     large integers and bulk operations.
     """
 
-    def __init__(self, mongodb_uri):
+    def __init__(self, mongodb_uri=None):
         """Initialize MongoDB connection.
 
         Args:

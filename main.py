@@ -1,5 +1,5 @@
-from remotes import KaggleUploader, KafkaDbUploader
-from publishers.dag_publisher import SupermarketDataPublisherInterface
+from remotes import KaggleUploader, KafkaDbUploader, MongoDbUploader
+from publishers import SupermarketDataPublisherInterface, SupermarketDataPublisher
 import os
 import datetime
 from utils import now
@@ -57,9 +57,29 @@ if __name__ == "__main__":
     logging.info(f"Limit: {limit}")
     logging.info(f"When: {when}")
     
+    wait_time_seconds = os.environ.get("WAIT_TIME_SECONDS", 60*30)
+    try:
+        wait_time_seconds = int(wait_time_seconds)
+    except ValueError:
+        wait_time_seconds = 60
     
 
-    publisher = SupermarketDataPublisherInterface(
+    
+    stop_condition = os.environ.get("STOP_CONDITION", "NEVER")
+
+    def output_short_term_destination_from_env(output_destination):
+
+        logging.info(f"Output destination: {output_destination}")
+        if output_destination == "kafka":
+            return KafkaDbUploader()
+        elif output_destination == "mongo":
+            return MongoDbUploader()
+        else:
+            raise ValueError(f"Invalid output destination: {output_destination}")
+
+
+
+    publisher = SupermarketDataPublisher(
         number_of_scraping_processes=num_of_processes,
         number_of_parseing_processs=num_of_processes,
         app_folder=os.environ["APP_DATA_PATH"],
@@ -75,8 +95,14 @@ if __name__ == "__main__":
             dataset_remote_name=os.environ["KAGGLE_DATASET_REMOTE_NAME"],
             when=when,
         ),
-        short_term_db_target=KafkaDbUploader(kafka_bootstrap_servers=os.environ["KAFKA_BOOTSTRAP_SERVERS"]),
+        short_term_db_target=output_short_term_destination_from_env(os.environ.get("OUTPUT_DESTINATION", "mongo")),
         limit=limit,
         when_date=when,
+        wait_time_seconds=wait_time_seconds,
+        should_execute_final_operations=os.environ.get("STOP", "EOW"),
+        should_stop_dag=os.environ.get("REPEAT", "NEVER")
     )
-    publisher.run(operations=os.environ["OPERATION"])
+    publisher.run(
+        operations="scraping,converting,api_update,clean_dump_files",
+        final_operations="publishing,clean_all_source_data"
+    )

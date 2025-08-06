@@ -22,7 +22,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: supermarket-api
+    container_name: supermarket-raw-data-api
     ports:
       - "8080:8000"
     depends_on:
@@ -48,7 +48,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: data_processing
-    container_name: data-processor
+    container_name: data-fetcher
     depends_on:
       - mongodb
     environment:
