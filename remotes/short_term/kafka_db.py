@@ -90,7 +90,7 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
         """
         return f"{table_target_name}"
 
-    async def _insert_to_destinations(self, table_target_name, items):
+    def _insert_to_destinations(self, table_target_name, items):
         """Insert items into a Kafka topic with error handling.
 
         Args:
@@ -108,11 +108,12 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
         try:
             # Send all messages
             for item in items:
-                await self.producer.send_and_wait(
+                self.producer.send_and_wait(
                     topic=topic_name,
                     key=str(item.get("_id", "default")).encode("utf-8"),
                     value=item,
                 )
+
             logging.info("Successfully sent %d records to Kafka", len(items))
         except KafkaError as e:
             logging.error("Failed to send messages to Kafka: %s", str(e))
@@ -136,7 +137,7 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
                 len(items),
             )
 
-    async def _create_destinations(self, partition_id, table_name):
+    def _create_destinations(self, partition_id, table_name):
         """Create a new topic (Kafka doesn't require explicit topic creation).
 
         Args:
@@ -150,7 +151,7 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
         )
         # Kafka creates topics automatically when first message is sent
         # No explicit creation needed
-        await self._insert_to_destinations(
+        self._insert_to_destinations(
             table_name, [{"partition_id": partition_id, "warmup": "true"}]
         )
 
