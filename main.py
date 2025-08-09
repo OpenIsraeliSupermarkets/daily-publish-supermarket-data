@@ -8,6 +8,18 @@ import logging
 import datetime
 import pytz
 
+
+
+def output_short_term_destination_from_env(output_destination):
+
+    logging.info(f"Output destination: {output_destination}")
+    if output_destination == "kafka":
+        return KafkaDbUploader()
+    elif output_destination == "mongo":
+        return MongoDbUploader()
+    else:
+        raise ValueError(f"Invalid output destination: {output_destination}")
+
 if __name__ == "__main__":
 
     logging.getLogger("Logger").setLevel(logging.INFO)
@@ -62,17 +74,6 @@ if __name__ == "__main__":
     except ValueError:
         wait_time_seconds = 60
 
-    stop_condition = os.environ.get("STOP_CONDITION", "NEVER")
-
-    def output_short_term_destination_from_env(output_destination):
-
-        logging.info(f"Output destination: {output_destination}")
-        if output_destination == "kafka":
-            return KafkaDbUploader()
-        elif output_destination == "mongo":
-            return MongoDbUploader()
-        else:
-            raise ValueError(f"Invalid output destination: {output_destination}")
 
     publisher = SupermarketDataPublisher(
         number_of_scraping_processes=num_of_processes,
@@ -107,7 +108,7 @@ if __name__ == "__main__":
         publisher.run(
             wait_time_seconds=wait_time_seconds,
             should_execute_final_operations=os.environ.get("STOP", "EOD"),
-            should_stop_dag=os.environ.get("REPEAT", "NEVER"),
+            should_stop_dag=os.environ.get("REPEAT", "FOREVER"),
             operations="scraping,converting,api_update,clean_dump_files",
             final_operations="publishing,clean_all_source_data",
         )

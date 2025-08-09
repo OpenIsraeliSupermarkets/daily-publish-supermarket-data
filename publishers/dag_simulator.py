@@ -80,7 +80,7 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
 
     def _should_stop_dag(self, should_stop_dag):
         """Return True if the stop condition is met"""
-        if should_stop_dag == "NEVER":
+        if should_stop_dag == "FOREVER":
             return False
         elif should_stop_dag == "ONCE":
             return self.last_execution_time is not None
@@ -93,7 +93,7 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
         final_operations=None,
         wait_time_seconds=60,
         should_execute_final_operations="EOD",
-        should_stop_dag="NEVER",
+        should_stop_dag="FOREVER",
     ):
         """
         Run the scheduled operations and then the final operations.
