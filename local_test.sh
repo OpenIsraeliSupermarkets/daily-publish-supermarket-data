@@ -43,6 +43,10 @@ mkdir -p "$MONGO_DATA_PATH/mongo_data"
 
 echo "Step 6: Rebuilding Docker containers without cache"
 docker compose build --no-cache
+if [ $? -ne 0 ]; then
+    echo -e "\033[31mDocker build failed. Exiting.\033[0m"
+    exit 1
+fi
 
 echo "Step 7: Starting background services (MongoDB and API)"
 docker compose up -d mongodb api
