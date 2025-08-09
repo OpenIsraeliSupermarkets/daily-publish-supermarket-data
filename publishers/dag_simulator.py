@@ -31,7 +31,6 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
         status_folder="status",
         enabled_scrapers=None,
         enabled_file_types=None,
-        num_of_occasions=3,
         limit=None,
         when_date=None,
     ):
@@ -72,6 +71,8 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
             )
         elif should_execute_final_operations == "ONCE":
             return self.last_execution_time is not None
+        elif isinstance(should_execute_final_operations, int):
+            return self.executed_jobs >= should_execute_final_operations
         else:
             raise ValueError(
                 f"Invalid repeat condition: {should_execute_final_operations}"
@@ -91,7 +92,7 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
         operations,
         final_operations=None,
         wait_time_seconds=60,
-        should_execute_final_operations="NEVER",
+        should_execute_final_operations="EOD",
         should_stop_dag="NEVER",
     ):
         """
@@ -107,7 +108,7 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
             This method overrides the parent class run method with different parameters.
         """
         logging.info(
-            f"Executing operations with {self.wait_time_seconds}s wait time between runs"
+            f"Executing operations with {wait_time_seconds}s wait time between runs"
         )
 
         while not self._should_stop_dag(should_stop_dag):
@@ -118,10 +119,8 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
                 logging.info(f"Executing operations")
                 self._execute_operations(operations)
 
-                logging.info(
-                    f"Waiting {self.wait_time_seconds} seconds before next run"
-                )
-                time.sleep(self.wait_time_seconds)
+                logging.info(f"Waiting {wait_time_seconds} seconds before next run")
+                time.sleep(wait_time_seconds)
 
             logging.info(f"Executing final operations")
             if final_operations:

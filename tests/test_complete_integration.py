@@ -62,13 +62,14 @@ def run_full_dag_integration(
         enabled_scrapers=enabled_scrapers,
         enabled_file_types=None,
         limit=file_per_run,
-        num_of_occasions=num_of_occasions,
         when_date=when_date,
-        wait_time_seconds=wait_time_seconds,
     )
 
     # Run with wait time approach
     publisher.run(
+        wait_time_seconds=wait_time_seconds,
+        should_execute_final_operations=num_of_occasions,
+        should_stop_dag="ONCE",
         operations="scraping,converting,api_update,clean_dump_files",
         final_operations="publishing,clean_all_source_data",
     )
