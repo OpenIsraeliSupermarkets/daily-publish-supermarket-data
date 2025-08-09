@@ -13,10 +13,9 @@ export API_IP=supermarket-api
 # limit the run time
 export ENABLED_SCRAPERS=BAREKET
 export LIMIT=10
-# export NUM_OF_OCCASIONS=1
-# export OPERATION=scraping,converting,clean_dump_files,api_update,publishing,clean_all_source_data
 export REPEAT=ONCE
 export STOP=ONCE
+export WAIT_TIME_SECONDS=60
 
 echo "Step 3: Stopping and removing existing Docker containers"
 docker compose stop
