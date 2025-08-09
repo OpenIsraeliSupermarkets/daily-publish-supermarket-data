@@ -68,7 +68,7 @@ def test_push_parser_status_reads_from_outputs_folder(
             status_folder="/tmp",
             short_term_db_target=dummy_uploader,
             enabled_scrapers=["scraper1", "scraper2"],
-            enabled_converters=["converter1", "converter2"],
+            enabled_file_types=["converter1", "converter2"],
         )
         manager._push_parser_status(dummy_cache_state)
         # Check that DummyUploader got the mocked record
