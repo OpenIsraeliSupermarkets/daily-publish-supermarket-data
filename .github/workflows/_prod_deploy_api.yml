@@ -54,4 +54,4 @@ jobs:
         run: docker compose up -d mongodb
 
       - name: Run Docker Compose
-        run: docker compose up -d api 
+        run: docker compose up -d api

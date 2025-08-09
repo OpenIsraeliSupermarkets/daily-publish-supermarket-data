@@ -1,7 +1,7 @@
 services:
   mongodb:
     image: mongo:latest
-    container_name: mongodb
+    container_name: raw-data-mongodb
     ports:
       - "27017:27017"
     volumes:
@@ -22,7 +22,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: supermarket-raw-data-api
+    container_name: raw-data-api
     ports:
       - "8080:8000"
     depends_on:

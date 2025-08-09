@@ -298,7 +298,7 @@ def validate_short_term_structure(
     # all the expected scraper was ran
     assert len(chains_batch_count) == len(
         enabled_scrapers
-    ), f"Expected {len(enabled_scrapers)} chains, found {len(chains_batch_count)}"
+    ), f"Expected {chains_batch_count} chains, found {chains_batch_count.keys()}"
 
     # each itreation was completed succsufll.
     for chain, counts in chains_batch_count.items():

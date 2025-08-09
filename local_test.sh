@@ -9,7 +9,7 @@ echo "Step 2: Setting up test environment variables"
 # override the kaggle dataset
 export KAGGLE_DATASET_REMOTE_NAME=test-super-dataset
 export MONGO_IP=mongodb
-export API_IP=supermarket-api
+export API_IP=api
 # limit the run time
 export ENABLED_SCRAPERS=BAREKET
 export LIMIT=10
@@ -60,7 +60,7 @@ echo "Step 9: print networks and running containers"
 docker network ls
 docker ps
 echo "Step 9.1: Print API container logs"
-docker logs supermarket-api
+docker logs raw-data-api
 
 
 echo "Step 10: Running system tests"
