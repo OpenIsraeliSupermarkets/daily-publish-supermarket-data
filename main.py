@@ -19,22 +19,21 @@ if __name__ == "__main__":
     when_str = os.environ.get("WHEN", None)
     if when_str:
         # Parse the datetime string from environment variable
-        when = datetime.datetime.fromisoformat(when_str.replace('Z', '+00:00'))
+        when = datetime.datetime.fromisoformat(when_str.replace("Z", "+00:00"))
         if when.tzinfo is None:
             # If no timezone info, assume Jerusalem timezone
             import pytz
+
             when = pytz.timezone("Asia/Jerusalem").localize(when)
     else:
         when = now()
-    
-    
+
     num_of_processes = os.environ.get("NUM_OF_PROCESSES", 5)
     try:
         num_of_processes = int(num_of_processes)
     except ValueError:
         num_of_processes = os.cpu_count()
-    
-    
+
     limit = os.environ.get("LIMIT", None)
     if limit:
         limit = int(limit)
@@ -50,21 +49,19 @@ if __name__ == "__main__":
         enabled_file_types = None
     else:
         enabled_file_types = enabled_file_types.split(",")
-    
+
     logging.info(f"Number of processes: {num_of_processes}")
     logging.info(f"Enabled scrapers: {enabled_scrapers}")
     logging.info(f"Enabled file types: {enabled_file_types}")
     logging.info(f"Limit: {limit}")
     logging.info(f"When: {when}")
-    
-    wait_time_seconds = os.environ.get("WAIT_TIME_SECONDS", 60*30)
+
+    wait_time_seconds = os.environ.get("WAIT_TIME_SECONDS", 60 * 30)
     try:
         wait_time_seconds = int(wait_time_seconds)
     except ValueError:
         wait_time_seconds = 60
-    
 
-    
     stop_condition = os.environ.get("STOP_CONDITION", "NEVER")
 
     def output_short_term_destination_from_env(output_destination):
@@ -76,8 +73,6 @@ if __name__ == "__main__":
             return MongoDbUploader()
         else:
             raise ValueError(f"Invalid output destination: {output_destination}")
-
-
 
     publisher = SupermarketDataPublisher(
         number_of_scraping_processes=num_of_processes,
@@ -95,14 +90,24 @@ if __name__ == "__main__":
             dataset_remote_name=os.environ["KAGGLE_DATASET_REMOTE_NAME"],
             when=when,
         ),
-        short_term_db_target=output_short_term_destination_from_env(os.environ.get("OUTPUT_DESTINATION", "mongo")),
+        short_term_db_target=output_short_term_destination_from_env(
+            os.environ.get("OUTPUT_DESTINATION", "mongo")
+        ),
         limit=limit,
         when_date=when,
-        wait_time_seconds=wait_time_seconds,
-        should_execute_final_operations=os.environ.get("STOP", "EOD"),
-        should_stop_dag=os.environ.get("REPEAT", "NEVER")
     )
-    publisher.run(
-        operations="scraping,converting,api_update,clean_dump_files",
-        final_operations="publishing,clean_all_source_data"
-    )
+
+    # self execute operations if OPERATIONS is set
+    operations = os.environ.get("OPERATIONS", "")
+    if operations != "":
+        logging.info(f"Executing operations: {operations}")
+        publisher._execute_operations(operations)
+    else:
+        logging.info(f"Running publisher")
+        publisher.run(
+            wait_time_seconds=wait_time_seconds,
+            should_execute_final_operations=os.environ.get("STOP", "EOD"),
+            should_stop_dag=os.environ.get("REPEAT", "NEVER"),
+            operations="scraping,converting,api_update,clean_dump_files",
+            final_operations="publishing,clean_all_source_data",
+        )

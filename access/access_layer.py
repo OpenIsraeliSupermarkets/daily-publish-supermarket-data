@@ -139,12 +139,12 @@ class AccessLayer:
         )
 
     def list_files_with_filters(
-        self, 
-        chain: str, 
+        self,
+        chain: str,
         file_type: str = None,
         store_number: Optional[str] = None,
         after_extracted_date: Optional[datetime] = None,
-        only_latest: bool = False
+        only_latest: bool = False,
     ) -> ScrapedFiles:
         """
         List files for a specific chain with enhanced filtering options.
@@ -191,23 +191,28 @@ class AccessLayer:
         ):
             if "response" in doc and "files_to_process" in doc["response"]:
                 doc_files = doc["response"]["files_to_process"]
-                
+
                 # Apply additional filters
                 if store_number:
                     doc_files = [f for f in doc_files if store_number in f]
-                
+
                 if after_extracted_date:
                     # Filter by date if available in the document
                     if "timestamp" in doc:
-                        doc_timestamp = datetime.fromisoformat(doc["timestamp"].replace('Z', '+00:00'))
+                        doc_timestamp = datetime.fromisoformat(
+                            doc["timestamp"].replace("Z", "+00:00")
+                        )
                         # Ensure both datetimes are timezone-aware for comparison
                         if after_extracted_date.tzinfo is None:
                             # If after_extracted_date is naive, make it timezone-aware using UTC
                             from datetime import timezone
-                            after_extracted_date = after_extracted_date.replace(tzinfo=timezone.utc)
+
+                            after_extracted_date = after_extracted_date.replace(
+                                tzinfo=timezone.utc
+                            )
                         if doc_timestamp < after_extracted_date:
                             continue
-                
+
                 files.extend(doc_files)
 
         # If only_latest is True, we could implement logic to return only the most recent files
@@ -262,11 +267,7 @@ class AccessLayer:
         )
 
     def get_file_content_paginated(
-        self, 
-        chain: str, 
-        file: str, 
-        chunk_size: int = 100, 
-        offset: int = 0
+        self, chain: str, file: str, chunk_size: int = 100, offset: int = 0
     ) -> PaginatedFileContent:
         """
         Get paginated content of a specific file from a specific chain.
@@ -298,28 +299,28 @@ class AccessLayer:
             raise ValueError(f"file {file} doesn't follow the correct pattern.")
 
         table_name = get_table_name(file_type.name, chain)
-        
+
         # Get all rows for the file
         all_rows = self.short_term_database_connector.get_destinations_content(
             table_name, DataTable.by_file_name(file)
         )
-        
+
         total_count = len(all_rows)
-        
+
         # Apply pagination
-        paginated_rows = all_rows[offset:offset + chunk_size]
+        paginated_rows = all_rows[offset : offset + chunk_size]
         has_more = offset + chunk_size < total_count
-        
+
         # Generate cursors for cursor-based pagination
         next_cursor = None
         prev_cursor = None
-        
+
         if has_more:
             next_cursor = str(offset + chunk_size)
-        
+
         if offset > 0:
             prev_cursor = str(max(0, offset - chunk_size))
-        
+
         return PaginatedFileContent(
             rows=paginated_rows,
             total_count=total_count,
@@ -327,15 +328,11 @@ class AccessLayer:
             offset=offset,
             chunk_size=chunk_size,
             next_cursor=next_cursor,
-            prev_cursor=prev_cursor
+            prev_cursor=prev_cursor,
         )
 
     def get_file_content_with_cursor_pagination(
-        self, 
-        chain: str, 
-        file: str, 
-        limit: int = 100, 
-        cursor: Optional[str] = None
+        self, chain: str, file: str, limit: int = 100, cursor: Optional[str] = None
     ) -> PaginatedFileContent:
         """
         Get paginated content of a specific file from a specific chain using cursor-based pagination.
@@ -367,14 +364,14 @@ class AccessLayer:
             raise ValueError(f"file {file} doesn't follow the correct pattern.")
 
         table_name = get_table_name(file_type.name, chain)
-        
+
         # Get all rows for the file
         all_rows = self.short_term_database_connector.get_destinations_content(
             table_name, DataTable.by_file_name(file)
         )
-        
+
         total_count = len(all_rows)
-        
+
         # Convert cursor to offset
         offset = 0
         if cursor:
@@ -382,21 +379,21 @@ class AccessLayer:
                 offset = int(cursor)
             except ValueError:
                 raise ValueError("Invalid cursor format")
-        
+
         # Apply pagination
-        paginated_rows = all_rows[offset:offset + limit]
+        paginated_rows = all_rows[offset : offset + limit]
         has_more = offset + limit < total_count
-        
+
         # Generate cursors for cursor-based pagination
         next_cursor = None
         prev_cursor = None
-        
+
         if has_more:
             next_cursor = str(offset + limit)
-        
+
         if offset > 0:
             prev_cursor = str(max(0, offset - limit))
-        
+
         return PaginatedFileContent(
             rows=paginated_rows,
             total_count=total_count,
@@ -404,5 +401,5 @@ class AccessLayer:
             offset=offset,
             chunk_size=limit,
             next_cursor=next_cursor,
-            prev_cursor=prev_cursor
+            prev_cursor=prev_cursor,
         )

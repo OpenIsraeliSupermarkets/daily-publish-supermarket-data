@@ -93,7 +93,16 @@ class PaginatedFileContent(BaseModel):
     next_cursor: Optional[str] = None
     prev_cursor: Optional[str] = None
 
-    def __init__(self, rows: list[dict[str, str]], total_count: int, has_more: bool, offset: int, chunk_size: int, next_cursor: Optional[str] = None, prev_cursor: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        rows: list[dict[str, str]],
+        total_count: int,
+        has_more: bool,
+        offset: int,
+        chunk_size: int,
+        next_cursor: Optional[str] = None,
+        prev_cursor: Optional[str] = None,
+    ) -> None:
         """Initialize the paginated file content from raw row data.
 
         Transforms raw dictionary rows into RawFileContent objects with pagination metadata.
@@ -116,7 +125,15 @@ class PaginatedFileContent(BaseModel):
             )
             for row in rows
         ]
-        super().__init__(rows=processed_rows, total_count=total_count, has_more=has_more, offset=offset, chunk_size=chunk_size, next_cursor=next_cursor, prev_cursor=prev_cursor)
+        super().__init__(
+            rows=processed_rows,
+            total_count=total_count,
+            has_more=has_more,
+            offset=offset,
+            chunk_size=chunk_size,
+            next_cursor=next_cursor,
+            prev_cursor=prev_cursor,
+        )
 
 
 class ServiceHealth(BaseModel):

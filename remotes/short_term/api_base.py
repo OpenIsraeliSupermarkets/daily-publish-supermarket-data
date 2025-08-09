@@ -78,7 +78,9 @@ class ShortTermDatabaseUploader:
         """
         raise NotImplementedError("Subclasses must implement _list_destinations()")
 
-    def restart_database(self, enabled_scrapers: list[str], enabled_file_types: list[str]):
+    def restart_database(
+        self, enabled_scrapers: list[str], enabled_file_types: list[str]
+    ):
         """Clean and recreate all tables in the database.
 
         This function drops all existing tables and recreates them with their original structure.
@@ -86,7 +88,9 @@ class ShortTermDatabaseUploader:
         try:
             self._clean_all_destinations()
             #
-            self._create_destinations(ParserStatus.get_index(), ParserStatus.get_table_name())
+            self._create_destinations(
+                ParserStatus.get_index(), ParserStatus.get_table_name()
+            )
             self._create_destinations(
                 ScraperStatus.get_index(), ScraperStatus.get_table_name()
             )

@@ -294,7 +294,9 @@ class TestAccessLayer(unittest.TestCase):
                             # Verify correct parameters to get_destinations_content
                             # pylint: disable=protected-access
                             self.short_term_db.get_destinations_content.assert_called_once()
-                            args, _ = self.short_term_db.get_destinations_content.call_args
+                            args, _ = (
+                                self.short_term_db.get_destinations_content.call_args
+                            )
                             self.assertEqual(args[0], "prices_shufersal")
                             self.assertEqual(args[1], {"file_name": "test_file.xml"})
 

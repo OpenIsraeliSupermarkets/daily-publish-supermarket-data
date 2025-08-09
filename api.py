@@ -43,6 +43,7 @@ app.add_middleware(TelemetryMiddleware)
 # Initialize the access layer and token validator
 _access_layer_instance = None
 
+
 def get_access_layer():
     """Singleton pattern for access layer to avoid connection issues during import."""
     global _access_layer_instance
@@ -88,16 +89,21 @@ async def read_files(
         parsed_date = None
         if after_extracted_date:
             try:
-                parsed_date = datetime.fromisoformat(after_extracted_date.replace('Z', '+00:00'))
+                parsed_date = datetime.fromisoformat(
+                    after_extracted_date.replace("Z", "+00:00")
+                )
             except ValueError:
-                raise HTTPException(status_code=400, detail="Invalid date format. Use ISO format (YYYY-MM-DDTHH:MM:SS)")
-        
+                raise HTTPException(
+                    status_code=400,
+                    detail="Invalid date format. Use ISO format (YYYY-MM-DDTHH:MM:SS)",
+                )
+
         return get_access_layer().list_files_with_filters(
-            chain=chain, 
+            chain=chain,
             file_type=file_type,
             store_number=store_number,
             after_extracted_date=parsed_date,
-            only_latest=only_latest
+            only_latest=only_latest,
         )
     except HTTPException:
         # Re-raise HTTPExceptions to preserve their status codes
@@ -119,10 +125,7 @@ async def file_content(
     try:
         actual_limit = limit if limit is not None else chunk_size
         return get_access_layer().get_file_content_with_cursor_pagination(
-            chain=chain, 
-            file=file, 
-            limit=actual_limit, 
-            cursor=cursor
+            chain=chain, file=file, limit=actual_limit, cursor=cursor
         )
     except HTTPException:
         # Re-raise HTTPExceptions to preserve their status codes

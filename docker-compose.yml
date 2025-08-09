@@ -62,6 +62,7 @@ services:
       - ENABLED_SCRAPERS=${ENABLED_SCRAPERS}
       - ENABLED_FILE_TYPES=${ENABLED_FILE_TYPES}
       - LOG_LEVEL=${LOG_LEVEL:-WARNING}
+      - OUTPUT_DESTINATION=mongo
     volumes:
       - app_data:/usr/src/app/app_data
     networks:

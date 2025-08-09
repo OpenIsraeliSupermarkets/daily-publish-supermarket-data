@@ -140,7 +140,9 @@ class ShortTermDBDatasetManager:
         """
         with CacheManager(self.app_folder) as local_cache:
             if local_cache.is_empty() or force_restart:
-                self.uploader.restart_database(self.enabled_scrapers, self.enabled_file_types)
+                self.uploader.restart_database(
+                    self.enabled_scrapers, self.enabled_file_types
+                )
 
             # push
             self._push_status_files(local_cache)

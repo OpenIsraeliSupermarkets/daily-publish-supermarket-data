@@ -68,8 +68,12 @@ class BaseSupermarketDataPublisher:
         self.data_folder = os.path.join(app_folder, data_folder)
         self.outputs_folder = os.path.join(app_folder, outputs_folder)
         self.status_folder = os.path.join(app_folder, data_folder, status_folder)
-        self.enabled_scrapers = enabled_scrapers if enabled_scrapers else ScraperFactory.all_scrapers_name()
-        self.enabled_file_types = enabled_file_types if enabled_file_types else FileTypesFilters.all_types()
+        self.enabled_scrapers = (
+            enabled_scrapers if enabled_scrapers else ScraperFactory.all_scrapers_name()
+        )
+        self.enabled_file_types = (
+            enabled_file_types if enabled_file_types else FileTypesFilters.all_types()
+        )
         self.limit = limit
 
         logging.info("app_folder=%s", app_folder)

@@ -34,9 +34,6 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
         num_of_occasions=3,
         limit=None,
         when_date=None,
-        wait_time_seconds=60,
-        should_execute_final_operations="NEVER",
-        should_stop_dag="NEVER"
     ):
         super().__init__(
             number_of_scraping_processes=number_of_scraping_processes,
@@ -53,14 +50,11 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
             when_date=when_date,
         )
         self.executed_jobs = 0
-        self.wait_time_seconds = wait_time_seconds
         self.last_execution_time = None
-        self.should_execute_final_operations = should_execute_final_operations
-        self.should_stop_dag = should_stop_dag
 
     def _now(self):
         return datetime.datetime.now()
-    
+
     def _execute_operations(self, operations):
         try:
             super().run(operations)
@@ -69,26 +63,37 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
             self.last_execution_time = self._now()
             logging.info(f"Done {operations}")
 
-
-    def _should_execute_final_operations(self):
+    def _should_execute_final_operations(self, should_execute_final_operations):
         """Return True if the repeat condition is met"""
-        if self.should_execute_final_operations == "EOD":
-            return self.last_execution_time and self.last_execution_time.date() < self._now().date()
-        elif self.should_execute_final_operations == "ONCE":
+        if should_execute_final_operations == "EOD":
+            return (
+                self.last_execution_time
+                and self.last_execution_time.date() < self._now().date()
+            )
+        elif should_execute_final_operations == "ONCE":
             return self.last_execution_time is not None
         else:
-            raise ValueError(f"Invalid repeat condition: {self.should_execute_final_operations}")
+            raise ValueError(
+                f"Invalid repeat condition: {should_execute_final_operations}"
+            )
 
-    def _should_stop_dag(self):
+    def _should_stop_dag(self, should_stop_dag):
         """Return True if the stop condition is met"""
-        if self.should_stop_dag == "NEVER":
+        if should_stop_dag == "NEVER":
             return False
-        elif self.should_stop_dag == "ONCE":
+        elif should_stop_dag == "ONCE":
             return self.last_execution_time is not None
         else:
-            raise ValueError(f"Invalid stop condition: {self.should_stop_dag}")
-    
-    def run(self, operations, final_operations=None):
+            raise ValueError(f"Invalid stop condition: {should_stop_dag}")
+
+    def run(
+        self,
+        operations,
+        final_operations=None,
+        wait_time_seconds=60,
+        should_execute_final_operations="NEVER",
+        should_stop_dag="NEVER",
+    ):
         """
         Run the scheduled operations and then the final operations.
 
@@ -105,13 +110,17 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
             f"Executing operations with {self.wait_time_seconds}s wait time between runs"
         )
 
-        while not self._should_stop_dag():
+        while not self._should_stop_dag(should_stop_dag):
 
-            while not self._should_execute_final_operations():
+            while not self._should_execute_final_operations(
+                should_execute_final_operations
+            ):
                 logging.info(f"Executing operations")
                 self._execute_operations(operations)
 
-                logging.info(f"Waiting {self.wait_time_seconds} seconds before next run")
+                logging.info(
+                    f"Waiting {self.wait_time_seconds} seconds before next run"
+                )
                 time.sleep(self.wait_time_seconds)
 
             logging.info(f"Executing final operations")

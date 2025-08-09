@@ -26,7 +26,9 @@ def short_term_test_case(short_term_db_target):
 
             # Test data insertion
             test_items = [{"id": 1, "data": "test1"}, {"id": 2, "data": "test2"}]
-            self.uploader._insert_to_destinations("test_table", copy.deepcopy(test_items))
+            self.uploader._insert_to_destinations(
+                "test_table", copy.deepcopy(test_items)
+            )
             self.assertEqual(
                 sorted(
                     list(self.uploader.get_destinations_content("test_table")),
@@ -60,7 +62,9 @@ def short_term_test_case(short_term_db_target):
             self.assertEqual(len(chain1_files), 3)
 
             # Test filtering by chain and file type
-            chain1_csv = self.uploader.get_destinations_content("files", {"file_type": "csv"})
+            chain1_csv = self.uploader.get_destinations_content(
+                "files", {"file_type": "csv"}
+            )
             self.assertEqual(len(chain1_csv), 2)
 
         def test_collection_updated(self):
@@ -97,20 +101,19 @@ class DummyTestCase(
         super().tearDown()
 
 
-
 class KafkaTestCase(
     short_term_test_case(KafkaDbUploader(kafka_bootstrap_servers="localhost:9092"))
 ):
-    
-    @setup_kafka(clean=True,topics=[])
+
+    @setup_kafka(clean=True, topics=[])
     def test_create_and_insert_to_table(self):
         super().test_create_and_insert_to_table()
-        
-    @setup_kafka(clean=True,topics=[])
+
+    @setup_kafka(clean=True, topics=[])
     def test_clean_all_destinations(self):
         super().test_clean_all_destinations()
 
-    @setup_kafka(clean=True,topics=[])
+    @setup_kafka(clean=True, topics=[])
     def testget_destinations_content(self):
         self.uploader._create_destinations("id", "files")
         test_items = [
@@ -124,9 +127,10 @@ class KafkaTestCase(
         chain1_files = self.uploader.get_destinations_content("files")
         self.assertEqual(len(chain1_files), 3)
 
-    @setup_kafka(clean=True,topics=[])
+    @setup_kafka(clean=True, topics=[])
     def test_collection_updated(self):
         super().test_collection_updated()
+
 
 if __name__ == "__main__":
     unittest.main()

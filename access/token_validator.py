@@ -11,12 +11,14 @@ class TokenValidator:  # pylint: disable=too-few-public-methods
 
     def __init__(self):
         """Initialize the TokenValidator with Supabase client."""
-        supabase_url = os.getenv("SUPABASE_URL",None)
-        supabase_key = os.getenv("SUPABASE_KEY",None)
-        
+        supabase_url = os.getenv("SUPABASE_URL", None)
+        supabase_key = os.getenv("SUPABASE_KEY", None)
+
         # For testing, if environment variables are not properly set, create a mock client
-        if  supabase_url is None or supabase_key is None:
-            raise ValueError("SUPABASE_URL and SUPABASE_KEY environment variables must be set")
+        if supabase_url is None or supabase_key is None:
+            raise ValueError(
+                "SUPABASE_URL and SUPABASE_KEY environment variables must be set"
+            )
         else:
             self.supabase = create_client(supabase_url, supabase_key)
 
@@ -30,7 +32,7 @@ class TokenValidator:  # pylint: disable=too-few-public-methods
         Returns:
             bool: True if token is valid, False otherwise
         """
-            
+
         try:
             # Check if token exists and is active via direct SQL query
             result = self.supabase.rpc(
