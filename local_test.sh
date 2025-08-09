@@ -13,7 +13,10 @@ export API_IP=supermarket-api
 # limit the run time
 export ENABLED_SCRAPERS=BAREKET
 export LIMIT=10
+# -- should correspond to the number of times the data should be validated
+export NUM_OF_OCCASIONS=1
 export REPEAT=ONCE
+# ----------------------------
 export STOP=ONCE
 export WAIT_TIME_SECONDS=60
 
