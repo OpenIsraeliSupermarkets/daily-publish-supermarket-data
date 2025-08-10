@@ -1,20 +1,24 @@
 #!/bin/bash
 
 echo "Step 1: Loading environment variables from .env.prod if exists"
-if [ -f .env.prod ]; then
-    export $(cat .env.prod | xargs)
+if [ -f .env.test ]; then
+    export $(cat .env.test | xargs)
 fi
 
 echo "Step 2: Setting up test environment variables"
 # override the kaggle dataset
 export KAGGLE_DATASET_REMOTE_NAME=test-super-dataset
 export MONGO_IP=mongodb
-export API_IP=supermarket-api
+export API_IP=api
 # limit the run time
 export ENABLED_SCRAPERS=BAREKET
 export LIMIT=10
+# -- should correspond to the number of times the data should be validated
 export NUM_OF_OCCASIONS=1
-export OPERATION=scraping,converting,clean_dump_files,api_update,publishing,clean_all_source_data
+export REPEAT=ONCE
+# ----------------------------
+export STOP=ONCE
+export WAIT_TIME_SECONDS=60
 
 echo "Step 3: Stopping and removing existing Docker containers"
 docker compose stop
@@ -41,6 +45,10 @@ mkdir -p "$MONGO_DATA_PATH/mongo_data"
 
 echo "Step 6: Rebuilding Docker containers without cache"
 docker compose build --no-cache
+if [ $? -ne 0 ]; then
+    echo -e "\033[31mDocker build failed. Exiting.\033[0m"
+    exit 1
+fi
 
 echo "Step 7: Starting background services (MongoDB and API)"
 docker compose up -d mongodb api
@@ -52,7 +60,7 @@ echo "Step 9: print networks and running containers"
 docker network ls
 docker ps
 echo "Step 9.1: Print API container logs"
-docker logs supermarket-api
+docker logs raw-data-api
 
 
 echo "Step 10: Running system tests"

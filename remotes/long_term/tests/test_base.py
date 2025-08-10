@@ -22,9 +22,11 @@ def long_term_test_case(
         def setUp(self):
             # Create temporary directories for testing
             self.temp_dir = tempfile.TemporaryDirectory()
-            self.dataset_path =  os.path.join(self.temp_dir.name, dataset_path or "dataset-path")
+            self.dataset_path = os.path.join(
+                self.temp_dir.name, dataset_path or "dataset-path"
+            )
             self.dataset_remote_name = dataset_remote_name or "test-super-dataset"
-            
+
             self.uploader = long_term_db_target(
                 self.dataset_path, self.dataset_remote_name, when, **kwargs
             )
@@ -39,7 +41,7 @@ def long_term_test_case(
             test_file_path = os.path.join(self.temp_dir.name, "test.txt")
             with open(test_file_path, "w") as f:
                 f.write("test")
-                
+
             self.uploader.stage(test_file_path)
             self.assertFalse(self.uploader.was_updated_in_last(seconds=1))
             self.uploader.upload_to_dataset("test_message", **{"test": "test"})
@@ -48,7 +50,7 @@ def long_term_test_case(
             files = self.uploader.list_files()
             self.assertEqual(len(files), 1)
             self.assertEqual(os.path.basename(files[0]), "test.txt")
-            
+
             file_content = self.uploader.get_file_content("test.txt")
             self.assertEqual(file_content, "test")
 
@@ -56,7 +58,7 @@ def long_term_test_case(
             # Clean up using the temporary directory manager
             self.temp_dir.cleanup()
             super().tearDown()
-            
+
     return TestLongTermDatabaseUploader
 
 

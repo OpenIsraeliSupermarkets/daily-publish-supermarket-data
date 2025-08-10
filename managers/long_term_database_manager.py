@@ -68,17 +68,19 @@ class LongTermDatasetManager:
 
             if "response" in entry and entry["response"]["file_was_created"]:
                 file_name = os.path.split(entry["response"]["file_created_path"])[-1]
-                
+
                 if file_name not in collector:
                     collector[file_name] = {
                         "path": file_name,
-                        "store": entry['store_enum'],
-                        "files_types": entry['response']['files_types'],
-                        "files_in_csv": entry['response']['files_to_process']
+                        "store": entry["store_enum"],
+                        "files_types": entry["response"]["files_types"],
+                        "files_in_csv": entry["response"]["files_to_process"],
                     }
                 else:
-                    collector[file_name]["files_in_csv"].extend(entry['response']['files_to_process'])
-                
+                    collector[file_name]["files_in_csv"].extend(
+                        entry["response"]["files_to_process"]
+                    )
+
         descriptions = []
         for file_name, file_info in collector.items():
             descriptions.append(

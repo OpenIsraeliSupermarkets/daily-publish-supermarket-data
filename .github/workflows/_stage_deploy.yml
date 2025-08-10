@@ -21,6 +21,9 @@ jobs:
           
       - name: Adding env variables    
         run: |
+          echo "ENABLED_SCRAPERS=${{ secrets.ENABLED_SCRAPERS }}" >> $GITHUB_ENV
+          echo "ENABLED_FILE_TYPES=${{ secrets.ENABLED_FILE_TYPES }}" >> $GITHUB_ENV
+          echo "LIMIT=${{ secrets.LIMIT }}" >> $GITHUB_ENV
           echo "APP_DATA_PATH=${{ runner.workspace }}/app_data" >> $GITHUB_ENV
           echo "MONGO_DATA_PATH=${{ runner.workspace }}/mongo_data" >> $GITHUB_ENV
           echo "MONGO_URL=${{ secrets.MONGO_URL }}" >> $GITHUB_ENV
@@ -33,6 +36,10 @@ jobs:
           echo "MONGO_USERNAME=${{ secrets.MONGO_USERNAME }}" >> $GITHUB_ENV
           echo "MONGO_PASSWORD=${{ secrets.MONGO_PASSWORD }}" >> $GITHUB_ENV
           echo "KAGGLE_DATASET_REMOTE_NAME=test-super-dataset-2" >> $GITHUB_ENV
+          echo "LOG_LEVEL=DEBUG" >> $GITHUB_ENV
+          echo "STOP=EOD" >> $GITHUB_ENV
+          echo "REPEAT=NEVER" >> $GITHUB_ENV
+          echo "WAIT_TIME_SECONDS=60" >> $GITHUB_ENV
 
 
       - name: Stoping Old Container
@@ -50,9 +57,6 @@ jobs:
         run: systemctl start docker || true # Start if not already running
       
       - name: Make sure mongodb is running
-        run: docker compose up -d mongodb
+        run: docker compose up -d
 
-      - name: Run Docker Compose
-        run: docker compose up -d api 
-
-      # act -W '.github/workflows/deploy_api.yml' -P self-hosted=catthehacker/ubuntu:act-latest
+      # act -W '.github/workflows/_stage_deploy.yml' -P self-hosted=catthehacker/ubuntu:act-latest --secret-file .env.stage

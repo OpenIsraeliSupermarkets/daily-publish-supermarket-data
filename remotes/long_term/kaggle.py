@@ -20,7 +20,7 @@ KAGGLE_API_AVAILABLE = None
 try:
     from kaggle.api.kaggle_api_extended import KaggleApi
     from kaggle.rest import ApiException
-except IOError as e:
+except Exception as e:
     KAGGLE_API_AVAILABLE = e
 
 
@@ -48,7 +48,9 @@ class KaggleUploader(LongTermDatabaseUploader):
                 "Fail to use kaggle api, message: \n%s" % KAGGLE_API_AVAILABLE
             )
         if not os.getenv("KAGGLE_USERNAME") or not os.getenv("KAGGLE_KEY"):
-            raise ValueError("KAGGLE_USERNAME and KAGGLE_KEY environment variables must be set")
+            raise ValueError(
+                "KAGGLE_USERNAME and KAGGLE_KEY environment variables must be set"
+            )
 
         logging.info(f"Kaggle username: {os.getenv('KAGGLE_USERNAME')}")
         logging.info(f"Kaggle key: ...{os.getenv('KAGGLE_KEY')[-5:]}")
@@ -118,7 +120,7 @@ class KaggleUploader(LongTermDatabaseUploader):
             version_notes=message,
             delete_old_versions=False,
         )
-        time.sleep(3) # wait for kaggle to process the request.
+        time.sleep(3)  # wait for kaggle to process the request.
 
     def clean(self):
         """Clean up temporary files."""
@@ -138,7 +140,9 @@ class KaggleUploader(LongTermDatabaseUploader):
             dataset_info = self.api.dataset_list(
                 user="erlichsefi", search=self.dataset_remote_name
             )
-            dataset_info = list(filter(lambda x: x.title == self.dataset_remote_name, dataset_info))[0]
+            dataset_info = list(
+                filter(lambda x: x.title == self.dataset_remote_name, dataset_info)
+            )[0]
             return (
                 datetime.now(tz=pytz.utc)
                 - dataset_info.lastUpdated.replace(tzinfo=pytz.utc)
@@ -158,7 +162,7 @@ class KaggleUploader(LongTermDatabaseUploader):
         """
         # Download files if needed
         try:
-            
+
             # Download all dataset files if not already present
             page_token = None
             collected_files = []
@@ -171,12 +175,16 @@ class KaggleUploader(LongTermDatabaseUploader):
                 if files.nextPageToken == "":
                     break
                 page_token = files.nextPageToken
-            
+
             # Filter by chain if specified
             if chain is not None or extension is not None:
                 pattern = self._build_pattern(chain, extension)
                 # Use glob-style pattern matching to filter files
-                collected_files = [f for f in collected_files if re.match(pattern.replace("*", ".*"), f)]
+                collected_files = [
+                    f
+                    for f in collected_files
+                    if re.match(pattern.replace("*", ".*"), f)
+                ]
             return collected_files
         except ApiException as e:
             logging.error("Error listing files from Kaggle: %s", str(e))
@@ -196,10 +204,9 @@ class KaggleUploader(LongTermDatabaseUploader):
             if not os.path.exists(file_name):
                 # Download specific file if it doesn't exist
                 self.api.dataset_download_file(
-                    f"erlichsefi/{self.dataset_remote_name}",
-                    file_name=file_name
+                    f"erlichsefi/{self.dataset_remote_name}", file_name=file_name
                 )
-                
+
             if file_name.endswith(".json"):
                 with open(file_name, "r", encoding="utf-8") as file:
                     return json.load(file)

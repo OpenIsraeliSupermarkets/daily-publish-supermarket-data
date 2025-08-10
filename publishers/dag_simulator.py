@@ -2,6 +2,7 @@
 Module for simulating DAG-based execution of supermarket data publishing tasks.
 Provides scheduling and execution of tasks at specified times.
 """
+
 import logging
 import time
 import datetime
@@ -30,10 +31,8 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
         status_folder="status",
         enabled_scrapers=None,
         enabled_file_types=None,
-        num_of_occasions=3,
         limit=None,
         when_date=None,
-        wait_time_seconds=60,
     ):
         super().__init__(
             number_of_scraping_processes=number_of_scraping_processes,
@@ -49,62 +48,53 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
             limit=limit,
             when_date=when_date,
         )
-        self.num_of_occasions = num_of_occasions
         self.executed_jobs = 0
-        self.occasions = None
-        self.wait_time_seconds = wait_time_seconds
+        self.last_execution_time = None
 
-    def _setup_schedule(self, operations):
-        self.occasions = self._compute_occasions()
-        logging.info("Scheduling the scraping tasks at %s", self.occasions)
-        for occasion in self.occasions:
-            schedule.every().day.at(occasion).do(self._execute_operations, operations)
+    def _now(self):
+        return datetime.datetime.now()
 
     def _execute_operations(self, operations):
         try:
             super().run(operations)
         finally:
             self.executed_jobs += 1
-            logging.info("Scraping task is done")
+            self.last_execution_time = self._now()
+            logging.info(f"Done {operations}")
 
-    def _track_task(self):
-        logging.info("Starting the tracking tasks")
-        while self.executed_jobs < len(self.occasions):
-            schedule.run_pending()
-            time.sleep(1)
-        logging.info("Scraping tasks are done, starting the converting task")
-
-    def _compute_occasions(self):
-        """Compute the occasions for the scraping tasks"""
-        interval_start = max(self.start_at, self.today)
-        interval = (
-            self.completed_by - interval_start
-        ).total_seconds() / self.num_of_occasions
-        occasions = [
-            (interval_start + datetime.timedelta(minutes=1)).strftime("%H:%M")
-        ] + [
-            (interval_start + datetime.timedelta(seconds=interval * (i + 1))).strftime(
-                "%H:%M"
+    def _should_execute_final_operations(self, should_execute_final_operations):
+        """Return True if the repeat condition is met"""
+        if should_execute_final_operations == "EOD":
+            return (
+                self.last_execution_time
+                and self.last_execution_time.date() < self._now().date()
             )
-            for i in range(1, self.num_of_occasions)
-        ]
-        return occasions
+        elif should_execute_final_operations == "ONCE":
+            return self.last_execution_time is not None
+        elif isinstance(should_execute_final_operations, int):
+            return self.executed_jobs >= should_execute_final_operations
+        else:
+            raise ValueError(
+                f"Invalid repeat condition: {should_execute_final_operations}"
+            )
 
-    def _get_time_to_execute(self):
-        return datetime.timedelta(hours=1)
+    def _should_stop_dag(self, should_stop_dag):
+        """Return True if the stop condition is met"""
+        if should_stop_dag == "FOREVER":
+            return False
+        elif should_stop_dag == "ONCE":
+            return self.last_execution_time is not None
+        else:
+            raise ValueError(f"Invalid stop condition: {should_stop_dag}")
 
-    def _end_of_day(self):
-        """Return the end of the day"""
-        return (
-            datetime.datetime.combine(self.today, datetime.time(23, 59))
-            - self._get_time_to_execute()
-        )
-
-    def _non(self):
-        """Return the start of the day"""
-        return datetime.datetime.combine(self.today, datetime.time(12, 0))
-
-    def run(self, operations, final_operations=None):
+    def run(
+        self,
+        operations,
+        final_operations=None,
+        wait_time_seconds=60,
+        should_execute_final_operations="EOD",
+        should_stop_dag="FOREVER",
+    ):
         """
         Run the scheduled operations and then the final operations.
 
@@ -116,13 +106,29 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
 
         Note:
             This method overrides the parent class run method with different parameters.
-        """        
-        logging.info(f"Executing operations with {self.wait_time_seconds}s wait time between runs")
-        for i in range(self.num_of_occasions):
-            logging.info(f"Starting execution {i+1}/{self.num_of_occasions}")
-            self._execute_operations(operations)
-            time.sleep(self.wait_time_seconds)
-        logging.info("All scheduled executions completed")
+        """
+        logging.info(
+            f"Executing operations with {wait_time_seconds}s wait time between runs"
+        )
 
-        if final_operations:
-            super().run(operations=final_operations)
+        while not self._should_stop_dag(should_stop_dag):
+            # execute operations until final operations are executed
+            while True:
+                
+                # execute operations
+                logging.info(f"Executing operations")
+                self._execute_operations(operations)
+
+                # check if final operations should be executed
+                if self._should_execute_final_operations(
+                    should_execute_final_operations
+                ):
+                    break
+
+                # if not, wait for next run
+                logging.info(f"Waiting {wait_time_seconds} seconds before next run")
+                time.sleep(wait_time_seconds)
+
+            logging.info(f"Executing final operations")
+            if final_operations:
+                super().run(operations=final_operations)

@@ -13,6 +13,10 @@ starlette==0.36.3
 supabase
 sqlalchemy==2.0.27
 filelock==3.18.0
+aiokafka>=0.10.0,<0.12
+kafka-python>=2.0.2
+six>=1.16.0
+mockafka-py==0.2.1
 requests>=2.32.2 # not directly required, pinned by Snyk to avoid a vulnerability
-urllib3>=2.2.2 # not directly required, pinned by Snyk to avoid a vulnerability
+urllib3>=2.5.0 # not directly required, pinned by Snyk to avoid a vulnerability
 zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability

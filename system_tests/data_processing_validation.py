@@ -218,7 +218,9 @@ def validate_data_processing(uri="mongodb://192.168.1.129:27017/"):
 
             # בדיקת סטטוס עבור כל קובץ
             pipeline = {
-                "new_files": list(set(files_saw) - set(chain_errors["overall_file_saw"])),
+                "new_files": list(
+                    set(files_saw) - set(chain_errors["overall_file_saw"])
+                ),
                 "saw": len(files_saw),
                 "fail_downloaded": 0,
                 "not_collected_by_parser": 0,
@@ -240,7 +242,7 @@ def validate_data_processing(uri="mongodb://192.168.1.129:27017/"):
                         pipeline["fail_parsed"] += 1
                         chain_errors["parsed"].append(parsing_results_failed[file])
                         chain_errors["overall_lost_files"].append(file)
-                        
+
                     elif file in parsing_results_success:
                         pipeline["succesful_processed"] += 1
                         chain_errors["overall_download_files"].append(file)
@@ -248,9 +250,11 @@ def validate_data_processing(uri="mongodb://192.168.1.129:27017/"):
                         raise ValueError(f"file {file} is not in any of the lists")
                 else:
                     raise ValueError(f"file {file} is not in any of the lists")
-            chain_errors["overall_file_saw"] = list(set(files_saw) | set(chain_errors["overall_file_saw"]))
+            chain_errors["overall_file_saw"] = list(
+                set(files_saw) | set(chain_errors["overall_file_saw"])
+            )
             validation_results[chain_name][itreation_timestamp] = pipeline
-        
+
         aggregated_errors[chain_name] = chain_errors
 
     with open("validation_results.json", "w") as f:
@@ -259,7 +263,14 @@ def validate_data_processing(uri="mongodb://192.168.1.129:27017/"):
         json.dump(aggregated_errors, f, indent=4)
 
     for chain, errors in aggregated_errors.items():
-        assert len(set(errors["overall_lost_files"]) - set(errors['overall_download_files'])) / len(errors['overall_file_saw']) < 0.02, f"chain {chain} data lost in the data processing pipeline is too high"
+        assert (
+            len(
+                set(errors["overall_lost_files"])
+                - set(errors["overall_download_files"])
+            )
+            / len(errors["overall_file_saw"])
+            < 0.02
+        ), f"chain {chain} data lost in the data processing pipeline is too high"
 
 
 if __name__ == "__main__":

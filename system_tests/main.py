@@ -4,19 +4,19 @@ import os
 import sys
 
 # Add parent directory to Python path so we can import modules from it
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from data_processing_validation import validate_data_processing
 from data_serving_validation import main as full_data_scan
 from static_validation import validate_data_storage
 from il_supermarket_scarper import ScraperFactory
 from utils import now
+from utils import configure_logging
+
 
 async def run_validations():
     # Configure logging
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-    )
+    configure_logging()
 
     # Run data processing validation
     # Run both validations concurrently
@@ -47,11 +47,15 @@ async def run_validations():
             asyncio.to_thread(
                 validate_data_storage,
                 os.getenv("KAGGLE_DATASET_REMOTE_NAME"),
-                os.getenv("ENABLED_SCRAPERS") or ",".join(ScraperFactory.all_scrapers_name()).split(","),
+                (os.getenv("ENABLED_SCRAPERS") or ",".join(ScraperFactory.all_scrapers_name())).split(","),
                 os.getenv("MONGODB_URI"),
                 file_per_run=int(os.getenv("LIMIT")) if os.getenv("LIMIT") else None,
-                num_of_occasions=int(os.getenv("NUM_OF_OCCASIONS")) if os.getenv("NUM_OF_OCCASIONS") else None,
-                upload_to_long_term_db=True # assume running after the publish
+                num_of_occasions=(
+                    int(os.getenv("NUM_OF_OCCASIONS"))
+                    if os.getenv("NUM_OF_OCCASIONS")
+                    else None
+                ),
+                upload_to_long_term_db=True,  # assume running after the publish
             )
         )
     )

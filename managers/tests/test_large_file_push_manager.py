@@ -10,6 +10,7 @@ from managers.cache_manager import CacheState
 from remotes import ShortTermDatabaseUploader
 from typing import List, Dict
 
+
 class TestLargeFilePushManager:
     @pytest.fixture
     def temp_dir(self):
@@ -22,7 +23,7 @@ class TestLargeFilePushManager:
     def mock_database_manager(self):
         """Create a mock database manager."""
         mock_db_manager = MagicMock(spec=ShortTermDatabaseUploader)
-        mock_db_manager._insert_to_database = MagicMock()
+        mock_db_manager._insert_to_destinations = MagicMock()
         return mock_db_manager
 
     @pytest.fixture
@@ -78,7 +79,7 @@ class TestLargeFilePushManager:
 
         # Verify
         assert cache_state.get_last_processed_row("test_file.csv") == -1
-        mock_database_manager._insert_to_database.assert_not_called()
+        mock_database_manager._insert_to_destinations.assert_not_called()
 
     @patch("pandas.read_csv")
     @patch("managers.large_file_push_manager.DataTable")
@@ -116,7 +117,7 @@ class TestLargeFilePushManager:
         manager.process_file("test_file.csv", cache_state)
 
         # Verify database insertion was called
-        mock_database_manager._insert_to_database.assert_called_once()
+        mock_database_manager._insert_to_destinations.assert_called_once()
 
         # Verify cache was updated
         assert cache_state.get_last_processed_row("test_file.csv") == 2
@@ -168,7 +169,7 @@ class TestLargeFilePushManager:
         )
 
         # Verify database insertion was called
-        mock_database_manager._insert_to_database.assert_called_once()
+        mock_database_manager._insert_to_destinations.assert_called_once()
 
         # Verify cache was updated with the last processed row
         # Starting from row 2, adding 1 row makes it 4 (0-based is 3)
@@ -217,7 +218,7 @@ class TestLargeFilePushManager:
         manager.process_file("test_file.csv", cache_state)
 
         # Verify database insertion was called twice (once for each chunk)
-        assert mock_database_manager._insert_to_database.call_count == 2
+        assert mock_database_manager._insert_to_destinations.call_count == 2
 
         # Verify cache was updated with the final position
         # The final position should be the sum of the lengths of all chunks
@@ -252,43 +253,39 @@ class TestLargeFilePushManager:
         manager.process_file(test_file, cache_state)
 
         # Verify database insertion was called 4 times (for chunks of size 3+3+3+1)
-        assert mock_database_manager._insert_to_database.call_count == 4
+        assert mock_database_manager._insert_to_destinations.call_count == 4
 
         # Verify cache was updated with the final row count
         assert cache_state.get_last_processed_row(test_file) == 9
 
     def test_last_row_saw_no_nulls(self, temp_dir, mock_database_manager, cache_state):
         """Test that last_row_saw doesn't contain null values."""
-        
+
         test_file = "test_file.csv"
         file_path = os.path.join(temp_dir, test_file)
         # Create test data with one chunk containing null values and another with valid data
         test_data = pd.DataFrame(
             {
                 "found_folder": ["test_folder"] + [np.nan for i in range(9)],
-                "file_name": ["test_file_"] +  [np.nan for i in range(9)],
-                "more_data": ["test_data_" ]+  [np.nan for i in range(9)],
+                "file_name": ["test_file_"] + [np.nan for i in range(9)],
+                "more_data": ["test_data_"] + [np.nan for i in range(9)],
             }
         )
         test_data.to_csv(file_path, index=False)
-        
-        
+
         manager = LargeFilePushManager(temp_dir, mock_database_manager, 3)
- 
-        
+
         def mock_insert(table_name, items: List[Dict]):
-            # Accessing private attribute for testing purposes            
+            # Accessing private attribute for testing purposes
             # Assert last_row_saw does not contain nulls after ffill operation
             for item in items:
                 for key, value in item.items():
-                    assert value is not None and not pd.isna(value), f"Key {key} contains NaN value"
-        
+                    assert value is not None and not pd.isna(
+                        value
+                    ), f"Key {key} contains NaN value"
+
         # Replace the method with our mock
-        manager.database_manager._insert_to_database = mock_insert
-        
-            
+        manager.database_manager._insert_to_destinations = mock_insert
+
         # Process the file
         manager.process_file(test_file, cache_state)
-
-
-    

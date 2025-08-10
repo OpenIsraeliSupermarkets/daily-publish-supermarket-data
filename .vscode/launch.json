@@ -37,7 +37,7 @@
             "envFile": "${workspaceFolder}/.env.test",
             "env": {
                 "OPERATION":"scraping,converting",
-                "ENABLED_SCRAPERS":"SHUFERSAL"
+                "ENABLED_SCRAPERS":"BAREKET"
             }
         },
         {

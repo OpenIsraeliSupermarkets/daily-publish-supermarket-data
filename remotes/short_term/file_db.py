@@ -51,7 +51,7 @@ class DummyDocumentDbUploader(ShortTermDatabaseUploader):
         if os.path.exists(tables_ids_path):
             os.remove(tables_ids_path)
 
-    def _insert_to_database(self, table_target_name, items):
+    def _insert_to_destinations(self, table_target_name, items):
         """Insert items into a table.
 
         Args:
@@ -71,7 +71,7 @@ class DummyDocumentDbUploader(ShortTermDatabaseUploader):
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(item, f, indent=4, ensure_ascii=False)
 
-    def _create_table(self, partition_id, table_name):
+    def _create_destinations(self, partition_id, table_name):
         """Create a new table directory.
 
         Args:
@@ -84,7 +84,7 @@ class DummyDocumentDbUploader(ShortTermDatabaseUploader):
         self._save_tables_ids()
         logging.info("Created table: %s", table_name)
 
-    def _clean_all_tables(self):
+    def _clean_all_destinations(self):
         """Remove all tables and their contents."""
         self._clean_meta_data()
         if os.path.exists(self.db_path):
@@ -133,7 +133,7 @@ class DummyDocumentDbUploader(ShortTermDatabaseUploader):
             )
             return False
 
-    def _list_tables(self):
+    def _list_destinations(self):
         """List all tables/collections in the database.
 
         Returns:
@@ -146,7 +146,7 @@ class DummyDocumentDbUploader(ShortTermDatabaseUploader):
                 tables.append(item)
         return tables
 
-    def get_table_content(self, table_name, filter=None):
+    def get_destinations_content(self, table_name, filter=None):
         """Get all content of a specific table.
 
         Args:

@@ -2,20 +2,15 @@
 Interface for executing DAG-like operations for supermarket data publishing.
 This module provides a class that supports running a sequence of operations.
 """
+
 import logging
 from publishers.base_publisher import BaseSupermarketDataPublisher
-
-
-logging.getLogger("Logger").setLevel(logging.INFO)
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
 
 
 class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
     """
     Interface for executing DAG-like operations for supermarket data publishing.
-    
+
     Extends BaseSupermarketDataPublisher to provide a method for running
     a sequence of operations specified as a comma-separated string.
     """
@@ -26,7 +21,7 @@ class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
     def run(self, operations):
         """
         Run the specified operations in sequence.
-        
+
         Args:
             operations: Comma-separated string of operations to execute
         """

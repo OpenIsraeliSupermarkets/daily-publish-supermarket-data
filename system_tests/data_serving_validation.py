@@ -12,6 +12,7 @@ import multiprocessing
 from functools import partial
 from tqdm import tqdm
 from tqdm.asyncio import tqdm as async_tqdm
+from utils import configure_logging
 
 
 @dataclass
@@ -56,7 +57,9 @@ class ApiCallValidator:
             async with aiohttp.ClientSession(headers=self.headers) as session:
                 async with session.get(f"{self.host}/short_term_health") as response:
                     if response.status != 200:
-                        raise Exception(f"Short-term health check failed: {response.status}")
+                        raise Exception(
+                            f"Short-term health check failed: {response.status}"
+                        )
                     return await response.json()
 
     async def check_long_term_health(self) -> Dict[str, Any]:
@@ -65,7 +68,9 @@ class ApiCallValidator:
             async with aiohttp.ClientSession(headers=self.headers) as session:
                 async with session.get(f"{self.host}/long_term_health") as response:
                     if response.status != 200:
-                        raise Exception(f"Long-term health check failed: {response.status}")
+                        raise Exception(
+                            f"Long-term health check failed: {response.status}"
+                        )
                     return await response.json()
 
     async def fetch_chains(self) -> List[str]:
@@ -180,9 +185,7 @@ class ApiCallValidator:
 
 async def main(api_token, host, rate_limit):
     # Configure logging
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-    )
+    configure_logging()
 
     if not api_token:
         raise ValueError("API_TOKEN environment variable is not set")
@@ -199,20 +202,24 @@ async def main(api_token, host, rate_limit):
         logging.info("Checking service health...")
         health_result = await validator.check_health()
         logging.info(f"Service health: {health_result['status']}")
-        if health_result['status'] != 'healthy':
+        if health_result["status"] != "healthy":
             raise Exception(f"Service health is not healthy: {health_result['status']}")
-        
+
         # Check short-term database health
         logging.info("Checking short-term database health...")
         short_term_health = await validator.check_short_term_health()
-        if not short_term_health['is_updated']:
-            raise Exception(f"Short-term database is not updated: {short_term_health['last_update']}")
-        
+        if not short_term_health["is_updated"]:
+            raise Exception(
+                f"Short-term database is not updated: {short_term_health['last_update']}"
+            )
+
         # Check long-term database health
         logging.info("Checking long-term database health...")
         long_term_health = await validator.check_long_term_health()
-        if not long_term_health['is_updated']:
-            raise Exception(f"Long-term database is not updated: {long_term_health['last_update']}")
+        if not long_term_health["is_updated"]:
+            raise Exception(
+                f"Long-term database is not updated: {long_term_health['last_update']}"
+            )
 
         # Run validation
         results = await validator.validate_all_data()

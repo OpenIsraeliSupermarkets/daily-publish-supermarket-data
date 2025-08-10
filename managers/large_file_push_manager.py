@@ -101,7 +101,7 @@ class LargeFilePushManager:
             if last_row_saw is not None:
                 items = items[1:]
 
-            self.database_manager._insert_to_database(target_table_name, items)
+            self.database_manager._insert_to_destinations(target_table_name, items)
 
             # Save last row for next iteration
             last_row_saw = chunk.tail(1).set_index("row_index")

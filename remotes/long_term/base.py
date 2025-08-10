@@ -116,7 +116,6 @@ class LongTermDatabaseUploader(ABC):
             )
         return index
 
-
     def _build_pattern(self, chain=None, extension=None):
         pattern = "*"
         if chain:
