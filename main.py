@@ -98,8 +98,8 @@ if __name__ == "__main__":
         when_date=when,
     )
 
-    # self execute operations if OPERATIONS is set
-    operations = os.environ.get("OPERATIONS", "")
+    # self execute operations if OPERATION is set
+    operations = os.environ.get("OPERATION", "")
     if operations != "":
         logging.info(f"Executing operations: {operations}")
         publisher._execute_operations(operations)

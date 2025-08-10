@@ -6,8 +6,6 @@ if [ -f .env.test ]; then
 fi
 
 echo "Step 2: Setting up test environment variables"
-# override the kaggle dataset
-export KAGGLE_DATASET_REMOTE_NAME=test-super-dataset
 export MONGO_IP=mongodb
 export API_IP=api
 # limit the run time
