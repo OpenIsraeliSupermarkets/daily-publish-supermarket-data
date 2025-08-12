@@ -113,6 +113,12 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
                     key=str(item.get("_id", "default")).encode("utf-8"),
                     value=item,
                 )
+            # send flush message
+            self.producer.send_and_wait(
+                topic=topic_name,
+                key=str(item.get("_id", "default")).encode("utf-8"),
+                value={"flush": "true"},
+            )
 
             logging.info("Successfully sent %d records to Kafka", len(items))
         except KafkaError as e:
