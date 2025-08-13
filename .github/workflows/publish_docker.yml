@@ -39,4 +39,5 @@ jobs:
         with:
           context: .
           push: true
+          target: data_processing
           tags: erlichsefi/data-fetcher:latest
