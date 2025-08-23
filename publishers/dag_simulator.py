@@ -56,10 +56,10 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
 
     def _execute_operations(self, operations):
         try:
+            self.last_execution_time = self._now()
             super().run(operations)
         finally:
             self.executed_jobs += 1
-            self.last_execution_time = self._now()
             logging.info(f"Done {operations}")
 
     def _should_execute_final_operations(self, should_execute_final_operations):
@@ -131,4 +131,4 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
 
             logging.info(f"Executing final operations")
             if final_operations:
-                super().run(operations=final_operations)
+                self._execute_operations(final_operations)

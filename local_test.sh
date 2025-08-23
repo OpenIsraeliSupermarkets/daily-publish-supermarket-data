@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# Ask user if they want to build without cache
+echo ""
+read -p "Do you want to build without cache? (y/N): " BUILD_NO_CACHE
+BUILD_NO_CACHE=${BUILD_NO_CACHE:-N}
+
 echo "Step 1: Loading environment variables from .env.prod if exists"
 if [ -f .env.test ]; then
     export $(cat .env.test | xargs)
@@ -9,7 +14,7 @@ echo "Step 2: Setting up test environment variables"
 export MONGO_IP=mongodb
 export API_IP=api
 # limit the run time
-export ENABLED_SCRAPERS=BAREKET
+export ENABLED_SCRAPERS=COFIX
 export LIMIT=10
 # -- should correspond to the number of times the data should be validated
 export NUM_OF_OCCASIONS=1
@@ -31,7 +36,6 @@ fi
 
 mkdir -p "$APP_DATA_PATH"
 
-
 echo "Step 5: Cleaning MongoDB data directory"
 # Clean the mongo data folder
 if [ -d "$MONGO_DATA_PATH" ]; then
@@ -42,7 +46,10 @@ fi
 mkdir -p "$MONGO_DATA_PATH/mongo_data"
 
 echo "Step 6: Rebuilding Docker containers without cache"
-docker compose build --no-cache
+if [[ "$BUILD_NO_CACHE" =~ ^[Yy]$ ]]; then
+    docker compose build --no-cache
+fi
+
 if [ $? -ne 0 ]; then
     echo -e "\033[31mDocker build failed. Exiting.\033[0m"
     exit 1
@@ -54,12 +61,6 @@ docker compose up -d mongodb api
 echo "Step 8: Starting data processor and waiting for scraping to complete"
 docker compose up data_processor
 
-echo "Step 9: print networks and running containers"
-docker network ls
-docker ps
-echo "Step 9.1: Print API container logs"
-docker logs raw-data-api
-
 
 echo "Step 10: Running system tests"
 if ! ./system_test.sh "${KAGGLE_DATASET_REMOTE_NAME}" "${MONGO_IP}" "${API_IP}" ; then
@@ -67,5 +68,5 @@ if ! ./system_test.sh "${KAGGLE_DATASET_REMOTE_NAME}" "${MONGO_IP}" "${API_IP}" 
     exit 1
 fi
 
-echo "Step 10: Stopping all containers"
+echo "Step 11: Stopping all containers"
 docker compose stop
