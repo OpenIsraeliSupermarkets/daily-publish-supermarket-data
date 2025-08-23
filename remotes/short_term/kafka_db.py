@@ -50,8 +50,10 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
                 except RuntimeError:
                     self._loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(self._loop)
-
+            
+            # Run the async connection in the event loop
             self._loop.run_until_complete(self._connect_to_kafka())
+
 
     async def _connect_to_kafka(self):
         """Establish connection to Kafka"""
@@ -83,6 +85,35 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
             else:
                 raise e
 
+    async def _disconnect_from_kafka(self):
+        """Disconnect from Kafka and clean up resources"""
+        if self.producer:
+            try:
+                await self.producer.stop()
+                logging.info("Kafka producer stopped")
+            except Exception as e:
+                logging.error(f"Error stopping Kafka producer: {e}")
+            finally:
+                self.producer = None
+        
+        if self.admin_client:
+            try:
+                self.admin_client.close()
+                logging.info("Kafka admin client closed")
+            except Exception as e:
+                logging.error(f"Error closing Kafka admin client: {e}")
+            finally:
+                self.admin_client = None
+
+    def disconnect(self):
+        """Public method to disconnect from Kafka"""
+        if self._loop and not self._loop.is_closed():
+            try:
+                self._loop.run_until_complete(self._disconnect_from_kafka())
+            except Exception as e:
+                logging.error(f"Error during Kafka disconnect: {e}")
+        self._connection_tested = False
+
     def _get_topic_name(self, table_target_name: str) -> str:
         """
         Generate Kafka topic name based on table name.
@@ -101,6 +132,25 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
             return
 
         self._ensure_connection()
+        
+        # Ensure we have a producer before proceeding
+        if self.producer is None:
+            logging.error("Failed to establish Kafka connection")
+            return
+            
+        # Run the async operation in the event loop
+        self._loop.run_until_complete(self._async_insert_to_destinations(table_target_name, items))
+
+    async def _async_insert_to_destinations(self, table_target_name, items):
+        """Async implementation of insert to destinations."""
+        if not items:
+            return
+
+        # Ensure we have a producer
+        if self.producer is None:
+            logging.error("Kafka producer not available")
+            return
+
         logging.info("Pushing to topic %s, %d items", table_target_name, len(items))
 
         topic_name = self._get_topic_name(table_target_name)
@@ -108,13 +158,13 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
         try:
             # Send all messages
             for item in items:
-                self.producer.send_and_wait(
+                await self.producer.send_and_wait(
                     topic=topic_name,
                     key=str(item.get("_id", "default")).encode("utf-8"),
                     value=item,
                 )
             # send flush message
-            self.producer.send_and_wait(
+            await self.producer.send_and_wait(
                 topic=topic_name,
                 key=str(item.get("_id", "default")).encode("utf-8"),
                 value={"flush": "true"},
@@ -127,12 +177,10 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
             successful_records = 0
             for item in items:
                 try:
-                    self._loop.run_until_complete(
-                        self.producer.send_and_wait(
-                            topic=topic_name,
-                            key=str(item.get("_id", "default")).encode("utf-8"),
-                            value=item,
-                        )
+                    await self.producer.send_and_wait(
+                        topic=topic_name,
+                        key=str(item.get("_id", "default")).encode("utf-8"),
+                        value=item,
                     )
                     successful_records += 1
                 except KafkaError as inner_e:
@@ -247,12 +295,15 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
             topic_name = self._get_topic_name(table_name)
 
             async def _get_messages():
+                import time
                 consumer = AIOKafkaConsumer(
                     topic_name,
                     bootstrap_servers=self.bootstrap_servers,
                     auto_offset_reset="earliest",
                     enable_auto_commit=False,
-                    group_id=f"test_consumer_{topic_name}_{id(self)}",  # Unique group ID
+                    group_id=f"test_consumer_{topic_name}_{int(time.time())}_{id(self)}",  # Unique group ID with timestamp
+                    session_timeout_ms=10000,  # Increase session timeout
+                    request_timeout_ms=20000,  # Increase request timeout
                 )
 
                 await consumer.start()
@@ -260,7 +311,7 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
 
                 try:
                     # Use getmany with timeout to avoid infinite loop
-                    msg_set = await consumer.getmany(timeout_ms=2000, max_records=100)
+                    msg_set = await consumer.getmany(timeout_ms=5000, max_records=1000)
 
                     seen_messages = set()  # For deduplication
 
@@ -272,10 +323,11 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
                                     deserialized_value = json.loads(
                                         msg.value.decode("utf-8")
                                     )
-                                    # Filter out warmup messages
+                                    # Filter out warmup and flush messages
                                     if not (
                                         isinstance(deserialized_value, dict)
-                                        and deserialized_value.get("warmup") == "true"
+                                        and (deserialized_value.get("warmup") == "true" or 
+                                             deserialized_value.get("flush") == "true")
                                     ):
                                         # Create a hash for deduplication
                                         msg_hash = json.dumps(
@@ -288,10 +340,11 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
                                     # If deserialization fails, add the raw value
                                     messages.append(msg.value)
                             else:
-                                # Filter out warmup messages for non-bytes values too
+                                # Filter out warmup and flush messages for non-bytes values too
                                 if not (
                                     isinstance(msg.value, dict)
-                                    and msg.value.get("warmup") == "true"
+                                    and (msg.value.get("warmup") == "true" or 
+                                         msg.value.get("flush") == "true")
                                 ):
                                     # Create a hash for deduplication
                                     msg_hash = json.dumps(msg.value, sort_keys=True)

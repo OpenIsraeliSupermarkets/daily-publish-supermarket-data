@@ -14,15 +14,14 @@ def mock_kafka_db(func):
         topics_data = {}  # topic_name -> list of messages
 
         # Mock producer that stores messages in memory
-        mock_producer = MagicMock()
+        class MockProducer:
+            async def send_and_wait(self, topic, key, value):
+                if topic not in topics_data:
+                    topics_data[topic] = []
+                topics_data[topic].append(value)
+                return None
 
-        def mock_send_and_wait(topic, key, value):
-            if topic not in topics_data:
-                topics_data[topic] = []
-            topics_data[topic].append(value)
-            return None
-
-        mock_producer.send_and_wait = mock_send_and_wait
+        mock_producer = MockProducer()
 
         # Mock admin client that manages topics list
         mock_admin = MagicMock()
@@ -70,7 +69,20 @@ def mock_kafka_db(func):
             self.uploader.producer = mock_producer
             self.uploader.admin_client = mock_admin
             self.uploader._connection_tested = True
-            self.uploader._loop = MagicMock()  # Mock the event loop
+            # Create a proper mock event loop that can handle run_until_complete
+            class MockEventLoop:
+                def run_until_complete(self, coro):
+                    # Create a new event loop to run the coroutine
+                    import asyncio
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    try:
+                        result = loop.run_until_complete(coro)
+                        return result
+                    finally:
+                        loop.close()
+            
+            self.uploader._loop = MockEventLoop()
 
             # Override get_destinations_content to return stored messages
             def mock_get_destinations_content(table_name, filter=None):
@@ -81,19 +93,33 @@ def mock_kafka_db(func):
 
                 topic_name = self.uploader._get_topic_name(table_name)
                 messages = topics_data.get(topic_name, [])
-                # Filter out warmup messages
+                # Filter out warmup and flush messages
                 return [
                     msg
                     for msg in messages
-                    if not (isinstance(msg, dict) and msg.get("warmup") == "true")
+                    if not (isinstance(msg, dict) and (msg.get("warmup") == "true" or msg.get("flush") == "true"))
                 ]
 
             # Override clean method to clear our in-memory storage
             def mock_clean_all_destinations():
                 topics_data.clear()
 
+            # Override ensure_connection to do nothing (we already have mock objects)
+            def mock_ensure_connection():
+                pass
+
+            # Override _list_destinations to use our mock admin client
+            def mock_list_destinations():
+                try:
+                    return list(topics_data.keys())
+                except Exception as e:
+                    logging.error("Error listing Kafka topics: %s", str(e))
+                    return []
+
             self.uploader.get_destinations_content = mock_get_destinations_content
             self.uploader._clean_all_destinations = mock_clean_all_destinations
+            self.uploader._ensure_connection = mock_ensure_connection
+            self.uploader._list_destinations = mock_list_destinations
 
             # Run the actual test
             return func(self)
