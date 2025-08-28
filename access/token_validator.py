@@ -1,6 +1,6 @@
 """Module providing token validation functionality with Supabase."""
 
-import logging
+from utils import Logger
 import os
 
 from supabase import create_client, Client
@@ -82,6 +82,6 @@ class SupabaseTelemetry:  # pylint: disable=too-few-public-methods
             self.supabase.table("api_telemetry").insert(telemetry_data).execute()
         except Exception as e:  # pylint: disable=broad-except
             # We need to catch any exception here to prevent API crashes during telemetry
-            logging.error("Failed to send telemetry to Supabase: %s", e)
+            Logger.error("Failed to send telemetry to Supabase: %s", e)
             # Continue logging even if Supabase send fails
-            logging.info("API Telemetry: %s", telemetry_data)
+            Logger.info("API Telemetry: %s", telemetry_data)

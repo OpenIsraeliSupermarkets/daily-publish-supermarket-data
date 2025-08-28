@@ -7,7 +7,7 @@ and validates the structure of the downloaded data.
 
 import os
 import tempfile
-import logging
+from utils import Logger
 from datetime import datetime
 import pytz
 import sys
@@ -46,7 +46,7 @@ def validate_data_storage(
     stage_folder = os.path.join(temp_dir, "test_stage")
     os.makedirs(stage_folder, exist_ok=True)
 
-    logging.info(f"Created temporary directory: {temp_dir}")
+    Logger.info(f"Created temporary directory: {temp_dir}")
 
     try:
         # Initialize KaggleUploader
@@ -82,4 +82,4 @@ def validate_data_storage(
 
         if os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
-            logging.info(f"Cleaned up temporary directory: {temp_dir}")
+            Logger.info(f"Cleaned up temporary directory: {temp_dir}")

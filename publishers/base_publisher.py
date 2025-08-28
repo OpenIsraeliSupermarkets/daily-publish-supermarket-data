@@ -3,7 +3,7 @@ Base module for supermarket data publishing.
 Provides the core functionality for scraping, converting, and uploading supermarket data.
 """
 
-import logging
+from utils import Logger
 import datetime
 import os
 import shutil
@@ -76,7 +76,7 @@ class BaseSupermarketDataPublisher:
         )
         self.limit = limit
 
-        logging.info("app_folder=%s", app_folder)
+        Logger.info("app_folder=%s", app_folder)
 
     def _check_tz(self):
         """
@@ -99,7 +99,7 @@ class BaseSupermarketDataPublisher:
         try:
             os.makedirs(self.data_folder, exist_ok=True)
 
-            logging.info("Starting the scraping task")
+            Logger.info("Starting the scraping task")
             ScarpingTask(
                 enabled_scrapers=self.enabled_scrapers,
                 files_types=self.enabled_file_types,
@@ -110,16 +110,16 @@ class BaseSupermarketDataPublisher:
                 limit=self.limit,
                 suppress_exception=True,
             ).start()
-            logging.info("Scraping task is done")
+            Logger.info("Scraping task is done")
         except Exception as e:
-            logging.error("An error occurred during scraping: %s", e)
+            Logger.error("An error occurred during scraping: %s", e)
             raise e
 
     def _execute_converting(self):
         """
         Execute the converting task to parse scraped data into structured format.
         """
-        logging.info("Starting the converting task")
+        Logger.info("Starting the converting task")
         os.makedirs(self.outputs_folder, exist_ok=True)
 
         ConvertingTask(
@@ -131,7 +131,7 @@ class BaseSupermarketDataPublisher:
             when_date=datetime.datetime.now(),
         ).start()
 
-        logging.info("Converting task is done")
+        Logger.info("Converting task is done")
 
     def _update_api_database(self, reset_cache=False):
         """
@@ -140,7 +140,7 @@ class BaseSupermarketDataPublisher:
         Args:
             reset_cache: Whether to force a restart of the cache (default: False).
         """
-        logging.info("Starting the short term database task")
+        Logger.info("Starting the short term database task")
         database = ShortTermDBDatasetManager(
             short_term_db_target=self.short_term_db_target,
             app_folder=self.app_folder,
@@ -155,7 +155,7 @@ class BaseSupermarketDataPublisher:
         """
         Upload the data to the long-term database (Kaggle by default).
         """
-        logging.info("Starting the long term database task")
+        Logger.info("Starting the long term database task")
         database = LongTermDatasetManager(
             long_term_db_target=self.long_term_db_target,
             enabled_scrapers=self.enabled_scrapers,
@@ -187,7 +187,7 @@ class BaseSupermarketDataPublisher:
             # but is not used in current implementation
             self._upload_to_kaggle()
         except ValueError as e:
-            logging.error("Failed to upload to kaggle")
+            Logger.error("Failed to upload to kaggle")
             raise e
         finally:
             # clean data allways after uploading

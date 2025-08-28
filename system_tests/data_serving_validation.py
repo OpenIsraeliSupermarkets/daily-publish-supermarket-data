@@ -1,6 +1,6 @@
 from typing import Dict, List, Optional, Any
 from datetime import datetime
-import logging
+from utils import Logger
 from dataclasses import dataclass
 from enum import Enum
 import asyncio
@@ -12,7 +12,6 @@ import multiprocessing
 from functools import partial
 from tqdm import tqdm
 from tqdm.asyncio import tqdm as async_tqdm
-from utils import configure_logging
 
 
 @dataclass
@@ -126,7 +125,7 @@ class ApiCallValidator:
             return results
 
         except Exception as e:
-            logging.error(f"Error in validate_all_data: {str(e)}")
+            Logger.error(f"Error in validate_all_data: {str(e)}")
             raise
 
     async def _process_chain(self, chain: str) -> Dict[str, Any]:
@@ -150,7 +149,7 @@ class ApiCallValidator:
             result["validation_results"] = file_tasks
 
         except Exception as e:
-            logging.error(f"Error processing chain {chain}: {str(e)}")
+            Logger.error(f"Error processing chain {chain}: {str(e)}")
             result["validation_results"] = [
                 {
                     "file": "chain_error",
@@ -172,7 +171,7 @@ class ApiCallValidator:
             return {"file": file, "validation": validation_result}
 
         except Exception as e:
-            logging.error(f"Error processing file {file} for chain {chain}: {str(e)}")
+            Logger.error(f"Error processing file {file} for chain {chain}: {str(e)}")
             return {
                 "file": file,
                 "validation": {"api_call_status": "error", "error": str(e)},
@@ -184,29 +183,27 @@ class ApiCallValidator:
 
 
 async def main(api_token, host, rate_limit):
-    # Configure logging
-    configure_logging()
 
     if not api_token:
         raise ValueError("API_TOKEN environment variable is not set")
 
-    logging.info(f"Using API host: {host}")
+    Logger.info(f"Using API host: {host}")
 
     # Initialize validator with host and rate limit
     validator = ApiCallValidator(api_token, host, rate_limit)
 
     try:
-        logging.info("Starting data validation process...")
+        Logger.info("Starting data validation process...")
 
         # Check service health
-        logging.info("Checking service health...")
+        Logger.info("Checking service health...")
         health_result = await validator.check_health()
-        logging.info(f"Service health: {health_result['status']}")
+        Logger.info(f"Service health: {health_result['status']}")
         if health_result["status"] != "healthy":
             raise Exception(f"Service health is not healthy: {health_result['status']}")
 
         # Check short-term database health
-        logging.info("Checking short-term database health...")
+        Logger.info("Checking short-term database health...")
         short_term_health = await validator.check_short_term_health()
         if not short_term_health["is_updated"]:
             raise Exception(
@@ -214,7 +211,7 @@ async def main(api_token, host, rate_limit):
             )
 
         # Check long-term database health
-        logging.info("Checking long-term database health...")
+        Logger.info("Checking long-term database health...")
         long_term_health = await validator.check_long_term_health()
         if not long_term_health["is_updated"]:
             raise Exception(
@@ -228,7 +225,7 @@ async def main(api_token, host, rate_limit):
         output_file = "validation_results.json"
         with open(output_file, "w") as f:
             json.dump(results, f, indent=2, default=str)
-        logging.info(f"\nResults saved to {output_file}")
+        Logger.info(f"\nResults saved to {output_file}")
 
         for chain in results:
             failed_files = list(
@@ -238,15 +235,15 @@ async def main(api_token, host, rate_limit):
                 )
             )
             if failed_files:
-                logging.error(f"Failed files for chain {chain}: {failed_files}")
+                Logger.error(f"Failed files for chain {chain}: {failed_files}")
                 raise Exception(f"Failed files for chain {chain}: {failed_files}")
             else:
-                logging.info(f"No failed files for chain {chain}")
+                Logger.info(f"No failed files for chain {chain}")
     except Exception as e:
-        logging.error(f"Error in main process: {str(e)}")
+        Logger.error(f"Error in main process: {str(e)}")
         raise
     finally:
-        logging.info("Validation process completed")
+        Logger.info("Validation process completed")
 
 
 if __name__ == "__main__":

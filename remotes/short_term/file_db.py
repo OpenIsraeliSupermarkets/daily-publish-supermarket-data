@@ -7,7 +7,7 @@ primarily used for testing and development purposes.
 import re
 import os
 import json
-import logging
+from utils import Logger
 from datetime import datetime, timedelta
 from .api_base import ShortTermDatabaseUploader
 
@@ -82,7 +82,7 @@ class DummyDocumentDbUploader(ShortTermDatabaseUploader):
         os.makedirs(table_path, exist_ok=True)
         self.tables_ids[table_name] = partition_id
         self._save_tables_ids()
-        logging.info("Created table: %s", table_name)
+        Logger.info("Created table: %s", table_name)
 
     def _clean_all_destinations(self):
         """Remove all tables and their contents."""
@@ -94,7 +94,7 @@ class DummyDocumentDbUploader(ShortTermDatabaseUploader):
                     for file in os.listdir(table_path):
                         os.remove(os.path.join(table_path, file))
                     os.rmdir(table_path)
-        logging.info("All tables deleted successfully!")
+        Logger.info("All tables deleted successfully!")
 
     def _is_collection_updated(
         self, collection_name: str, seconds: int = 10800
@@ -128,7 +128,7 @@ class DummyDocumentDbUploader(ShortTermDatabaseUploader):
             return (now - last_modified) < timedelta(seconds=seconds)
 
         except Exception as e:  # pylint: disable=W0718
-            logging.error(
+            Logger.error(
                 "Error checking DummyDocumentDb ParserStatus update time: %s", str(e)
             )
             return False
@@ -157,7 +157,7 @@ class DummyDocumentDbUploader(ShortTermDatabaseUploader):
         """
         table_path = os.path.join(self.db_path, table_name)
         if not os.path.exists(table_path):
-            logging.error("Table '%s' does not exist", table_name)
+            Logger.error("Table '%s' does not exist", table_name)
             return []
 
         content = []
@@ -181,5 +181,5 @@ class DummyDocumentDbUploader(ShortTermDatabaseUploader):
                     else:
                         content.append(data)
             except Exception as e:  # pylint: disable=W0718
-                logging.error("Error reading file %s: %s", file_path, str(e))
+                Logger.error("Error reading file %s: %s", file_path, str(e))
         return content

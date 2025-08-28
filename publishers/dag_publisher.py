@@ -3,7 +3,8 @@ Interface for executing DAG-like operations for supermarket data publishing.
 This module provides a class that supports running a sequence of operations.
 """
 
-import logging
+from utils import Logger
+
 from publishers.base_publisher import BaseSupermarketDataPublisher
 
 
@@ -25,11 +26,11 @@ class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
         Args:
             operations: Comma-separated string of operations to execute
         """
-        logging.info("Starting executing DAG = %s", operations)
+        Logger.info("Starting executing DAG = %s", operations)
         self._check_tz()
         for operation in operations.split(","):
 
-            logging.info("Starting the operation=%s", operation)
+            Logger.info(f"DAG is {operations} starting the operation=%s", operation)
             if operation == "scraping":
                 self._execute_scraping()
             elif operation == "converting":
@@ -54,3 +55,4 @@ class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
                 self._upload_and_clean()
             else:
                 raise ValueError(f"Invalid operation {operation}")
+            Logger.info("Done the operation=%s", operation)

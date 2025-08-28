@@ -1,2 +1,2 @@
-from .logging_config import configure_logging
-from .datetime_utils import now
+from utils.logging_config import Logger
+from utils.datetime_utils import now

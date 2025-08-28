@@ -1,5 +1,5 @@
 import asyncio
-import logging
+from utils import Logger
 import os
 import sys
 
@@ -11,18 +11,16 @@ from data_serving_validation import main as full_data_scan
 from static_validation import validate_data_storage
 from il_supermarket_scarper import ScraperFactory
 from utils import now
-from utils import configure_logging
 
 
 async def run_validations():
-    # Configure logging
-    configure_logging()
+
 
     # Run data processing validation
     # Run both validations concurrently
     tasks = []
 
-    logging.info("Starting data processing validation...")
+    Logger.info("Starting data processing validation...")
 
     tasks.append(
         asyncio.create_task(

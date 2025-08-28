@@ -3,7 +3,7 @@ Module for simulating DAG-based execution of supermarket data publishing tasks.
 Provides scheduling and execution of tasks at specified times.
 """
 
-import logging
+from utils import Logger
 import time
 import datetime
 import schedule
@@ -60,7 +60,7 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
             super().run(operations)
         finally:
             self.executed_jobs += 1
-            logging.info(f"Done {operations}")
+            Logger.info(f"Done {operations}")
 
     def _should_execute_final_operations(self, should_execute_final_operations):
         """Return True if the repeat condition is met"""
@@ -107,7 +107,7 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
         Note:
             This method overrides the parent class run method with different parameters.
         """
-        logging.info(
+        Logger.info(
             f"Executing operations with {wait_time_seconds}s wait time between runs"
         )
 
@@ -116,7 +116,7 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
             while True:
                 
                 # execute operations
-                logging.info(f"Executing operations")
+                Logger.info(f"Executing operations")
                 self._execute_operations(operations)
 
                 # check if final operations should be executed
@@ -126,9 +126,9 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
                     break
 
                 # if not, wait for next run
-                logging.info(f"Waiting {wait_time_seconds} seconds before next run")
+                Logger.info(f"Waiting {wait_time_seconds} seconds before next run")
                 time.sleep(wait_time_seconds)
 
-            logging.info(f"Executing final operations")
+            Logger.info(f"Executing final operations")
             if final_operations:
                 self._execute_operations(final_operations)

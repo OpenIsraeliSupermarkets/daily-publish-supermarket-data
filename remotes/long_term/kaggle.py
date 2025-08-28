@@ -8,7 +8,7 @@ import time
 import os
 import re
 import pytz
-import logging
+from utils import Logger
 import shutil
 import json
 import pandas as pd
@@ -52,8 +52,8 @@ class KaggleUploader(LongTermDatabaseUploader):
                 "KAGGLE_USERNAME and KAGGLE_KEY environment variables must be set"
             )
 
-        logging.info(f"Kaggle username: {os.getenv('KAGGLE_USERNAME')}")
-        logging.info(f"Kaggle key: ...{os.getenv('KAGGLE_KEY')[-5:]}")
+        Logger.info(f"Kaggle username: {os.getenv('KAGGLE_USERNAME')}")
+        Logger.info(f"Kaggle key: ...{os.getenv('KAGGLE_KEY')[-5:]}")
         self.api = KaggleApi()
         self.api.authenticate()
 
@@ -68,7 +68,7 @@ class KaggleUploader(LongTermDatabaseUploader):
                     path=self.dataset_path,
                 )
             else:
-                logging.warn("Index file already exists")
+                Logger.warning("Index file already exists")
 
             with open(
                 os.path.join(self.dataset_path, "index.json"), "r", encoding="utf-8"
@@ -148,7 +148,7 @@ class KaggleUploader(LongTermDatabaseUploader):
                 - dataset_info.lastUpdated.replace(tzinfo=pytz.utc)
             ) < timedelta(seconds=seconds)
         except Exception as e:  # pylint: disable=W0718
-            logging.error("Error checking Kaggle dataset update time: %s", str(e))
+            Logger.error("Error checking Kaggle dataset update time: %s", str(e))
             return False
 
     def list_files(self, chain=None, extension=None):
@@ -187,7 +187,7 @@ class KaggleUploader(LongTermDatabaseUploader):
                 ]
             return collected_files
         except ApiException as e:
-            logging.error("Error listing files from Kaggle: %s", str(e))
+            Logger.error("Error listing files from Kaggle: %s", str(e))
             return []
 
     def get_file_content(self, file_name):
@@ -217,7 +217,7 @@ class KaggleUploader(LongTermDatabaseUploader):
                 with open(file_name, "r") as file:
                     return file.read()
         except ApiException as e:
-            logging.error("Error getting file content from Kaggle: %s", str(e))
+            Logger.error("Error getting file content from Kaggle: %s", str(e))
             raise e
         finally:
             if os.path.exists(file_name):

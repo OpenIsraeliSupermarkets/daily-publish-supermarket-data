@@ -15,9 +15,14 @@ RUN pyenv install $PY_VERSION
 RUN pyenv global $PY_VERSION
 
 WORKDIR /usr/src/app
-COPY . .
+COPY requirements.txt .
 
 RUN pip install -r requirements.txt
+
+COPY requirements-dev.txt .
+RUN pip install -r requirements-dev.txt
+
+COPY . .
 
 FROM base as dev
 RUN pip install -r requirements-dev.txt

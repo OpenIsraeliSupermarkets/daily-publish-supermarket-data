@@ -6,7 +6,7 @@ primarily used for testing and development purposes.
 
 import os
 import glob
-import logging
+from utils import Logger
 import shutil
 from ..utils import was_updated_within_seconds
 from .base import LongTermDatabaseUploader
@@ -71,7 +71,7 @@ class DummyFileStorage(LongTermDatabaseUploader):
         Args:
             message (str): Message to log with the upload operation
         """
-        logging.info(
+        Logger.info(
             "Uploading dataset '%s' to remote database, message %s",
             self.dataset_remote_path,
             message,

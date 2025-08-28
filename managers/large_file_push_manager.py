@@ -1,5 +1,5 @@
 import os
-import logging
+from utils import Logger
 import pandas as pd
 from remotes import ShortTermDatabaseUploader
 from managers.cache_manager import CacheState
@@ -39,15 +39,15 @@ class LargeFilePushManager:
         """
         file_path = os.path.join(self.outputs_folder, file)
         target_table_name = file_name_to_table(file)
-        logging.info(f"Pushing {file} to {target_table_name}")
+        Logger.info(f"Pushing {file} to {target_table_name}")
 
         # Get last processed row from cache
         last_row = local_cache.get_last_processed_row(file, default=-1)
-        logging.info(f"Last row: {last_row}")
+        Logger.info(f"Last row: {last_row}")
 
         # Read header for column names
         header = self._get_header(file)
-        logging.info(f"Header: {header}")
+        Logger.info(f"Header: {header}")
 
         last_row_saw = None
         # Process file in chunks
@@ -59,7 +59,7 @@ class LargeFilePushManager:
         ):
 
             if chunk.empty:
-                logging.warning(f"Chunk is empty,exiting... ")
+                Logger.warning(f"Chunk is empty,exiting... ")
                 break
 
             # Set index releative to the 'last_row'
@@ -68,7 +68,7 @@ class LargeFilePushManager:
             # update for next itreation
             last_row = stop_index - 1
             # log the batch
-            logging.info(
+            Logger.info(
                 f"Batch start: {chunk.iloc[0].name}, end: {chunk.iloc[-1].name}"
             )
 
@@ -93,8 +93,8 @@ class LargeFilePushManager:
                     for record in chunk.to_dict(orient="records")
                 ]
             except Exception as e:
-                logging.error(f"Error processing chunk: {e}")
-                logging.error(f"Chunk: {chunk}")
+                Logger.error(f"Error processing chunk: {e}")
+                Logger.error(f"Chunk: {chunk}")
                 raise e
 
             # remove the first item since it was used of ffill
@@ -108,4 +108,4 @@ class LargeFilePushManager:
 
         # Update cache with last processed row
         local_cache.update_last_processed_row(file, last_row)
-        logging.info(f"Completed pushing {file}")
+        Logger.info(f"Completed pushing {file}")

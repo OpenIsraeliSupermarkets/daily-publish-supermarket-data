@@ -4,31 +4,53 @@ Module for centralized logging configuration.
 
 import logging
 import os
+from sys import stdout
 
 
-def configure_logging():
-    """
-    Configure logging based on environment variables.
 
-    The log level can be set using the LOG_LEVEL environment variable.
-    Valid values are: DEBUG, INFO, WARNING, ERROR, CRITICAL
-    If not set, defaults to WARNING.
-    """
-    log_level = os.getenv("LOG_LEVEL", "WARNING").upper()
-    valid_levels = {
-        "DEBUG": logging.DEBUG,
-        "INFO": logging.INFO,
-        "WARNING": logging.WARNING,
-        "ERROR": logging.ERROR,
-        "CRITICAL": logging.CRITICAL,
-    }
 
-    # Default to WARNING if invalid level provided
-    level = valid_levels.get(log_level, logging.WARNING)
+def build_logger():
+    """create the logger instance"""
+    # Define logger
+    logger = logging.getLogger(os.getenv("LOG_LEVEL", "WARNING").upper())
 
-    # Configure root logger
-    logging.basicConfig(level=level, format="%(asctime)s - %(levelname)s - %(message)s")
+    if not logger.handlers:
+        logger.setLevel(logging.DEBUG)  # set logger level
+        log_formatter = logging.Formatter(
+            "%(name)-12s %(asctime)s %(levelname)-8s %(filename)s:%(funcName)s %(message)s"
+        )
+        console_handler = logging.StreamHandler(stdout)  # set streamhandler to stdout
+        console_handler.setFormatter(log_formatter)
+        logger.addHandler(console_handler)
 
-    # Set level for all existing loggers
-    for logger_name in logging.root.manager.loggerDict:
-        logging.getLogger(logger_name).setLevel(level)
+        file_handler = logging.FileHandler("logging.log")
+        file_handler.setFormatter(log_formatter)
+        logger.addHandler(file_handler)
+
+    return logger
+
+
+class Logger:
+    """a static logger class to share will all components"""
+
+    logger = build_logger()
+
+    @classmethod
+    def info(cls, msg, *args, **kwargs):
+        """log info"""
+        cls.logger.info(msg, *args, **kwargs)
+
+    @classmethod
+    def debug(cls, msg, *args, **kwargs):
+        """log debug"""
+        cls.logger.debug(msg, *args, **kwargs)
+
+    @classmethod
+    def error(cls, msg, *args, **kwargs):
+        """log error"""
+        cls.logger.error(msg, *args, **kwargs)
+
+    @classmethod
+    def warning(cls, msg, *args, **kwargs):
+        """log warning"""
+        cls.logger.warning(msg, *args, **kwargs)

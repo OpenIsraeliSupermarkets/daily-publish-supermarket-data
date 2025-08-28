@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 import json
-import logging
+from utils import Logger
 from remotes import ShortTermDatabaseUploader
 from managers.cache_manager import CacheManager, CacheState
 from managers.large_file_push_manager import LargeFilePushManager
@@ -63,12 +63,12 @@ class ShortTermDBDatasetManager:
             "parser-status.json", list(set(added_timestamps)) + pushed_timestamps
         )
 
-        logging.info("Parser status stored in DynamoDB successfully.")
+        Logger.info("Parser status stored in DynamoDB successfully.")
 
     def _push_status_files(self, local_cahce: CacheState):
         for file in os.listdir(self.status_folder):
             if not file.endswith(".json"):
-                logging.warn(f"Skipping '{file}', should we store it?")
+                Logger.warning(f"Skipping '{file}', should we store it?")
                 continue
 
             self._push_scraper_status(file, local_cahce)
@@ -81,7 +81,7 @@ class ShortTermDBDatasetManager:
             data = json.load(f)
 
         pushed_timestamp = local_cahce.get_pushed_timestamps(file_name)
-        logging.info(f"Pushing {file_name}: already pushed {pushed_timestamp}")
+        Logger.info(f"Pushing {file_name}: already pushed {pushed_timestamp}")
 
         records = []
         for index, (timestamp, actions) in enumerate(data.items()):
@@ -92,7 +92,7 @@ class ShortTermDBDatasetManager:
             if timestamp in pushed_timestamp:
                 continue
 
-            logging.info(f"Pushing {file_name}: {timestamp}")
+            Logger.info(f"Pushing {file_name}: {timestamp}")
             for action in actions:
                 records.append(
                     ScraperStatus(
@@ -126,13 +126,13 @@ class ShortTermDBDatasetManager:
         #
         for file in os.listdir(self.outputs_folder):
             if not file.endswith(".csv"):
-                logging.warn(f"Skipping '{file}', should we store it?")
+                Logger.warning(f"Skipping '{file}', should we store it?")
                 continue
 
             large_file_pusher = LargeFilePushManager(self.outputs_folder, self.uploader)
             large_file_pusher.process_file(file, local_cahce)
 
-        logging.info("Files data pushed in DynamoDB successfully.")
+        Logger.info("Files data pushed in DynamoDB successfully.")
 
     def upload(self, force_restart=False):
         """
@@ -148,4 +148,4 @@ class ShortTermDBDatasetManager:
             self._push_status_files(local_cache)
             self._push_files_data(local_cache)
 
-        logging.info("Upload completed successfully.")
+        Logger.info("Upload completed successfully.")

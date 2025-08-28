@@ -1,6 +1,6 @@
 import os
 import json
-import logging
+from utils import Logger
 import shutil
 from remotes import LongTermDatabaseUploader
 from utils import now
@@ -152,7 +152,7 @@ class LongTermDatasetManager:
                 **resources,
             )
         except Exception as e:
-            logging.critical(f"Error uploading file: {e}")
+            Logger.critical(f"Error uploading file: {e}")
             raise ValueError(f"Error uploading file: {e}")
 
     def clean(self):

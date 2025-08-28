@@ -4,7 +4,7 @@ This module provides functionality for uploading and managing data in Kafka,
 handling message serialization, topic management, and status tracking.
 """
 
-import logging
+from utils import Logger
 import os
 import json
 import asyncio
@@ -71,16 +71,16 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
                 client_id="supermarket_data_admin",
             )
 
-            logging.info(f"Successfully connected to Kafka: {self.bootstrap_servers}")
+            Logger.info(f"Successfully connected to Kafka: {self.bootstrap_servers}")
             self._connection_tested = True
         except KafkaError as e:
-            logging.error(f"Error connecting to Kafka: {e}")
+            Logger.error(f"Error connecting to Kafka: {e}")
             # For testing, don't raise the exception
             if (
                 "test" in self.bootstrap_servers
                 or "localhost" in self.bootstrap_servers
             ):
-                logging.warning("Kafka connection failed in test mode, continuing...")
+                Logger.warning("Kafka connection failed in test mode, continuing...")
                 self._connection_tested = True
             else:
                 raise e
@@ -90,18 +90,18 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
         if self.producer:
             try:
                 await self.producer.stop()
-                logging.info("Kafka producer stopped")
+                Logger.info("Kafka producer stopped")
             except Exception as e:
-                logging.error(f"Error stopping Kafka producer: {e}")
+                Logger.error(f"Error stopping Kafka producer: {e}")
             finally:
                 self.producer = None
         
         if self.admin_client:
             try:
                 self.admin_client.close()
-                logging.info("Kafka admin client closed")
+                Logger.info("Kafka admin client closed")
             except Exception as e:
-                logging.error(f"Error closing Kafka admin client: {e}")
+                Logger.error(f"Error closing Kafka admin client: {e}")
             finally:
                 self.admin_client = None
 
@@ -111,7 +111,7 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
             try:
                 self._loop.run_until_complete(self._disconnect_from_kafka())
             except Exception as e:
-                logging.error(f"Error during Kafka disconnect: {e}")
+                Logger.error(f"Error during Kafka disconnect: {e}")
         self._connection_tested = False
 
     def _get_topic_name(self, table_target_name: str) -> str:
@@ -135,7 +135,7 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
         
         # Ensure we have a producer before proceeding
         if self.producer is None:
-            logging.error("Failed to establish Kafka connection")
+            Logger.error("Failed to establish Kafka connection")
             return
             
         # Run the async operation in the event loop
@@ -148,10 +148,10 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
 
         # Ensure we have a producer
         if self.producer is None:
-            logging.error("Kafka producer not available")
+            Logger.error("Kafka producer not available")
             return
 
-        logging.info("Pushing to topic %s, %d items", table_target_name, len(items))
+        Logger.info("Pushing to topic %s, %d items", table_target_name, len(items))
 
         topic_name = self._get_topic_name(table_target_name)
 
@@ -170,9 +170,9 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
                 value={"flush": "true"},
             )
 
-            logging.info("Successfully sent %d records to Kafka", len(items))
+            Logger.info("Successfully sent %d records to Kafka", len(items))
         except KafkaError as e:
-            logging.error("Failed to send messages to Kafka: %s", str(e))
+            Logger.error("Failed to send messages to Kafka: %s", str(e))
             # Try individual sends for better error handling
             successful_records = 0
             for item in items:
@@ -184,8 +184,8 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
                     )
                     successful_records += 1
                 except KafkaError as inner_e:
-                    logging.error("Failed to send record: %s", str(inner_e))
-            logging.info(
+                    Logger.error("Failed to send record: %s", str(inner_e))
+            Logger.info(
                 "Successfully sent %d/%d records individually",
                 successful_records,
                 len(items),
@@ -199,7 +199,7 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
             table_name (str): Name of the topic to create
         """
         self._ensure_connection()
-        logging.info(
+        Logger.info(
             "Topic %s will be created automatically when first message is sent",
             table_name,
         )
@@ -211,8 +211,8 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
 
     def _clean_all_destinations(self):
         """Clean all topics in the Kafka cluster (not implemented for safety)."""
-        logging.warning("Kafka topic deletion not implemented for safety reasons")
-        logging.info("Kafka topics will persist until manually deleted")
+        Logger.warning("Kafka topic deletion not implemented for safety reasons")
+        Logger.info("Kafka topics will persist until manually deleted")
         self._ensure_connection()
         try:
             # Get list of all topics
@@ -220,14 +220,14 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
 
             try:
                 self.admin_client.delete_topics(topics)
-                logging.info("Successfully deleted topic: %s", topics)
+                Logger.info("Successfully deleted topic: %s", topics)
             except KafkaError as e:
-                logging.error("Failed to delete topic %s: %s", topics, str(e))
+                Logger.error("Failed to delete topic %s: %s", topics, str(e))
 
-            logging.info("Completed topic cleanup attempt")
+            Logger.info("Completed topic cleanup attempt")
 
         except Exception as e:
-            logging.error("Error during topic cleanup: %s", str(e))
+            Logger.error("Error during topic cleanup: %s", str(e))
 
     def _is_collection_updated(
         self, collection_name: str, seconds: int = 10800
@@ -255,7 +255,7 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
             return len(non_warmup_messages) > 0
 
         except KafkaError as e:
-            logging.error("Error checking Kafka topic activity: %s", str(e))
+            Logger.error("Error checking Kafka topic activity: %s", str(e))
             return False
 
     def _list_destinations(self):
@@ -269,10 +269,10 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
             # Get cluster metadata which includes topic list
             cluster_metadata = self.admin_client.list_topics()
             topic_names = list(cluster_metadata)
-            logging.info("Found %d Kafka topics", len(topic_names))
+            Logger.info("Found %d Kafka topics", len(topic_names))
             return topic_names
         except Exception as e:
-            logging.error("Error listing Kafka topics: %s", str(e))
+            Logger.error("Error listing Kafka topics: %s", str(e))
             return []
 
     def get_destinations_content(self, table_name, filter=None):
@@ -360,7 +360,7 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
             return self._loop.run_until_complete(_get_messages())
 
         except KafkaError as e:
-            logging.error("Error reading from Kafka topic: %s", str(e))
+            Logger.error("Error reading from Kafka topic: %s", str(e))
             return []
 
     async def send_message(
@@ -393,10 +393,10 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
                 topic=topic_name, key=message_key.encode("utf-8"), value=message
             )
 
-            logging.debug(f"Sent message to topic {topic_name} for chain {chain}")
+            Logger.debug(f"Sent message to topic {topic_name} for chain {chain}")
 
         except KafkaError as e:
-            logging.error(f"Failed to send message to Kafka: {e}")
+            Logger.error(f"Failed to send message to Kafka: {e}")
             raise
 
     async def send_batch_messages(
@@ -429,12 +429,12 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
                     topic=topic_name, key=message_key.encode("utf-8"), value=message
                 )
 
-            logging.info(
+            Logger.info(
                 f"Sent {len(messages)} messages to topic {topic_name} for chain {chain}"
             )
 
         except KafkaError as e:
-            logging.error(f"Failed to send batch messages to Kafka: {e}")
+            Logger.error(f"Failed to send batch messages to Kafka: {e}")
             raise
 
     async def __aenter__(self):
@@ -448,7 +448,7 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
             await self.producer.stop()
         if self.admin_client:
             self.admin_client.close()
-        logging.info("Disconnected from Kafka")
+        Logger.info("Disconnected from Kafka")
 
     def restart_database(
         self, enabled_scrapers: list[str], enabled_file_types: list[str]

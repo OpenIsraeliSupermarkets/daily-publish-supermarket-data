@@ -4,7 +4,7 @@ This module provides functionality for uploading and managing data in MongoDB,
 handling large integers, collection management, and status tracking.
 """
 
-import logging
+from utils import Logger
 import os
 import re
 from datetime import datetime, timedelta
@@ -40,9 +40,9 @@ class MongoDbUploader(ShortTermDatabaseUploader):
         """Test the connection to the MongoDB database."""
         try:
             self.client.admin.command("ping")
-            logging.info("Successfully connected to MongoDB")
+            Logger.info("Successfully connected to MongoDB")
         except pymongo.errors.PyMongoError as e:
-            logging.error("Error connecting to MongoDB: %s", str(e))
+            Logger.error("Error connecting to MongoDB: %s", str(e))
             raise e
 
     def _insert_to_destinations(self, table_target_name, items):
@@ -55,14 +55,14 @@ class MongoDbUploader(ShortTermDatabaseUploader):
         if not items:
             return
 
-        logging.info("Pushing to table %s, %d items", table_target_name, len(items))
+        Logger.info("Pushing to table %s, %d items", table_target_name, len(items))
         collection = self.db[table_target_name]
 
         try:
             collection.insert_many(items, ordered=False)
-            logging.info("Successfully inserted %d records to MongoDB", len(items))
+            Logger.info("Successfully inserted %d records to MongoDB", len(items))
         except pymongo.errors.BulkWriteError as e:
-            logging.warning("Bulk insert failed, trying individual inserts: %s", str(e))
+            Logger.warning("Bulk insert failed, trying individual inserts: %s", str(e))
             successful_records = 0
             for record in items:
                 if "_id" in record:  #
@@ -70,8 +70,8 @@ class MongoDbUploader(ShortTermDatabaseUploader):
                         collection.insert_one(record)
                         successful_records += 1
                     except pymongo.errors.PyMongoError as inner_e:
-                        logging.error("Failed to insert record: %s", str(inner_e))
-            logging.info(
+                        Logger.error("Failed to insert record: %s", str(inner_e))
+            Logger.info(
                 "Successfully inserted %d/%d records individually",
                 successful_records,
                 len(items),
@@ -84,20 +84,20 @@ class MongoDbUploader(ShortTermDatabaseUploader):
             partition_id (str): Field to use as partition key
             table_name (str): Name of the collection to create
         """
-        logging.info("Creating collection: %s", table_name)
+        Logger.info("Creating collection: %s", table_name)
         try:
             self.db.create_collection(table_name)
             self.db[table_name].create_index(
                 [(partition_id, pymongo.ASCENDING)], unique=True
             )
         except pymongo.errors.PyMongoError as e:
-            logging.error("Error creating collection: %s", str(e))
+            Logger.error("Error creating collection: %s", str(e))
 
     def _clean_all_destinations(self):
         """Drop all collections in the database."""
         for collection in self.db.list_collection_names():
             self.db[collection].drop()
-        logging.info("All collections deleted successfully!")
+        Logger.info("All collections deleted successfully!")
 
     def _is_collection_updated(
         self, collection_name: str, seconds: int = 10800
@@ -123,7 +123,7 @@ class MongoDbUploader(ShortTermDatabaseUploader):
             )
 
         except pymongo.errors.PyMongoError as e:
-            logging.error("Error checking MongoDB ParserStatus update time: %s", str(e))
+            Logger.error("Error checking MongoDB ParserStatus update time: %s", str(e))
             return False
 
     def _list_destinations(self):
@@ -146,7 +146,7 @@ class MongoDbUploader(ShortTermDatabaseUploader):
         try:
             return list(self.db[table_name].find(filter, {"_id": 0}))
         except pymongo.errors.PyMongoError as e:
-            logging.error(
+            Logger.error(
                 "Error retrieving documents from collection %s: %s", table_name, str(e)
             )
             return []

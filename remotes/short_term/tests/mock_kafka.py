@@ -113,7 +113,7 @@ def mock_kafka_db(func):
                 try:
                     return list(topics_data.keys())
                 except Exception as e:
-                    logging.error("Error listing Kafka topics: %s", str(e))
+                    Logger.error("Error listing Kafka topics: %s", str(e))
                     return []
 
             self.uploader.get_destinations_content = mock_get_destinations_content

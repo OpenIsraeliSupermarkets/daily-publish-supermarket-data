@@ -3,8 +3,7 @@ from publishers import SupermarketDataPublisherInterface, SupermarketDataPublish
 import os
 import datetime
 from utils import now
-from utils import configure_logging
-import logging
+from utils import Logger
 import datetime
 import pytz
 
@@ -12,7 +11,7 @@ import pytz
 
 def output_short_term_destination_from_env(output_destination):
 
-    logging.info(f"Output destination: {output_destination}")
+    Logger.info(f"Output destination: {output_destination}")
     if output_destination == "kafka":
         return KafkaDbUploader()
     elif output_destination == "mongo":
@@ -21,11 +20,6 @@ def output_short_term_destination_from_env(output_destination):
         raise ValueError(f"Invalid output destination: {output_destination}")
 
 if __name__ == "__main__":
-
-    logging.getLogger("Logger").setLevel(logging.INFO)
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-    )
 
     # Allow providing when from environment variable, otherwise use current time
     when_str = os.environ.get("WHEN", None)
@@ -62,11 +56,11 @@ if __name__ == "__main__":
     else:
         enabled_file_types = enabled_file_types.split(",")
 
-    logging.info(f"Number of processes: {num_of_processes}")
-    logging.info(f"Enabled scrapers: {enabled_scrapers}")
-    logging.info(f"Enabled file types: {enabled_file_types}")
-    logging.info(f"Limit: {limit}")
-    logging.info(f"When: {when}")
+    Logger.info(f"Number of processes: {num_of_processes}")
+    Logger.info(f"Enabled scrapers: {enabled_scrapers}")
+    Logger.info(f"Enabled file types: {enabled_file_types}")
+    Logger.info(f"Limit: {limit}")
+    Logger.info(f"When: {when}")
 
     wait_time_seconds = os.environ.get("WAIT_TIME_SECONDS", 60 * 30)
     try:
@@ -101,10 +95,10 @@ if __name__ == "__main__":
     # self execute operations if OPERATION is set
     operations = os.environ.get("OPERATION", "")
     if operations != "":
-        logging.info(f"Executing operations: {operations}")
+        Logger.info(f"Executing operations: {operations}")
         publisher._execute_operations(operations)
     else:
-        logging.info(f"Running publisher")
+        Logger.info(f"Running publisher")
         publisher.run(
             wait_time_seconds=wait_time_seconds,
             should_execute_final_operations=os.environ.get("STOP", "EOD"),
