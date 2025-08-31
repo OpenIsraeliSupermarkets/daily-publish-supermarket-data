@@ -156,24 +156,7 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
         topic_name = self._get_topic_name(table_target_name)
 
         try:
-            # Send all messages
-            for item in items:
-                await self.producer.send_and_wait(
-                    topic=topic_name,
-                    key=str(item.get("_id", "default")).encode("utf-8"),
-                    value=item,
-                )
-            # send flush message
-            await self.producer.send_and_wait(
-                topic=topic_name,
-                key=str(item.get("_id", "default")).encode("utf-8"),
-                value={"flush": "true"},
-            )
-
-            Logger.info("Successfully sent %d records to Kafka", len(items))
-        except KafkaError as e:
-            Logger.error("Failed to send messages to Kafka: %s", str(e))
-            # Try individual sends for better error handling
+            # Send all messages individually to avoid duplicates on partial failure
             successful_records = 0
             for item in items:
                 try:
@@ -185,11 +168,22 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
                     successful_records += 1
                 except KafkaError as inner_e:
                     Logger.error("Failed to send record: %s", str(inner_e))
-            Logger.info(
-                "Successfully sent %d/%d records individually",
-                successful_records,
-                len(items),
-            )
+            
+            # send flush message only if we successfully sent some records
+            if successful_records > 0:
+                try:
+                    await self.producer.send_and_wait(
+                        topic=topic_name,
+                        key=b"flush",
+                        value={"flush": "true"},
+                    )
+                except KafkaError as flush_e:
+                    Logger.error("Failed to send flush message: %s", str(flush_e))
+
+            Logger.info("Successfully sent %d/%d records to Kafka", successful_records, len(items))
+        except Exception as e:
+            Logger.error("Unexpected error during message sending: %s", str(e))
+            raise
 
     def _create_destinations(self, partition_id, table_name):
         """Create a new topic (Kafka doesn't require explicit topic creation).
