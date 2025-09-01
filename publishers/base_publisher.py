@@ -133,6 +133,20 @@ class BaseSupermarketDataPublisher:
 
         Logger.info("Converting task is done")
 
+    def _download_from_long_term_database(self):
+        """
+        Download the data from the long-term database.
+        """
+        Logger.info("Starting the long term database task")
+        database = LongTermDatasetManager(
+            long_term_db_target=self.long_term_db_target,
+            enabled_scrapers=self.enabled_scrapers,
+            enabled_file_types=self.enabled_file_types,
+            outputs_folder=self.outputs_folder,
+            status_folder=self.status_folder,
+        )
+        return database.download()
+
     def _update_api_database(self, reset_cache=False):
         """
         Update the short-term database with the converted data.

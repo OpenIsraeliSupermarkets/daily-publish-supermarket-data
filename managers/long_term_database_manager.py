@@ -162,3 +162,37 @@ class LongTermDatasetManager:
         shutil.rmtree(self.outputs_folder, ignore_errors=True)
         shutil.rmtree(self.status_folder, ignore_errors=True)
         self.remote_database_manager.clean()
+
+
+    def reverse(self, dataset_path):
+        """
+        Reverse the staging operations by unstaging folders from the remote database.
+        
+        This method unstages both the outputs folder and status folder that were
+        previously staged via the compose() method.
+        """
+        shutil.rmtree(self.outputs_folder, ignore_errors=True)
+        shutil.rmtree(self.status_folder, ignore_errors=True)
+        os.makedirs(self.outputs_folder, exist_ok=True)
+        os.makedirs(self.status_folder, exist_ok=True)
+        if os.path.isdir(dataset_path):
+        # Determine subfolder based on file type
+            for file in os.listdir(dataset_path):
+                # if not in enabled scrapers or index.json, skip
+                if not any(scraper.lower() in file.lower() for scraper in self.enabled_scrapers.split(",")) and file != "parser-status.json":
+                    continue
+
+                if file.endswith(".csv") or file == "parser-status.json":
+                    self.remote_database_manager.unstage(file, self.outputs_folder)
+                else:
+                    self.remote_database_manager.unstage(file, self.status_folder)
+
+
+    def download(self):
+        """
+        Download the data from the long-term database.
+        """
+        dataset_path = self.remote_database_manager.download()
+        self.reverse(dataset_path)
+        return dataset_path
+        

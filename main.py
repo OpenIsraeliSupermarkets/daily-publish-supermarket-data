@@ -1,4 +1,4 @@
-from remotes import KaggleUploader, KafkaDbUploader, MongoDbUploader
+from remotes import KaggleUploader, KafkaDbUploader, MongoDbUploader, DummyDocumentDbUploader
 from publishers import SupermarketDataPublisherInterface, SupermarketDataPublisher
 import os
 import datetime
@@ -16,6 +16,8 @@ def output_short_term_destination_from_env(output_destination):
         return KafkaDbUploader()
     elif output_destination == "mongo":
         return MongoDbUploader()
+    elif output_destination == "file":
+        return DummyDocumentDbUploader("./document_db")
     else:
         raise ValueError(f"Invalid output destination: {output_destination}")
 

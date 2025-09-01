@@ -35,6 +35,8 @@ class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
                 self._execute_scraping()
             elif operation == "converting":
                 self._execute_converting()
+            elif operation == "download_from_long_term":
+                self._download_from_long_term_database()
             elif operation == "clean_dump_files":
                 self._clean_all_dump_files()
             elif operation == "publishing":

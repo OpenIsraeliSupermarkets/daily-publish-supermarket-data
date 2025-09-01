@@ -2,10 +2,6 @@ il-supermarket-scraper==0.6.1
 il-supermarket-parser==0.2
 kaggle==1.6.17
 schedule==1.2.2
-kaggle==1.6.17
-schedule==1.2.2
-boto3==1.36
-botocore==1.36
 fastapi[all]==0.109.2
 uvicorn==0.29.0
 pymongo==4.6.3
@@ -14,7 +10,7 @@ supabase
 sqlalchemy==2.0.27
 filelock==3.18.0
 aiokafka>=0.10.0,<0.12
-kafka-python>=2.0.2
+kafka-python==2.0.2
 six>=1.16.0
 mockafka-py==0.2.1
 requests>=2.32.2 # not directly required, pinned by Snyk to avoid a vulnerability

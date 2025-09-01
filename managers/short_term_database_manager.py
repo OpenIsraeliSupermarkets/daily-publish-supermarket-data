@@ -67,7 +67,7 @@ class ShortTermDBDatasetManager:
 
     def _push_status_files(self, local_cahce: CacheState):
         for file in os.listdir(self.status_folder):
-            if not file.endswith(".json"):
+            if not file.endswith(".json") or file == "index.json":
                 Logger.warning(f"Skipping '{file}', should we store it?")
                 continue
 

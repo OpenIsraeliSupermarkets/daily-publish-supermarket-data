@@ -9,6 +9,7 @@ import os
 import re
 import pytz
 from utils import Logger
+import zipfile
 import shutil
 import json
 import pandas as pd
@@ -222,3 +223,21 @@ class KaggleUploader(LongTermDatabaseUploader):
         finally:
             if os.path.exists(file_name):
                 os.remove(file_name)
+
+    def download(self):
+        """Download the data from the remote dataset.
+        """
+        shutil.rmtree(self.dataset_path, ignore_errors=True)
+        self.api.dataset_download_cli(
+            f"erlichsefi/{self.dataset_remote_name}",
+            path=self.dataset_path,
+        )
+        # Unzip all downloaded zip files in the dataset_path
+        zip_path = os.path.join(self.dataset_path, f"{self.dataset_remote_name}.zip")
+        try:
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(self.dataset_path)
+        except zipfile.BadZipFile:
+            raise ValueError("Failed to unzip file: %s", zip_path)
+        os.remove(zip_path)
+        return self.dataset_path
