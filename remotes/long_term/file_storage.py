@@ -82,6 +82,11 @@ class DummyFileStorage(LongTermDatabaseUploader):
             if os.path.isfile(file_path):
                 shutil.copy(file_path, self.dataset_remote_path)
 
+    def download(self):
+        """Download the data from the remote dataset.
+        """
+        shutil.copytree(self.dataset_remote_path, self.dataset_path)
+
     def was_updated_in_last(self, seconds: int = 24 * 60 * 60) -> bool:
         """Check if any files in the storage were updated within specified hours.
 
