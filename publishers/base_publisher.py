@@ -3,6 +3,7 @@ Base module for supermarket data publishing.
 Provides the core functionality for scraping, converting, and uploading supermarket data.
 """
 
+from tkinter import E
 from utils import Logger
 import datetime
 import os
@@ -200,7 +201,7 @@ class BaseSupermarketDataPublisher:
             # compose parameter is maintained for API compatibility
             # but is not used in current implementation
             self._upload_to_kaggle()
-        except ValueError as e:
+        except Exception as e:
             Logger.error("Failed to upload to kaggle")
             raise e
         finally:
