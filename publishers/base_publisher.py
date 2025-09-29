@@ -3,7 +3,6 @@ Base module for supermarket data publishing.
 Provides the core functionality for scraping, converting, and uploading supermarket data.
 """
 
-from tkinter import E
 from utils import Logger
 import datetime
 import os
