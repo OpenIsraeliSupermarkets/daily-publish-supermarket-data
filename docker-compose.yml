@@ -38,11 +38,12 @@ services:
       - ENABLED_SCRAPERS=${ENABLED_SCRAPERS}
       - ENABLED_FILE_TYPES=${ENABLED_FILE_TYPES}
       - LOG_LEVEL=${LOG_LEVEL:-WARNING}
+      - API_TOKEN=${API_TOKEN}
     networks:
       - mongo-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/service_health" ]
+      test: ["CMD-SHELL", "response=$$(curl -s -X GET http://localhost:8000/service_health -H 'accept: application/json' -H 'Authorization: Bearer ${API_TOKEN}') && echo \"$$response\" | grep -q '\"status\":\"healthy\"'"]
       interval: 30s
       timeout: 10s
       retries: 3
