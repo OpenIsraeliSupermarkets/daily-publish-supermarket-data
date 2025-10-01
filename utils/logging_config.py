@@ -75,3 +75,8 @@ class Logger:
     def warning(cls, msg, *args, **kwargs):
         """log warning"""
         cls.logger.warning(msg, *args, **kwargs)
+
+    @classmethod
+    def critical(cls, msg, *args, **kwargs):
+        """log critical"""
+        cls.logger.critical(msg, *args, **kwargs)

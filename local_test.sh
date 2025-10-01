@@ -19,12 +19,13 @@ export LIMIT=10
 # -- should correspond to the number of times the data should be validated
 export NUM_OF_OCCASIONS=1
 export REPEAT=ONCE
+export OUTPUT_DESTINATION=mongo
 # ----------------------------
 export STOP=ONCE
 export WAIT_TIME_SECONDS=60
 
 echo "Step 3: Stopping and removing existing Docker containers"
-docker compose stop
+docker compose down -v
 docker compose rm -f
 
 echo "Step 4: Cleaning app data directory"
@@ -63,10 +64,57 @@ docker compose up data_processor
 
 
 echo "Step 10: Running system tests"
-if ! ./system_test.sh "${KAGGLE_DATASET_REMOTE_NAME}" "${MONGO_IP}" "${API_IP}" ; then
-    echo -e "\033[31mTest Failed\033[0m"
-    exit 1
-fi
+
+docker build --target testing -t supermarket-testing .
+docker run \
+    --network=daily-publish-supermarket-data_mongo-network \
+    -e API_HOST=http://${API_IP}:8000/ \
+    -e MONGODB_URI=mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_IP}:${MONGO_PORT} \
+    -e API_TOKEN=${API_TOKEN} \
+    -e KAGGLE_USERNAME=${KAGGLE_USERNAME} \
+    -e KAGGLE_KEY=${KAGGLE_KEY} \
+    -e KAGGLE_DATASET_REMOTE_NAME=${TEST_DB_NAME} \
+    -e ENABLED_SCRAPERS=${ENABLED_SCRAPERS} \
+    -e ENABLED_FILE_TYPES=${ENABLED_FILE_TYPES} \
+    -e LIMIT=${LIMIT} \
+    -e NUM_OF_OCCASIONS=${NUM_OF_OCCASIONS} \
+    -e SUPABASE_KEY=${SUPABASE_KEY} \
+    -e SUPABASE_URL=${SUPABASE_URL} \
+    supermarket-testing
+    
+
+echo "Step 9: Checking health of API and data_processor containers"
+
+# Function to check container health
+check_container_health() {
+    local container_name=$1
+    local retries=20
+    local wait_seconds=5
+    local i=0
+
+    while [ $i -lt $retries ]; do
+        health_status=$(docker inspect --format='{{.State.Health.Status}}' "$container_name" 2>/dev/null)
+        if [ "$health_status" == "healthy" ]; then
+            echo "$container_name is healthy."
+            return 0
+        elif [ "$health_status" == "unhealthy" ]; then
+            echo -e "\033[31m$container_name is unhealthy. Exiting.\033[0m"
+            return 1
+        else
+            echo "Waiting for $container_name to become healthy... ($((i+1))/$retries)"
+            sleep $wait_seconds
+        fi
+        i=$((i+1))
+    done
+
+    echo -e "\033[31mTimeout waiting for $container_name to become healthy. Exiting.\033[0m"
+    return 1
+}
+
+check_container_health "raw-data-api" || exit 1
+check_container_health "data-fetcher" || exit 1
+
+
 
 echo "Step 11: Stopping all containers"
 docker compose stop

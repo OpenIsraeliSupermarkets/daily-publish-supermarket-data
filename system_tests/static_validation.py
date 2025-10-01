@@ -7,7 +7,7 @@ and validates the structure of the downloaded data.
 
 import os
 import tempfile
-from utils import Logger
+from utils.logging_config import Logger
 from datetime import datetime
 import pytz
 import sys

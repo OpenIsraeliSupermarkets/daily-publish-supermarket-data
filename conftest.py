@@ -3,6 +3,7 @@ Pytest configuration file that loads environment variables from .env.unittest
 """
 
 from pathlib import Path
+import pytest
 
 # Load environment variables from .env.unittest if it exists
 env_file = Path(__file__).parent / ".env.unittest"
@@ -10,3 +11,8 @@ if env_file.exists():
     from dotenv import load_dotenv
 
     load_dotenv(env_file)
+
+
+def pytest_configure(config):
+    """Configure pytest with asyncio support."""
+    config.option.asyncio_mode = "auto"

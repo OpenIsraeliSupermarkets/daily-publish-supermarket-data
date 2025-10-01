@@ -24,3 +24,5 @@ venv
 .secrets
 mongo-data
 test-super-dataset
+aggregated_errors.json
+validation_results.json

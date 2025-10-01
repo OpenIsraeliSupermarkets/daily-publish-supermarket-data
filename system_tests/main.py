@@ -1,16 +1,16 @@
-import asyncio
-from utils import Logger
 import os
 import sys
+import asyncio
 
 # Add parent directory to Python path so we can import modules from it
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+from utils.logging_config import Logger
+from utils.datetime_utils import now
 from data_processing_validation import validate_data_processing
 from data_serving_validation import main as full_data_scan
 from static_validation import validate_data_storage
 from il_supermarket_scarper import ScraperFactory
-from utils import now
 
 
 async def run_validations():
