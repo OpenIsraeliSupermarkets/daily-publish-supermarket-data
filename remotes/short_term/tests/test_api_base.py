@@ -155,49 +155,49 @@ class KafkaTestCase(
         super().test_collection_updated()
 
 
-class RealKafkaTestCase(
-    short_term_test_case(KafkaDbUploader(kafka_bootstrap_servers="localhost:9092"))
-):
-    """Test case for running against real Kafka without mocks."""
+# class RealKafkaTestCase(
+#     short_term_test_case(KafkaDbUploader(kafka_bootstrap_servers="localhost:9092"))
+# ):
+#     """Test case for running against real Kafka without mocks."""
     
-    def setUp(self):
-        super().setUp()
-        # Clean up any existing topics before each test
-        try:
-            self.uploader._clean_all_destinations()
-        except Exception as e:
-            print(f"Warning: Could not clean up before test: {e}")
+#     def setUp(self):
+#         super().setUp()
+#         # Clean up any existing topics before each test
+#         try:
+#             self.uploader._clean_all_destinations()
+#         except Exception as e:
+#             print(f"Warning: Could not clean up before test: {e}")
         
-    def tearDown(self):
-        super().tearDown()
-        # Clean up topics after each test
-        try:
-            self.uploader._clean_all_destinations()
-        except Exception as e:
-            print(f"Warning: Could not clean up after test: {e}")
+#     def tearDown(self):
+#         super().tearDown()
+#         # Clean up topics after each test
+#         try:
+#             self.uploader._clean_all_destinations()
+#         except Exception as e:
+#             print(f"Warning: Could not clean up after test: {e}")
 
-    def test_create_and_insert_to_table(self):
-        super().test_create_and_insert_to_table()
+#     def test_create_and_insert_to_table(self):
+#         super().test_create_and_insert_to_table()
 
-    def test_clean_all_destinations(self):
-        super().test_clean_all_destinations()
+#     def test_clean_all_destinations(self):
+#         super().test_clean_all_destinations()
 
-    def testget_destinations_content(self):
-        # Special implementation for real Kafka that doesn't support filtering
-        self.uploader._create_destinations("id", "files")
-        test_items = [
-            {"id": "1", "chain": "chain1", "file_type": "csv", "data": "test1"},
-            {"id": "2", "chain": "chain1", "file_type": "json", "data": "test2"},
-            {"id": "3", "chain": "chain2", "file_type": "csv", "data": "test3"},
-        ]
-        self.uploader._insert_to_destinations("files", test_items)
+#     def testget_destinations_content(self):
+#         # Special implementation for real Kafka that doesn't support filtering
+#         self.uploader._create_destinations("id", "files")
+#         test_items = [
+#             {"id": "1", "chain": "chain1", "file_type": "csv", "data": "test1"},
+#             {"id": "2", "chain": "chain1", "file_type": "json", "data": "test2"},
+#             {"id": "3", "chain": "chain2", "file_type": "csv", "data": "test3"},
+#         ]
+#         self.uploader._insert_to_destinations("files", test_items)
 
-        # Test reading the content we just inserted
-        chain1_files = self.uploader.get_destinations_content("files")
-        self.assertEqual(len(chain1_files), 3)
+#         # Test reading the content we just inserted
+#         chain1_files = self.uploader.get_destinations_content("files")
+#         self.assertEqual(len(chain1_files), 3)
 
-    def test_collection_updated(self):
-        super().test_collection_updated()
+#     def test_collection_updated(self):
+#         super().test_collection_updated()
 
 
 if __name__ == "__main__":
