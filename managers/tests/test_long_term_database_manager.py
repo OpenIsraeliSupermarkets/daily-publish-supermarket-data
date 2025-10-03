@@ -112,7 +112,7 @@ def test_compose(sample_manager):
     sample_manager.remote_database_manager.increase_index.assert_called_once()
 
 
-@patch("logging.critical")
+@patch("utils.logging_config.Logger.critical")
 def test_upload_failure(mock_critical, sample_manager):
     sample_manager.remote_database_manager.upload_to_dataset.side_effect = Exception(
         "Upload failed"

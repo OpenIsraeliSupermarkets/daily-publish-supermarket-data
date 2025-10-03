@@ -67,6 +67,18 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "envFile": "${workspaceFolder}/.env.test",
+            "env": {
+                "API_HOST": "http://localhost:8080/",
+                "ENABLED_SCRAPERS": "COFIX",
+                "LIMIT": "10",
+                "NUM_OF_OCCASIONS": "1",
+                "REPEAT": "ONCE"
+            },
+            "args": [
+                "test-super-dataset",
+                "localhost",
+                "localhost"
+            ]
         },
         {
             "name": "System Tests (Stage)",

@@ -31,6 +31,11 @@ jobs:
           echo "API_TOKEN=${{ secrets.API_TOKEN }}" >> $GITHUB_ENV
           echo "SUPABASE_KEY=${{ secrets.SUPABASE_KEY }}" >> $GITHUB_ENV
           echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> $GITHUB_ENV
+          echo "KAGGLE_DATASET_REMOTE_NAME=test-super-dataset-2" >> $GITHUB_ENV
+          echo "TZ=Asia/Jerusalem" >> $GITHUB_ENV
 
-      - name: Run system test
-        run: ./local_test.sh "test-super-dataset-2" 
+      - name: Run system test with incremental mode
+        run: ./local_test.sh --incremental 
+
+      - name: Run system test with persistent mode
+        run: ./local_test.sh --persist 

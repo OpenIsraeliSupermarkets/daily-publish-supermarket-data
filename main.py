@@ -64,12 +64,17 @@ if __name__ == "__main__":
     Logger.info(f"Limit: {limit}")
     Logger.info(f"When: {when}")
 
-    wait_time_seconds = os.environ.get("WAIT_TIME_SECONDS", 60 * 30)
+    second_to_wait_between_opreation = os.environ.get("SECOND_TO_WAIT_BETWEEN_OPERATIONS", 60 * 30)
     try:
-        wait_time_seconds = int(wait_time_seconds)
+        second_to_wait_between_opreation = int(second_to_wait_between_opreation)
     except ValueError:
-        wait_time_seconds = 60
+        second_to_wait_between_opreation = 60
 
+    second_to_wait_after_final_operations = os.environ.get("SECOND_TO_WAIT_AFTER_FINAL_OPERATIONS", 0)
+    try:
+        second_to_wait_after_final_operations = int(second_to_wait_after_final_operations)
+    except ValueError:
+        second_to_wait_after_final_operations = 0
 
     publisher = SupermarketDataPublisher(
         number_of_scraping_processes=num_of_processes,
@@ -102,9 +107,10 @@ if __name__ == "__main__":
     else:
         Logger.info(f"Running publisher")
         publisher.run(
-            wait_time_seconds=wait_time_seconds,
-            should_execute_final_operations=os.environ.get("STOP", "EOD"),
-            should_stop_dag=os.environ.get("REPEAT", "FOREVER"),
+            second_to_wait_between_opreation=second_to_wait_between_opreation,
+            second_to_wait_after_final_operations=second_to_wait_after_final_operations,
+            should_execute_final_operations=os.environ.get("EXEC_FINAL_OPERATIONS_CONDITION", "EOD"),
+            should_stop_dag=os.environ.get("STOP_DAG_CONDITION", "NEVER"),
             operations="scraping,converting,api_update,clean_dump_files",
             final_operations="publishing,clean_all_source_data",
         )

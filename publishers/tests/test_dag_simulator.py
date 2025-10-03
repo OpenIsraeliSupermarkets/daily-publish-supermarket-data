@@ -89,7 +89,8 @@ class TestSupermarketDataPublisher:
             with patch('publishers.dag_simulator.SupermarketDataPublisherInterface.run') as mock_super_run:
                 mock_publisher.run(operations="a,b,c",
                                 final_operations="d,e",
-                                wait_time_seconds=sleep_time,
+                                second_to_wait_between_opreation=sleep_time,
+                                second_to_wait_after_final_operations=0,
                                 should_execute_final_operations="EOD",
                                 should_stop_dag="ONCE")
                 

@@ -38,10 +38,16 @@ services:
       - ENABLED_SCRAPERS=${ENABLED_SCRAPERS}
       - ENABLED_FILE_TYPES=${ENABLED_FILE_TYPES}
       - LOG_LEVEL=${LOG_LEVEL:-WARNING}
-
+      - API_TOKEN=${API_TOKEN}
     networks:
       - mongo-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "response=$$(curl -s -X GET http://localhost:8000/service_health -H 'accept: application/json' -H 'Authorization: Bearer ${API_TOKEN}') && echo \"$$response\" | grep -q '\"status\":\"healthy\"'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   data_processor:
     build:
@@ -63,13 +69,21 @@ services:
       - ENABLED_FILE_TYPES=${ENABLED_FILE_TYPES}
       - LOG_LEVEL=${LOG_LEVEL:-WARNING}
       - OUTPUT_DESTINATION=mongo
-      - STOP=${STOP}
-      - REPEAT=${REPEAT}
-      - WAIT_TIME_SECONDS=${WAIT_TIME_SECONDS}
+      - STOP_DAG_CONDITION=${STOP_DAG_CONDITION}
+      - EXEC_FINAL_OPERATIONS_CONDITION=${EXEC_FINAL_OPERATIONS_CONDITION}
+      - SECOND_TO_WAIT_AFTER_FINAL_OPERATIONS=${SECOND_TO_WAIT_AFTER_FINAL_OPERATIONS}
+      - SECOND_TO_WAIT_BETWEEN_OPERATIONS=${SECOND_TO_WAIT_BETWEEN_OPERATIONS}
+      - HEALTHCHECK_MAX_AGE_SECONDS=${HEALTHCHECK_MAX_AGE_SECONDS:-300}
     volumes:
       - app_data:/usr/src/app/app_data
     networks:
       - mongo-network
+    healthcheck:
+      test: ["CMD", "python", "healthcheck.py"]
+      interval: 30s
+      timeout: 10s
+      retries: 2
+      start_period: 60s
     deploy:
       resources:
         limits:

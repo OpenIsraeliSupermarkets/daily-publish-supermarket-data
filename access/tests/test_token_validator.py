@@ -164,7 +164,7 @@ class TestSupabaseTelemetry:
         telemetry_data = {"endpoint": "/test", "method": "GET", "status_code": 500}
 
         # Call method with logging capture
-        with patch("access.token_validator.logging") as mock_logging:
+        with patch("access.token_validator.Logger") as mock_logging:
             await telemetry.send_telemetry(telemetry_data)
 
             # Verify error was logged

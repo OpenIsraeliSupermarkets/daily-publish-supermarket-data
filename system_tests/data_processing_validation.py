@@ -5,11 +5,14 @@ import json
 from itertools import chain
 from il_supermarket_scarper import DumpFolderNames
 
-
 # פונקציות עזר
 def connect_to_mongodb(uri="mongodb://192.168.1.129:27017/"):
     """התחברות למסד הנתונים והגדרת האוספים"""
     client = pymongo.MongoClient(uri)
+
+    if client.admin.command("ping")["ok"] != 1:
+        raise Exception("Failed to connect to MongoDB")
+
     db = client["supermarket_data"]
     return db["ScraperStatus"], db["ParserStatus"]
 
@@ -86,13 +89,18 @@ def match_parsing_timestamps(
             parsing_timestamp.strip(), "%Y-%m-%d %H:%M:%S"
         )
         diff = parsing_timestamp_dt - scraping_timestamp
-        if (
-            parsing_timestamp_dt > scraping_timestamp
-            and (min_delta is None or diff < min_delta)
-            and parsing_timestamp not in used_timestamp
-        ):
+
+        if parsing_timestamp in used_timestamp:
+            continue
+
+        if parsing_timestamp_dt < scraping_timestamp:
+            continue
+
+        if min_delta is None or diff < min_delta:
             associated_stamp = parsing_timestamp
             min_delta = diff
+
+      
     return associated_stamp, used_timestamp + [associated_stamp]
 
 
