@@ -80,7 +80,7 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
 
     def _should_stop_dag(self, should_stop_dag):
         """Return True if the stop condition is met"""
-        if should_stop_dag == "FOREVER":
+        if should_stop_dag == "NEVER":
             return False
         elif should_stop_dag == "ONCE":
             return self.last_execution_time is not None
@@ -91,7 +91,8 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
         self,
         operations,
         final_operations=None,
-        wait_time_seconds=60,
+        second_to_wait_between_opreation=60,
+        second_to_wait_after_final_operations=0,        
         should_execute_final_operations="EOD",
         should_stop_dag="FOREVER",
     ):
@@ -108,7 +109,7 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
             This method overrides the parent class run method with different parameters.
         """
         Logger.info(
-            f"Executing operations with {wait_time_seconds}s wait time between runs"
+            f"Executing operations with second_to_wait_between_opreation={second_to_wait_between_opreation}s wait time between operations and second_to_wait_after_final_operations={second_to_wait_after_final_operations}s wait time after final operations"
         )
 
         while not self._should_stop_dag(should_stop_dag):
@@ -126,9 +127,11 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
                     break
 
                 # if not, wait for next run
-                Logger.info(f"Waiting {wait_time_seconds} seconds before next run")
-                time.sleep(wait_time_seconds)
+                Logger.info(f"Waiting {second_to_wait_between_opreation} seconds before next run")
+                time.sleep(second_to_wait_between_opreation)
 
             Logger.info(f"Executing final operations")
             if final_operations:
                 self._execute_operations(final_operations)
+                Logger.info(f"Waiting {second_to_wait_after_final_operations} seconds after final operations")
+                time.sleep(second_to_wait_after_final_operations)

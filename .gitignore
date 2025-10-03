@@ -26,3 +26,6 @@ mongo-data
 test-super-dataset
 aggregated_errors.json
 validation_results.json
+.push_cache.lock
+.push_cache
+heartbeat.json

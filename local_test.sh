@@ -2,7 +2,7 @@
 
 # Ask user if they want to build without cache
 echo ""
-read -p "Do you want to build without cache? (y/N): " BUILD_NO_CACHE
+read -p "Do you want to build without cache? (y/N): (Enter for N) " BUILD_NO_CACHE
 BUILD_NO_CACHE=${BUILD_NO_CACHE:-N}
 
 echo "Step 1: Loading environment variables from .env.prod if exists"
@@ -18,11 +18,41 @@ export ENABLED_SCRAPERS=COFIX
 export LIMIT=10
 # -- should correspond to the number of times the data should be validated
 export NUM_OF_OCCASIONS=1
-export REPEAT=ONCE
 export OUTPUT_DESTINATION=mongo
 # ----------------------------
-export STOP=ONCE
-export WAIT_TIME_SECONDS=60
+export STOP_DAG_CONDITION=NEVER
+export SECOND_TO_WAIT_BETWEEN_OPERATIONS=0
+
+export EXEC_FINAL_OPERATIONS_CONDITION=ONCE
+export SECOND_TO_WAIT_AFTER_FINAL_OPERATIONS=60000
+
+
+
+# Function to check container health
+check_container_health() {
+    local container_name=$1
+    local retries=20
+    local wait_seconds=5
+    local i=0
+
+    while [ $i -lt $retries ]; do
+        health_status=$(docker inspect --format='{{.State.Health.Status}}' "$container_name" 2>/dev/null)
+        if [ "$health_status" == "healthy" ]; then
+            echo "$container_name is healthy."
+            return 0
+        elif [ "$health_status" == "unhealthy" ]; then
+            echo -e "\033[31m$container_name is unhealthy. Exiting.\033[0m"
+            return 1
+        else
+            echo "Waiting for $container_name to become healthy... ($((i+1))/$retries)"
+            sleep $wait_seconds
+        fi
+        i=$((i+1))
+    done
+
+    echo -e "\033[31mTimeout waiting for $container_name to become healthy. Exiting.\033[0m"
+    return 1
+}
 
 echo "Step 3: Stopping and removing existing Docker containers"
 docker compose down -v
@@ -60,8 +90,20 @@ echo "Step 7: Starting background services (MongoDB and API)"
 docker compose up -d mongodb api
 
 echo "Step 8: Starting data processor and waiting for scraping to complete"
-docker compose up data_processor
+docker compose up data_processor -d
 
+
+echo "Step 8.5: Waiting 1.5 minutes before proceeding with a progress bar..."
+wait_seconds=120
+for ((i=1; i<=wait_seconds; i++)); do
+    bar=$(printf '#%.0s' $(seq 1 $((i*90/wait_seconds))))
+    printf "\rWaiting: [%-90s] %d/%d seconds" "$bar" "$i" "$wait_seconds"
+    sleep 1
+done
+echo -e "\nDone waiting."
+
+check_container_health "raw-data-api" || exit 1
+check_container_health "data-fetcher" || exit 1
 
 echo "Step 10: Running system tests"
 
@@ -73,7 +115,7 @@ docker run \
     -e API_TOKEN=${API_TOKEN} \
     -e KAGGLE_USERNAME=${KAGGLE_USERNAME} \
     -e KAGGLE_KEY=${KAGGLE_KEY} \
-    -e KAGGLE_DATASET_REMOTE_NAME=${TEST_DB_NAME} \
+    -e KAGGLE_DATASET_REMOTE_NAME=${KAGGLE_DATASET_REMOTE_NAME} \
     -e ENABLED_SCRAPERS=${ENABLED_SCRAPERS} \
     -e ENABLED_FILE_TYPES=${ENABLED_FILE_TYPES} \
     -e LIMIT=${LIMIT} \
@@ -84,32 +126,6 @@ docker run \
     
 
 echo "Step 9: Checking health of API and data_processor containers"
-
-# Function to check container health
-check_container_health() {
-    local container_name=$1
-    local retries=20
-    local wait_seconds=5
-    local i=0
-
-    while [ $i -lt $retries ]; do
-        health_status=$(docker inspect --format='{{.State.Health.Status}}' "$container_name" 2>/dev/null)
-        if [ "$health_status" == "healthy" ]; then
-            echo "$container_name is healthy."
-            return 0
-        elif [ "$health_status" == "unhealthy" ]; then
-            echo -e "\033[31m$container_name is unhealthy. Exiting.\033[0m"
-            return 1
-        else
-            echo "Waiting for $container_name to become healthy... ($((i+1))/$retries)"
-            sleep $wait_seconds
-        fi
-        i=$((i+1))
-    done
-
-    echo -e "\033[31mTimeout waiting for $container_name to become healthy. Exiting.\033[0m"
-    return 1
-}
 
 check_container_health "raw-data-api" || exit 1
 check_container_health "data-fetcher" || exit 1

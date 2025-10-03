@@ -93,7 +93,7 @@ def match_parsing_timestamps(
         if parsing_timestamp in used_timestamp:
             continue
 
-        if parsing_timestamp_dt > scraping_timestamp:
+        if parsing_timestamp_dt < scraping_timestamp:
             continue
 
         if min_delta is None or diff < min_delta:
