@@ -4,15 +4,15 @@ Supermarket publisher
 
 This repository defines cron jobs that run every day to scrape Israeli supermarket data, process it, and publish it to long term and short term data storage
 
-The workflow:
+The code is used from:
 - Fetch the data from all supermarkets (every X hours)
-- Convert to data frame (at midnight)
+- Convert to data dataframe.
 - Compose Kaggle dataset with a binding between the version number and the scrape date (at midnight)
 - Create new version in Kaggle (at midnight)
 
 [Link to Kaggle Dataset](https://www.kaggle.com/datasets/erlichsefi/israeli-supermarkets-2024)
 
-[![Last Publish Data to Kaggle Status](https://github.com/OpenIsraeliSupermarkets/daily-publish-supermarket-data/actions/workflows/publishing.yml/badge.svg)](https://github.com/OpenIsraeliSupermarkets/daily-publish-supermarket-data/actions/workflows/publishing.yml)
+[![Last Publish Data to Kaggle Status](https://github.com/OpenIsraeliSupermarkets/daily-publish-supermarket-data/actions/workflows/_prod_publishing.yml/badge.svg)](https://github.com/OpenIsraeliSupermarkets/daily-publish-supermarket-data/actions/workflows/_prod_publishing.yml)
 
 ---
 
