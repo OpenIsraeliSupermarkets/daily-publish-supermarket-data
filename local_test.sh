@@ -1,17 +1,56 @@
 #!/bin/bash
 
-# Ask user which mode to test
-echo ""
-echo "Select test mode:"
-echo "1) Loop/Persistent mode (runs continuously)"
-echo "2) Full Production Flow (default - run scrape then publish as separate executions)"
-read -p "Enter choice (1-2): (Enter for 2) " TEST_MODE
-TEST_MODE=${TEST_MODE:-2}
+# Usage: ./local_test.sh [--incremental|--persist] [--no-cache]
+# Arguments:
+#   --incremental: Run Full Production Flow (scrape then publish as separate executions) - default
+#   --persist: Run Loop/Persistent mode (runs continuously)
+#   --no-cache: Build Docker images without cache
 
-# Ask user if they want to build without cache
-echo ""
-read -p "Do you want to build without cache? (y/N): (Enter for N) " BUILD_NO_CACHE
-BUILD_NO_CACHE=${BUILD_NO_CACHE:-N}
+TEST_MODE=""
+BUILD_NO_CACHE="N"
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --incremental)
+            TEST_MODE="production"
+            shift
+            ;;
+        --persist)
+            TEST_MODE="loop"
+            shift
+            ;;
+        --no-cache)
+            BUILD_NO_CACHE="y"
+            shift
+            ;;
+        *)
+            echo "Unknown argument: $1"
+            echo "Usage: ./local_test.sh [--incremental|--persist] [--no-cache]"
+            exit 1
+            ;;
+    esac
+done
+
+# If test mode not provided via flags, prompt interactively
+if [ -z "$TEST_MODE" ]; then
+    echo ""
+    echo "Select test mode:"
+    echo "1) --incremental - Full Production Flow (default - run scrape then publish as separate executions)"
+    echo "2) --persist - Loop/Persistent mode (runs continuously)"
+    read -p "Enter choice (incremental/persist): (Enter for incremental) " TEST_MODE_INPUT
+    TEST_MODE_INPUT=${TEST_MODE_INPUT:-incremental}
+    
+    if [ "$TEST_MODE_INPUT" == "persist" ]; then
+        TEST_MODE="loop"
+    else
+        TEST_MODE="production"
+    fi
+    
+    echo ""
+    read -p "Do you want to build without cache? (y/N): (Enter for N) " BUILD_NO_CACHE
+    BUILD_NO_CACHE=${BUILD_NO_CACHE:-N}
+fi
 
 echo "Step 1: Loading environment variables from .env.prod if exists"
 if [ -f .env.test ]; then
@@ -90,7 +129,7 @@ docker compose up -d mongodb api
 
 echo "Step 8: Starting data processor"
 
-if [ "$TEST_MODE" == "2" ]; then
+if [ "$TEST_MODE" == "production" ]; then
     echo "Step 8.1: Running SCRAPE operation (scraping,converting,clean_dump_files,api_update)"
     export OPERATION="scraping,converting,clean_dump_files,api_update"
     docker compose up data_processor
@@ -161,7 +200,7 @@ echo "Step 9: Checking health of API and data_processor containers"
 
 check_container_health "raw-data-api" || exit 1
 
-if [ "$TEST_MODE" == "2" ]; then
+if [ "$TEST_MODE" == "production" ]; then
 check_container_health "data-fetcher" || exit 1
 fi
 
