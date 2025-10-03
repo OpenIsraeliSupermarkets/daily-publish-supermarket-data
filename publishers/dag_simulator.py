@@ -94,7 +94,7 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
         second_to_wait_between_opreation=60,
         second_to_wait_after_final_operations=0,        
         should_execute_final_operations="EOD",
-        should_stop_dag="FOREVER",
+        should_stop_dag="NEVER",
     ):
         """
         Run the scheduled operations and then the final operations.

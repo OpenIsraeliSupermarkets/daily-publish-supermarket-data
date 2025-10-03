@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 # Load environment variables from .env.unittest if it exists
-env_file = Path(__file__).parent / ".env.unittest"
+env_file = Path(__file__).parent / ".env.test"
 if env_file.exists():
     from dotenv import load_dotenv
 

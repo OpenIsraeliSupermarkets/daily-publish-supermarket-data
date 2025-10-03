@@ -67,7 +67,7 @@ def run_full_dag_integration(
 
     # Run with wait time approach
     publisher.run(
-        wait_time_seconds=wait_time_seconds,
+        second_to_wait_between_opreation=wait_time_seconds,
         should_execute_final_operations=num_of_occasions,
         should_stop_dag="ONCE",
         operations="scraping,converting,api_update,clean_dump_files",
