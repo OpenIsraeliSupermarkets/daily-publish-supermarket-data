@@ -11,8 +11,6 @@ if [ -f .env.test ]; then
 fi
 
 echo "Step 2: Setting up test environment variables"
-export MONGO_IP=mongodb
-export API_IP=api
 # limit the run time
 export ENABLED_SCRAPERS=COFIX
 export LIMIT=10
@@ -110,8 +108,8 @@ echo "Step 10: Running system tests"
 docker build --target testing -t supermarket-testing .
 docker run \
     --network=daily-publish-supermarket-data_mongo-network \
-    -e API_HOST=http://${API_IP}:8000/ \
-    -e MONGODB_URI=mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_IP}:${MONGO_PORT} \
+    -e API_HOST=http://api:8000/ \
+    -e MONGODB_URI=mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@mongodb:${MONGO_PORT} \
     -e API_TOKEN=${API_TOKEN} \
     -e KAGGLE_USERNAME=${KAGGLE_USERNAME} \
     -e KAGGLE_KEY=${KAGGLE_KEY} \
