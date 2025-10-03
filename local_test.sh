@@ -200,7 +200,7 @@ echo "Step 9: Checking health of API and data_processor containers"
 
 check_container_health "raw-data-api" || exit 1
 
-if [ "$TEST_MODE" == "production" ]; then
+if [ "$TEST_MODE" == "loop" ]; then
 check_container_health "data-fetcher" || exit 1
 fi
 
