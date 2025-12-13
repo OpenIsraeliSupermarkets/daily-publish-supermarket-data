@@ -1,5 +1,5 @@
-il-supermarket-scraper==0.6.1
-il-supermarket-parser==0.2
+il-supermarket-scraper==0.6.3
+il-supermarket-parser==0.2.1
 kaggle==1.6.17
 schedule==1.2.2
 fastapi[all]==0.109.2
@@ -13,7 +13,7 @@ aiokafka>=0.10.0,<0.12
 kafka-python==2.0.2
 six>=1.16.0
 mockafka-py==0.2.1
-requests>=2.32.2 # not directly required, pinned by Snyk to avoid a vulnerability
+requests>=2.32.4 # not directly required, pinned by Snyk to avoid a vulnerability
 urllib3>=2.5.0 # not directly required, pinned by Snyk to avoid a vulnerability
 zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability
 python-logging-discord-handler==0.1.5
