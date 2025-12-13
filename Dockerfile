@@ -1,4 +1,4 @@
-FROM node:20-bookworm as base
+FROM node:20.19.6-trixie-slim as base
 
 ENV TZ="Asia/Jerusalem"
 
