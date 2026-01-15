@@ -115,9 +115,6 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
         while not self._should_stop_dag(should_stop_dag):
             # execute operations until final operations are executed
             while True:
-                now = self._now()
-                Logger.info(f"Setting when_date to {now}")
-                self.when_date = now
                 
                 # execute operations
                 Logger.info(f"Executing operations")
