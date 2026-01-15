@@ -19,7 +19,7 @@ class ValidationResult:
     num_of_rows: int
     status: str
 
-async def get_api_host():
+def get_api_host():
     return "http://${API_IP}:8000/".format(API_IP=os.getenv("API_IP"))
 
 class ApiCallValidator:
@@ -253,4 +253,4 @@ if __name__ == "__main__":
     api_token = os.getenv("API_TOKEN")
     host = os.getenv("API_HOST")
     rate_limit = int(os.getenv("RATE_LIMIT", "3"))  # Add rate limit env var
-    asyncio.run(main(api_token, get_api_host, rate_limit))
+    asyncio.run(main(api_token, get_api_host(), rate_limit))

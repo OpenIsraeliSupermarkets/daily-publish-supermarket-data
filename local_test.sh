@@ -175,6 +175,13 @@ else
 
 fi
 
+echo "Step 9: Checking health of API and data_processor containers"
+
+check_container_health "raw-data-api" || exit 1
+
+if [ "$TEST_MODE" == "loop" ]; then
+    check_container_health "data-fetcher" || exit 1
+fi
 
 echo "Step 10: Running system tests"
 
@@ -194,17 +201,11 @@ docker run \
     -e SUPABASE_KEY=${SUPABASE_KEY} \
     -e SUPABASE_URL=${SUPABASE_URL} \
     supermarket-testing
-    
 
-echo "Step 9: Checking health of API and data_processor containers"
-
-check_container_health "raw-data-api" || exit 1
-
-if [ "$TEST_MODE" == "loop" ]; then
-check_container_health "data-fetcher" || exit 1
+if [ $? -ne 0 ]; then
+    echo -e "\033[31mSystem tests failed. Exiting.\033[0m"
+    exit 1
 fi
-
-
 
 echo "Step 11: Stopping all containers"
 docker compose stop

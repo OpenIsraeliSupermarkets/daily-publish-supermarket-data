@@ -135,9 +135,7 @@ async def file_content(
 
 
 @app.get("/service_health", tags=["Health"])
-async def service_health_check(
-    credentials: HTTPAuthorizationCredentials = Security(security),
-) -> ServiceHealth:
+async def service_health_check() -> ServiceHealth:
     return ServiceHealth(
         status="healthy", timestamp=datetime.now().astimezone().isoformat()
     )
@@ -145,13 +143,11 @@ async def service_health_check(
 
 @app.get("/short_term_health", tags=["Health"])
 async def is_short_term_updated(
-    credentials: HTTPAuthorizationCredentials = Security(security),
 ) -> ShortTermDatabaseHealth:
     return get_access_layer().is_short_term_updated()
 
 
 @app.get("/long_term_health", tags=["Health"])
 async def is_long_term_updated(
-    credentials: HTTPAuthorizationCredentials = Security(security),
 ) -> LongTermDatabaseHealth:
     return get_access_layer().is_long_term_updated()

@@ -89,8 +89,8 @@ class AuthMiddleware(BaseHTTPMiddleware):  # pylint: disable=too-few-public-meth
             Response: The API response or an error response
         """
         try:
-            # Allow documentation endpoints without authentication
-            if request.url.path in ("/docs", "/openapi.json"):
+            # Allow documentation and health check endpoints without authentication
+            if request.url.path in ("/docs", "/openapi.json", "/service_health", "/short_term_health", "/long_term_health"):
                 return await call_next(request)
 
             # Validate Authorization header
