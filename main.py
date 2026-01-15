@@ -25,6 +25,7 @@ if __name__ == "__main__":
 
     # Allow providing when from environment variable, otherwise use current time
     when_str = os.environ.get("WHEN", None)
+    when = None
     if when_str:
         # Parse the datetime string from environment variable
         when = datetime.datetime.fromisoformat(when_str.replace("Z", "+00:00"))
@@ -33,8 +34,6 @@ if __name__ == "__main__":
             import pytz
 
             when = pytz.timezone("Asia/Jerusalem").localize(when)
-    else:
-        when = now()
 
     num_of_processes = os.environ.get("NUM_OF_PROCESSES", 5)
     try:
@@ -90,7 +89,7 @@ if __name__ == "__main__":
                 "KAGGLE_DATASET_REMOTE_NAME"
             ],  # make the folder the same name
             dataset_remote_name=os.environ["KAGGLE_DATASET_REMOTE_NAME"],
-            when=when,
+            when=when if when else now(),
         ),
         short_term_db_target=output_short_term_destination_from_env(
             os.environ.get("OUTPUT_DESTINATION", "mongo")

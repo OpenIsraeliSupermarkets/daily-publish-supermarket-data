@@ -57,7 +57,7 @@ class BaseSupermarketDataPublisher:
         self.short_term_db_target = short_term_db_target
         self.long_term_db_target = long_term_db_target
         self.today = now()
-        self.when_date = when_date if when_date else self.today
+        self.when_date = when_date
         self.number_of_scraping_processes = number_of_scraping_processes
         self.number_of_parseing_processs = (
             number_of_parseing_processs
@@ -106,7 +106,7 @@ class BaseSupermarketDataPublisher:
                 dump_folder_name=self.data_folder,
                 multiprocessing=self.number_of_scraping_processes,
                 lookup_in_db=True,
-                when_date=self.when_date,
+                when_date=self.when_date if self.when_date else now(backfill_hours=1),
                 limit=self.limit,
                 suppress_exception=True,
             ).start()

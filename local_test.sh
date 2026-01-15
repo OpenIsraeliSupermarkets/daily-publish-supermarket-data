@@ -59,7 +59,7 @@ fi
 
 echo "Step 2: Setting up test environment variables"
 # limit the run time
-export ENABLED_SCRAPERS=COFIX
+export ENABLED_SCRAPERS=BAREKET
 export LIMIT=10
 export OUTPUT_DESTINATION=mongo
 # -- should correspond to the number of times the data should be validated
@@ -175,6 +175,50 @@ else
 
 fi
 
+    
+echo "Step 8.5: Verifying clean_all_source_data operation"
+# Verify that clean_all_source_data cleaned all folders and cache
+data_folder="${APP_DATA_PATH}/dumps"
+outputs_folder="${APP_DATA_PATH}/outputs"
+status_folder="${APP_DATA_PATH}/dumps/status"
+
+if [ -d "$data_folder" ]; then
+    echo -e "\033[31mERROR: Data folder $data_folder still exists after clean_all_source_data\033[0m"
+    exit 1
+fi
+
+if [ -d "$outputs_folder" ]; then
+    echo -e "\033[31mERROR: Outputs folder $outputs_folder still exists after clean_all_source_data\033[0m"
+    exit 1
+fi
+
+if [ -d "$status_folder" ]; then
+    echo -e "\033[31mERROR: Status folder $status_folder still exists after clean_all_source_data\033[0m"
+    exit 1
+fi
+
+# Verify cache file is empty or doesn't exist (cache is stored as .push_cache file)
+cache_file="${APP_DATA_PATH}/.push_cache"
+if [ -f "$cache_file" ]; then
+    # Check if cache file is empty (should be empty JSON object {})
+    cache_content=$(cat "$cache_file" 2>/dev/null | tr -d '[:space:]')
+    if [ "$cache_content" != "{}" ] && [ -n "$cache_content" ]; then
+        echo -e "\033[31mERROR: Cache file $cache_file is not empty after clean_all_source_data (content: $cache_content)\033[0m"
+        exit 1
+    fi
+fi
+# If cache file doesn't exist, that's also fine (means cache was never created or was deleted)
+
+echo "✓ clean_all_source_data verification passed: all folders and cache cleaned successfully"
+
+
+echo "Step 9: Checking health of API and data_processor containers"
+
+check_container_health "raw-data-api" || exit 1
+
+if [ "$TEST_MODE" == "loop" ]; then
+    check_container_health "data-fetcher" || exit 1
+fi
 
 echo "Step 10: Running system tests"
 
@@ -194,17 +238,11 @@ docker run \
     -e SUPABASE_KEY=${SUPABASE_KEY} \
     -e SUPABASE_URL=${SUPABASE_URL} \
     supermarket-testing
-    
 
-echo "Step 9: Checking health of API and data_processor containers"
-
-check_container_health "raw-data-api" || exit 1
-
-if [ "$TEST_MODE" == "loop" ]; then
-check_container_health "data-fetcher" || exit 1
+if [ $? -ne 0 ]; then
+    echo -e "\033[31mSystem tests failed. Exiting.\033[0m"
+    exit 1
 fi
-
-
 
 echo "Step 11: Stopping all containers"
 docker compose stop

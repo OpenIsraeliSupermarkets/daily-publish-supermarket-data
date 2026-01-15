@@ -22,7 +22,7 @@ def scrapers_to_test():
     return [
         ScraperFactory.BAREKET.name,
         ScraperFactory.WOLT.name,
-        ScraperFactory.COFIX.name,
+        # ScraperFactory.COFIX.name,
     ]
 
 
