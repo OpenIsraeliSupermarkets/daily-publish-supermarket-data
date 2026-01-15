@@ -59,7 +59,7 @@ fi
 
 echo "Step 2: Setting up test environment variables"
 # limit the run time
-export ENABLED_SCRAPERS=COFIX
+export ENABLED_SCRAPERS=BAREKET
 export LIMIT=10
 export OUTPUT_DESTINATION=mongo
 # -- should correspond to the number of times the data should be validated

@@ -36,7 +36,7 @@ app = FastAPI(
     ],
     default_response_class=ORJSONResponse,
 )
-app.add_middleware(AuthMiddleware)
+# app.add_middleware(AuthMiddleware)
 app.add_middleware(TelemetryMiddleware)
 
 
@@ -63,14 +63,12 @@ def get_access_layer():
 
 @app.get("/list_chains", tags=["API"])
 async def list_chains(
-    credentials: HTTPAuthorizationCredentials = Security(security),
 ) -> AvailableChains:
     return get_access_layer().list_all_available_chains()
 
 
 @app.get("/list_file_types", tags=["API"])
 async def list_file_types(
-    credentials: HTTPAuthorizationCredentials = Security(security),
 ) -> TypeOfFileScraped:
     return get_access_layer().list_all_available_file_types()
 
@@ -81,8 +79,7 @@ async def read_files(
     file_type: Optional[str] = None,
     store_number: Optional[str] = None,
     after_extracted_date: Optional[str] = None,
-    only_latest: bool = False,
-    credentials: HTTPAuthorizationCredentials = Security(security),
+    only_latest: bool = False
 ) -> ScrapedFiles:
     try:
         # Parse the date string if provided
