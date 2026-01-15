@@ -1,5 +1,5 @@
-il-supermarket-scraper==0.6.3
-il-supermarket-parser==0.2.1
+il-supermarket-scraper==0.6.4
+il-supermarket-parser==0.2.2
 kaggle==1.6.17
 schedule==1.2.2
 fastapi[all]==0.109.2
