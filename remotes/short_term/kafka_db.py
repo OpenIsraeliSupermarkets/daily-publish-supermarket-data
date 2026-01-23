@@ -35,6 +35,12 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
         self.bootstrap_servers = kafka_bootstrap_servers or os.getenv(
             "KAFKA_BOOTSTRAP_SERVERS", "localhost:9092"
         )
+        # Support for larger messages via environment variables
+        # promo files can be larger than 1.2B
+        # Default: 2MB (2097152 bytes)
+        self.max_request_size = int(
+            os.getenv("KAFKA_MAX_REQUEST_SIZE", "2097152")
+        )
         self.producer: Optional[AIOKafkaProducer] = None
         self.admin_client: Optional[KafkaAdminClient] = None
         self._connection_tested = False
@@ -62,6 +68,7 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
                 bootstrap_servers=self.bootstrap_servers,
                 client_id="supermarket_data_producer",
                 value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+                max_request_size=self.max_request_size,
             )
             await self.producer.start()
 
@@ -298,6 +305,7 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
                     group_id=f"test_consumer_{topic_name}_{int(time.time())}_{id(self)}",  # Unique group ID with timestamp
                     session_timeout_ms=10000,  # Increase session timeout
                     request_timeout_ms=20000,  # Increase request timeout
+                    max_partition_fetch_bytes=self.max_request_size,
                 )
 
                 await consumer.start()

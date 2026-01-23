@@ -36,8 +36,8 @@
             "justMyCode": false,
             "envFile": "${workspaceFolder}/.env.test",
             "env": {
-                "OPERATION":"scraping,converting",
-                "ENABLED_SCRAPERS":"BAREKET"
+                "OPERATION":"api_update",
+                "ENABLED_SCRAPERS":"BAREKET,KING_STORE,TIV_TAAM"
             }
         },
         {
