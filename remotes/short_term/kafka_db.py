@@ -169,7 +169,7 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
                 try:
                     await self.producer.send_and_wait(
                         topic=topic_name,
-                        key=str(item.get("_id", "default")).encode("utf-8"),
+                        key=item['file_name'].encode("utf-8"),
                         value=item,
                     )
                     successful_records += 1

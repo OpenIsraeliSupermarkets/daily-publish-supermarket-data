@@ -4,7 +4,7 @@ import tempfile
 import shutil
 import pandas as pd
 import numpy as np
-from unittest.mock import MagicMock, patch, mock_open, ANY
+from unittest.mock import MagicMock, patch, mock_open, ANY, call
 from managers.large_file_push_manager import LargeFilePushManager
 from managers.cache_manager import CacheState
 from remotes import ShortTermDatabaseUploader
@@ -117,10 +117,22 @@ class TestLargeFilePushManager:
         manager.process_file("test_file.csv", cache_state)
 
         # Verify database insertion was called
-        mock_database_manager._insert_to_destinations.assert_called_once()
+
+        eof_to_send = [{"file_complete": "true",
+                            "file_name": "test_file_1.csv",
+                            "total_expected_records": 1
+                        },{"file_complete": "true",
+                            "file_name": "test_file_2.csv",
+                            "total_expected_records": 1
+                        }]
+        last_eof_to_send = [{"file_complete": "true",
+                            "file_name": "test_file_3.csv",
+                            "total_expected_records": 1
+                        }]
+        assert mock_database_manager._insert_to_destinations.call_args_list == [call('test_file', [{"mocked": "data"},{"mocked": "data"},{"mocked": "data"}]), call('test_file', eof_to_send), call('test_file', last_eof_to_send)]
 
         # Verify cache was updated
-        assert cache_state.get_last_processed_row("test_file.csv") == 2
+        assert cache_state.get_last_processed_row("test_file.csv") == 2 # 
 
     @patch("pandas.read_csv")
     @patch("managers.large_file_push_manager.DataTable")
@@ -169,7 +181,10 @@ class TestLargeFilePushManager:
         )
 
         # Verify database insertion was called
-        mock_database_manager._insert_to_destinations.assert_called_once()
+        assert mock_database_manager._insert_to_destinations.call_args_list == [call('test_file', [{"mocked": "data"}]), call('test_file', [{"file_complete": "true",
+                            "file_name": "test_file_3.csv",
+                            "total_expected_records": 1
+                        }])]
 
         # Verify cache was updated with the last processed row
         # Starting from row 2, adding 1 row makes it 4 (0-based is 3)
@@ -218,11 +233,25 @@ class TestLargeFilePushManager:
         manager.process_file("test_file.csv", cache_state)
 
         # Verify database insertion was called twice (once for each chunk)
-        assert mock_database_manager._insert_to_destinations.call_count == 2
+        assert mock_database_manager._insert_to_destinations.call_args_list == [
+            call('test_file', [{"mocked": "data"},{"mocked": "data"}]),
+            call('test_file', [{"file_complete": "true",
+                            "file_name": "test_file_1.csv",
+                            "total_expected_records": 1
+                        }]),
+            call('test_file', [{"mocked": "data"}]), 
+            call('test_file', [{"file_complete": "true",
+                "file_name": "test_file_2.csv",
+                "total_expected_records": 1
+            }]),
+            call('test_file', [{"file_complete": "true",
+                "file_name": "test_file_3.csv",
+                "total_expected_records": 1
+            }])]
 
         # Verify cache was updated with the final position
         # The final position should be the sum of the lengths of all chunks
-        # 2 rows in chunk1 + 1 row in chunk2 + 1 (starting position) = 4
+        # 2 rows in chunk1 (loc 0,1) + 1 row in chunk2  (loc 2)= 2
         assert cache_state.get_last_processed_row("test_file.csv") == 2
 
     def test_process_real_csv_with_custom_chunks(
@@ -252,8 +281,145 @@ class TestLargeFilePushManager:
         # Process the file
         manager.process_file(test_file, cache_state)
 
-        # Verify database insertion was called 4 times (for chunks of size 3+3+3+1)
-        assert mock_database_manager._insert_to_destinations.call_count == 4
+        # Verify database insertion calls
+        # With chunk_size=3 and 10 rows, we get chunks: [0-2], [3-5], [6-8], [9]
+        # Each row has a different file_name, so each triggers EOF for previous file
+        
+        # Chunk 1: rows 0, 1, 2
+        # - Row 0: file_name="test_file_0.csv" (opens it)
+        # - Row 1: file_name="test_file_1.csv" (EOF for test_file_0.csv)
+        # - Row 2: file_name="test_file_2.csv" (EOF for test_file_1.csv)
+        # - Send all items together: [row0, row1, row2]
+        # - Send EOFs together: [test_file_0.csv, test_file_1.csv]
+        
+        # Chunk 2: rows 3, 4, 5 (with last_row_saw=row 2)
+        # - Process row 2 (from last_row_saw), row 3, row 4, row 5
+        # - Row 3: file_name="test_file_3.csv" (EOF for test_file_2.csv)
+        # - Row 4: file_name="test_file_4.csv" (EOF for test_file_3.csv)
+        # - Row 5: file_name="test_file_5.csv" (EOF for test_file_4.csv)
+        # - Remove first item (row2): [row3, row4, row5]
+        # - Send items together: [row3, row4, row5]
+        # - Send EOFs together: [test_file_2.csv, test_file_3.csv, test_file_4.csv]
+        
+        # Chunk 3: rows 6, 7, 8 (with last_row_saw=row 5)
+        # - Process row 5 (from last_row_saw), row 6, row 7, row 8
+        # - Row 6: file_name="test_file_6.csv" (EOF for test_file_5.csv)
+        # - Row 7: file_name="test_file_7.csv" (EOF for test_file_6.csv)
+        # - Row 8: file_name="test_file_8.csv" (EOF for test_file_7.csv)
+        # - Remove first item (row5): [row6, row7, row8]
+        # - Send items together: [row6, row7, row8]
+        # - Send EOFs together: [test_file_5.csv, test_file_6.csv, test_file_7.csv]
+        
+        # Chunk 4: row 9 (with last_row_saw=row 8)
+        # - Process row 8 (from last_row_saw), row 9
+        # - Row 9: file_name="test_file_9.csv" (EOF for test_file_8.csv)
+        # - Remove first item (row8): [row9]
+        # - Send items together: [row9]
+        # - Send EOFs together: [test_file_8.csv]
+        
+        # Final EOF for the last file: [test_file_9.csv]
+        
+        res = []
+        
+        # Chunk 1: rows 0, 1, 2 - all items sent together
+        res.append(call('test_file', [
+            {
+                "row_index": 0,
+                "found_folder": "test_folder_0",
+                "file_name": "test_file_0.csv",
+                "content": {"more_data": "test_data_0", "some_more_data": "test_data_0"}
+            },
+            {
+                "row_index": 1,
+                "found_folder": "test_folder_1",
+                "file_name": "test_file_1.csv",
+                "content": {"more_data": "test_data_1", "some_more_data": "test_data_1"}
+            },
+            {
+                "row_index": 2,
+                "found_folder": "test_folder_2",
+                "file_name": "test_file_2.csv",
+                "content": {"more_data": "test_data_2", "some_more_data": "test_data_2"}
+            }
+        ]))
+        res.append(call('test_file', [
+            {"file_complete": "true", "file_name": "test_file_0.csv", "total_expected_records": 1},
+            {"file_complete": "true", "file_name": "test_file_1.csv", "total_expected_records": 1}
+        ]))
+        
+        # Chunk 2: rows 3, 4, 5 (row 2 removed)
+        res.append(call('test_file', [
+            {
+                "row_index": 3,
+                "found_folder": "test_folder_3",
+                "file_name": "test_file_3.csv",
+                "content": {"more_data": "test_data_3", "some_more_data": "test_data_3"}
+            },
+            {
+                "row_index": 4,
+                "found_folder": "test_folder_4",
+                "file_name": "test_file_4.csv",
+                "content": {"more_data": "test_data_4", "some_more_data": "test_data_4"}
+            },
+            {
+                "row_index": 5,
+                "found_folder": "test_folder_5",
+                "file_name": "test_file_5.csv",
+                "content": {"more_data": "test_data_5", "some_more_data": "test_data_5"}
+            }
+        ]))
+        res.append(call('test_file', [
+            {"file_complete": "true", "file_name": "test_file_2.csv", "total_expected_records": 1},
+            {"file_complete": "true", "file_name": "test_file_3.csv", "total_expected_records": 1},
+            {"file_complete": "true", "file_name": "test_file_4.csv", "total_expected_records": 1}
+        ]))
+        
+        # Chunk 3: rows 6, 7, 8 (row 5 removed)
+        res.append(call('test_file', [
+            {
+                "row_index": 6,
+                "found_folder": "test_folder_6",
+                "file_name": "test_file_6.csv",
+                "content": {"more_data": "test_data_6", "some_more_data": "test_data_6"}
+            },
+            {
+                "row_index": 7,
+                "found_folder": "test_folder_7",
+                "file_name": "test_file_7.csv",
+                "content": {"more_data": "test_data_7", "some_more_data": "test_data_7"}
+            },
+            {
+                "row_index": 8,
+                "found_folder": "test_folder_8",
+                "file_name": "test_file_8.csv",
+                "content": {"more_data": "test_data_8", "some_more_data": "test_data_8"}
+            }
+        ]))
+        res.append(call('test_file', [
+            {"file_complete": "true", "file_name": "test_file_5.csv", "total_expected_records": 1},
+            {"file_complete": "true", "file_name": "test_file_6.csv", "total_expected_records": 1},
+            {"file_complete": "true", "file_name": "test_file_7.csv", "total_expected_records": 1}
+        ]))
+        
+        # Chunk 4: row 9 (row 8 removed)
+        res.append(call('test_file', [
+            {
+                "row_index": 9,
+                "found_folder": "test_folder_9",
+                "file_name": "test_file_9.csv",
+                "content": {"more_data": "test_data_9", "some_more_data": "test_data_9"}
+            }
+        ]))
+        res.append(call('test_file', [
+            {"file_complete": "true", "file_name": "test_file_8.csv", "total_expected_records": 1}
+        ]))
+        
+        # Final EOF for the last file
+        res.append(call('test_file', [
+            {"file_complete": "true", "file_name": "test_file_9.csv", "total_expected_records": 1}
+        ]))
+        
+        assert mock_database_manager._insert_to_destinations.call_args_list == res
 
         # Verify cache was updated with the final row count
         assert cache_state.get_last_processed_row(test_file) == 9
