@@ -93,7 +93,7 @@ class LargeFilePushManager:
                     else:
                         eof_to_send.append({"file_complete": "true",
                             "file_name": open_file,
-                            "total_expected_records": total_expected_records
+                            "total_expected_records": total_expected_records,
                         })
                         open_file = record["file_name"]
                         total_expected_records = 1

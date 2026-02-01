@@ -211,7 +211,7 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
         # Kafka creates topics automatically when first message is sent
         # No explicit creation needed
         self._insert_to_destinations(
-            table_name, [{"partition_id": partition_id, "warmup": "true"}]
+            table_name, [{"file_name": "this is a warmup message", "warmup": "true"}]
         )
 
     def _clean_all_destinations(self):

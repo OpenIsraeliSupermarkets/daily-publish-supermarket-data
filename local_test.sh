@@ -52,7 +52,7 @@ if [ -z "$TEST_MODE" ]; then
     BUILD_NO_CACHE=${BUILD_NO_CACHE:-N}
 fi
 
-echo "Step 1: Loading environment variables from .env.prod if exists"
+echo "Step 1: Loading environment variables from .env.test if exists"
 if [ -f .env.test ]; then
     export $(cat .env.test | xargs)
 fi
@@ -98,12 +98,12 @@ docker compose rm -f
 
 echo "Step 4: Cleaning app data directory"
 # Clean the app data folder
-if [ -d "$APP_DATA_PATH" ]; then
-    rm -rf "$APP_DATA_PATH"  # Remove hidden files/folders except . and ..
-    echo "Cleaned contents of $APP_DATA_PATH including hidden files"
+if [ -d "$APP_DATA_PATH/app_data" ]; then
+    rm -rf "$APP_DATA_PATH/app_data"  # Remove hidden files/folders except . and ..
+    echo "Cleaned contents of $APP_DATA_PATH/app_data including hidden files"
 fi
 
-mkdir -p "$APP_DATA_PATH"
+mkdir -p "$APP_DATA_PATH/app_data"
 
 echo "Step 5: Cleaning MongoDB data directory"
 # Clean the mongo data folder
