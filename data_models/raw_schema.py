@@ -68,6 +68,7 @@ class ParserStatus(CommonModel):
     file type, and execution response details.
     """
 
+
     index: str
     when_date: str
     requested_limit: Optional[str] = None
@@ -77,6 +78,7 @@ class ParserStatus(CommonModel):
     output_folder: str
     status: bool
     response: Response
+    file_name: str = "parser_status"
 
     @classmethod
     def to_index(cls, file_type: str, store_enum: str, when_date: str) -> str:
@@ -257,7 +259,8 @@ class ScraperStatus(CommonModel):
         ScraperDownloadtTimeException,
         ScraperScrapingException,
     ]
-
+    file_name: str = "scraper_status"
+    
     @classmethod
     def to_index(cls, file_name: str, status: str, timestamp: str, index: str) -> str:
         return f"{file_name}@{status}@{timestamp}@{index}"

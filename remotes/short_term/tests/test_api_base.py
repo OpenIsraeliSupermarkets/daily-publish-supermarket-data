@@ -24,20 +24,20 @@ def short_term_test_case(short_term_db_target):
         def test_create_and_insert_to_table(self):
             # Test table creation
             self.uploader._clean_all_destinations()
-            self.uploader._create_destinations("id", "test_table")
+            self.uploader._create_destinations("file_name", "test_table")
             self.assertIn("test_table", self.uploader._list_destinations())
 
             # Test data insertion
-            test_items = [{"id": 1, "data": "test1"}, {"id": 2, "data": "test2"}]
+            test_items = [{"file_name": "1", "data": "test1"}, {"file_name": "2", "data": "test2"}]
             self.uploader._insert_to_destinations(
                 "test_table", copy.deepcopy(test_items)
             )
             self.assertEqual(
                 sorted(
                     list(self.uploader.get_destinations_content("test_table")),
-                    key=lambda x: x["id"],
+                    key=lambda x: x["file_name"],
                 ),
-                sorted(test_items, key=lambda x: x["id"]),
+                sorted(test_items, key=lambda x: x["file_name"]),
             )
 
         def test_clean_all_destinations(self):
@@ -92,12 +92,12 @@ def short_term_test_case(short_term_db_target):
 
         def test_collection_updated(self):
             # Test recent update
-            self.uploader._create_destinations("id", "test_table")
+            self.uploader._create_destinations("file_name", "test_table")
             self.assertTrue(not self.uploader._is_collection_updated("test_table"))
 
             # Test old update
             self.uploader._insert_to_destinations(
-                "test_table", [{"id": "1", "data": "test"}]
+                "test_table", [{"file_name": "1", "data": "test"}]
             )
             self.assertTrue(self.uploader._is_collection_updated("test_table"))
 
@@ -140,9 +140,9 @@ class KafkaTestCase(
     def testget_destinations_content(self):
         self.uploader._create_destinations("id", "files")
         test_items = [
-            {"id": "1", "chain": "chain1", "file_type": "csv", "data": "test1"},
-            {"id": "2", "chain": "chain1", "file_type": "json", "data": "test2"},
-            {"id": "3", "chain": "chain2", "file_type": "csv", "data": "test3"},
+            {"file_name": "1", "chain": "chain1", "file_type": "csv", "data": "test1"},
+            {"file_name": "2", "chain": "chain1", "file_type": "json", "data": "test2"},
+            {"file_name": "3", "chain": "chain2", "file_type": "csv", "data": "test3"},
         ]
         self.uploader._insert_to_destinations("files", test_items)
 

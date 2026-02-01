@@ -50,6 +50,8 @@ class LargeFilePushManager:
         Logger.info(f"Header: {header}")
 
         last_row_saw = None
+        open_file = None
+        total_expected_records = 0
         # Process file in chunks
         for chunk in pd.read_csv(
             file_path,
@@ -77,21 +79,35 @@ class LargeFilePushManager:
                 chunk = pd.concat([last_row_saw, chunk])
 
             # Process and upload chunk
+            eof_to_send = []
             try:
                 chunk = chunk.reset_index(names=["row_index"]).ffill()
-                items = [
-                    DataTable(
-                        row_index=record["row_index"],
-                        found_folder=record["found_folder"],
-                        file_name=record["file_name"],
-                        content={
-                            k: v
-                            for k, v in record.items()
-                            if k not in ["row_index", "found_folder", "file_name"]
-                        },
-                    ).to_dict()
-                    for record in chunk.to_dict(orient="records")
-                ]
+                items = []
+                for record in chunk.to_dict(orient="records"):
+                    if open_file is None:
+                        open_file = record["file_name"]
+                        total_expected_records = 0
+
+                    if open_file == record["file_name"]:
+                        total_expected_records += 1
+                    else:
+                        eof_to_send.append({"file_complete": "true",
+                            "file_name": open_file,
+                            "total_expected_records": total_expected_records,
+                        })
+                        open_file = record["file_name"]
+                        total_expected_records = 1
+
+                    items.append(DataTable(
+                            row_index=record["row_index"],
+                            found_folder=record["found_folder"],
+                            file_name=record["file_name"],
+                            content={
+                                k: v
+                                for k, v in record.items()
+                                if k not in ["row_index", "found_folder", "file_name"]
+                            },
+                    ).to_dict())
             except Exception as e:
                 Logger.error(f"Error processing chunk: {e}")
                 Logger.error(f"Chunk: {chunk}")
@@ -102,10 +118,20 @@ class LargeFilePushManager:
                 items = items[1:]
 
             self.database_manager._insert_to_destinations(target_table_name, items)
-
+            if eof_to_send:
+                if last_row_saw is not None:
+                    for eof in eof_to_send:
+                        if eof["file_name"] == last_row_saw.iloc[0].file_name:
+                            eof["total_expected_records"] -= 1
+                self.database_manager._insert_to_destinations(target_table_name, eof_to_send)
             # Save last row for next iteration
             last_row_saw = chunk.tail(1).set_index("row_index")
 
+        if open_file is not None:
+            self.database_manager._insert_to_destinations(target_table_name, [{"file_complete": "true",
+                                "file_name": open_file,
+                                "total_expected_records": total_expected_records
+                            }])
         # Update cache with last processed row
         local_cache.update_last_processed_row(file, last_row)
         Logger.info(f"Completed pushing {file}")
