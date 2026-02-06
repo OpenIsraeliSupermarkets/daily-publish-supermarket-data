@@ -36,23 +36,27 @@ class ShortTermDBDatasetManager:
 
         for record in records:
             if record["when_date"] not in pushed_timestamps:
-                processed_records.append(
-                    ParserStatus(
-                        index=ParserStatus.to_index(
-                            record["file_type"],
-                            record["store_enum"],
-                            record["when_date"],
-                        ),
-                        when_date=record["when_date"],
-                        requested_limit=record["limit"],
-                        requested_store_enum=record["store_enum"],
-                        requested_file_type=record["file_type"],
-                        scaned_data_folder=record["data_folder"],
-                        output_folder=record["output_folder"],
-                        status=record["status"],
-                        response=record["response"],
-                    ).to_dict()
-                )
+                try:
+                    processed_records.append(
+                        ParserStatus(
+                            index=ParserStatus.to_index(
+                                record["file_type"],
+                                record["store_enum"],
+                                record["when_date"],
+                            ),
+                            when_date=record["when_date"],
+                            requested_limit=record["limit"],
+                            requested_store_enum=record["store_enum"],
+                            requested_file_type=record["file_type"],
+                            scaned_data_folder=record["data_folder"],
+                            output_folder=record["output_folder"],
+                            status=record["status"],
+                            response=record["response"],
+                        ).to_dict()
+                    )
+                except Exception as e:
+                    Logger.error(f"Error processing record: {e}")
+                    continue
                 added_timestamps.append(record["when_date"])
 
         self.uploader._insert_to_destinations(
