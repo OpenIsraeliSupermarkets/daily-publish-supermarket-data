@@ -75,6 +75,7 @@ class FileContent(BaseModel):
                 row_content=row["content"],
             )
             for row in rows
+            if "file_complete" not in row
         ]
         super().__init__(rows=processed_rows)
 

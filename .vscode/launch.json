@@ -117,7 +117,7 @@
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
-            "envFile": "${workspaceFolder}/.env.prod"
+            "envFile": "${workspaceFolder}/.env.test"
         },
         {
             "name": "Copy Dump From Stage To Prod",
@@ -126,7 +126,7 @@
             "program": "scripts/copy_from_stage.py",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "envFile": "${workspaceFolder}/.env.prod",
+            "envFile": "${workspaceFolder}/.env.test",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}"
             }
@@ -138,7 +138,7 @@
             "program": "main.py",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "envFile": "${workspaceFolder}/.env.prod",
+            "envFile": "${workspaceFolder}/.env.test",
             "env": {
                 "WHEN":"2025-07-29T10:30:00+03:00",
                 "OPERATION":"scraping,converting,publishing,clean_all_source_data",

@@ -165,23 +165,27 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
         try:
             # Send all messages individually to avoid duplicates on partial failure
             successful_records = 0
+            flushs = set()
             for item in items:
                 try:
                     await self.producer.send_and_wait(
                         topic=topic_name,
-                        key=str(item.get("_id", "default")).encode("utf-8"),
+                        key=item['file_name'].encode("utf-8"),
                         value=item,
                     )
                     successful_records += 1
                 except KafkaError as inner_e:
                     Logger.error("Failed to send record: %s", str(inner_e))
+
+                if item['file_name'] not in flushs:
+                    flushs.add(item['file_name'])
             
             # send flush message only if we successfully sent some records
-            if successful_records > 0:
+            for file_name in flushs:
                 try:
                     await self.producer.send_and_wait(
                         topic=topic_name,
-                        key=b"flush",
+                        key=file_name.encode("utf-8"),
                         value={"flush": "true"},
                     )
                 except KafkaError as flush_e:
@@ -207,7 +211,7 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
         # Kafka creates topics automatically when first message is sent
         # No explicit creation needed
         self._insert_to_destinations(
-            table_name, [{"partition_id": partition_id, "warmup": "true"}]
+            table_name, [{"file_name": "this is a warmup message", "warmup": "true"}]
         )
 
     def _clean_all_destinations(self):
@@ -370,7 +374,7 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
         chain: str,
         file_type: str,
         message: Dict[str, Any],
-        key: Optional[str] = None,
+        key: str,
     ) -> None:
         """
         Send a message to the appropriate Kafka topic.
@@ -388,11 +392,8 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
             # Align with consumer topic naming: {file_type_lower}_{chain_lower}
             topic_name = f"{file_type.lower()}_{chain.lower()}"
 
-            # Use chain as key if no key provided
-            message_key = key or chain
-
             await self.producer.send_and_wait(
-                topic=topic_name, key=message_key.encode("utf-8"), value=message
+                topic=topic_name, key=key.encode("utf-8"), value=message
             )
 
             Logger.debug(f"Sent message to topic {topic_name} for chain {chain}")
@@ -406,7 +407,7 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
         chain: str,
         file_type: str,
         messages: List[Dict[str, Any]],
-        key: Optional[str] = None,
+        key: str,
     ) -> None:
         """
         Send multiple messages to the appropriate Kafka topic.
@@ -423,12 +424,11 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
 
             # Align with consumer topic naming: {file_type_lower}_{chain_lower}
             topic_name = f"{file_type.lower()}_{chain.lower()}"
-            message_key = key or chain
 
             # Send all messages
             for message in messages:
                 await self.producer.send_and_wait(
-                    topic=topic_name, key=message_key.encode("utf-8"), value=message
+                    topic=topic_name, key=key.encode("utf-8"), value=message
                 )
 
             Logger.info(
