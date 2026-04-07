@@ -32,6 +32,7 @@ jobs:
           echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> $GITHUB_ENV
           echo "KAGGLE_DATASET_REMOTE_NAME=erlichsefi/test-super-dataset-2" >> $GITHUB_ENV
           echo "TZ=Asia/Jerusalem" >> $GITHUB_ENV
+          echo "DISCORD_WEBHOOK_URL=${{ secrets.DISCORD_WEBHOOK_URL }}" >> $GITHUB_ENV
 
       - name: Run system test with incremental mode
         run: ./local_test.sh --incremental 

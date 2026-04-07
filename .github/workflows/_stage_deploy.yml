@@ -36,6 +36,7 @@ jobs:
           echo "MONGO_PASSWORD=${{ secrets.MONGO_PASSWORD }}" >> $GITHUB_ENV
           echo "KAGGLE_DATASET_REMOTE_NAME=erlichsefi/test-super-dataset-2" >> $GITHUB_ENV
           echo "LOG_LEVEL=DEBUG" >> $GITHUB_ENV
+          echo "DISCORD_WEBHOOK_URL=${{ secrets.DISCORD_WEBHOOK_URL }}" >> $GITHUB_ENV
           echo "STOP=EOD" >> $GITHUB_ENV
           echo "REPEAT=NEVER" >> $GITHUB_ENV
           echo "WAIT_TIME_SECONDS=60" >> $GITHUB_ENV
