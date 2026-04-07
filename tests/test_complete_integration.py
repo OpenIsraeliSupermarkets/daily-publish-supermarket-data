@@ -122,7 +122,7 @@ def test_full_dag_integration_real():
         stage_folder = os.path.join(temp_dir, "stage")
         long_term_db_target = KaggleUploader(
             dataset_path=stage_folder,
-            dataset_remote_name="test-super-dataset-2",
+            dataset_remote_name="erlichsefi/test-super-dataset-2",
             when=now(),
         )
 

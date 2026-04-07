@@ -53,7 +53,6 @@ def get_access_layer():
                 mongodb_uri=os.environ["MONGODB_URI"]
             ),
             long_term_database_connector=KaggleUploader(
-                dataset_path=os.environ["KAGGLE_DATASET_REMOTE_NAME"],
                 dataset_remote_name=os.environ["KAGGLE_DATASET_REMOTE_NAME"],
                 when=datetime.now(),
             ),
@@ -62,14 +61,12 @@ def get_access_layer():
 
 
 @app.get("/list_chains", tags=["API"])
-async def list_chains(
-) -> AvailableChains:
+async def list_chains() -> AvailableChains:
     return get_access_layer().list_all_available_chains()
 
 
 @app.get("/list_file_types", tags=["API"])
-async def list_file_types(
-) -> TypeOfFileScraped:
+async def list_file_types() -> TypeOfFileScraped:
     return get_access_layer().list_all_available_file_types()
 
 
@@ -79,7 +76,7 @@ async def read_files(
     file_type: Optional[str] = None,
     store_number: Optional[str] = None,
     after_extracted_date: Optional[str] = None,
-    only_latest: bool = False
+    only_latest: bool = False,
 ) -> ScrapedFiles:
     try:
         # Parse the date string if provided
@@ -139,12 +136,10 @@ async def service_health_check() -> ServiceHealth:
 
 
 @app.get("/short_term_health", tags=["Health"])
-async def is_short_term_updated(
-) -> ShortTermDatabaseHealth:
+async def is_short_term_updated() -> ShortTermDatabaseHealth:
     return get_access_layer().is_short_term_updated()
 
 
 @app.get("/long_term_health", tags=["Health"])
-async def is_long_term_updated(
-) -> LongTermDatabaseHealth:
+async def is_long_term_updated() -> LongTermDatabaseHealth:
     return get_access_layer().is_long_term_updated()

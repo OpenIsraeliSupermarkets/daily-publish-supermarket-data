@@ -8,8 +8,6 @@ from sys import stdout
 from discord_logging.handler import DiscordHandler
 
 
-
-
 def build_logger():
     """create the logger instance"""
     # Define logger
@@ -20,7 +18,7 @@ def build_logger():
         log_formatter = logging.Formatter(
             "%(name)-12s %(asctime)s %(levelname)-8s %(filename)s:%(funcName)s %(message)s"
         )
-        
+
         # Console handler
         console_handler = logging.StreamHandler(stdout)  # set streamhandler to stdout
         console_handler.setFormatter(log_formatter)
@@ -39,7 +37,7 @@ def build_logger():
                 discord_handler = DiscordHandler(
                     "Supermarket Scraping Bot",
                     discord_webhook_url,
-                    avatar_url="https://cdn-icons-png.flaticon.com/512/3081/3081840.png"
+                    avatar_url="https://cdn-icons-png.flaticon.com/512/3081/3081840.png",
                 )
                 discord_handler.setFormatter(discord_formatter)
                 # Only log ERROR and CRITICAL messages to Discord to avoid spam

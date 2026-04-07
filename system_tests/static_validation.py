@@ -51,9 +51,9 @@ def validate_data_storage(
     try:
         # Initialize KaggleUploader
         long_term_db_target = KaggleUploader(
-            dataset_path=stage_folder,
             dataset_remote_name=dataset_remote_name,
             when=datetime.now(tz=pytz.utc),
+            dataset_path=stage_folder,
         )
 
         short_term_db_target = MongoDbUploader(mongodb_uri=mongodb_uri)

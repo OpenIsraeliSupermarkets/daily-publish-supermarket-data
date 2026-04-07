@@ -5,6 +5,7 @@ import json
 from itertools import chain
 from il_supermarket_scarper import DumpFolderNames
 
+
 # פונקציות עזר
 def connect_to_mongodb(uri="mongodb://192.168.1.129:27017/"):
     """התחברות למסד הנתונים והגדרת האוספים"""
@@ -100,7 +101,6 @@ def match_parsing_timestamps(
             associated_stamp = parsing_timestamp
             min_delta = diff
 
-      
     return associated_stamp, used_timestamp + [associated_stamp]
 
 

@@ -98,8 +98,7 @@ The health check integrates with the `HeartbeatManager` utility which the data p
 docker run -d \
   --name supermarket-data-processor \
   -e MONGODB_URI="mongodb://user:password@mongodb:27017/" \  # MongoDB connection string for short-term storage
-  -e KAGGLE_KEY="your_kaggle_key" \  # Kaggle API key from ~/.kaggle/kaggle.json
-  -e KAGGLE_USERNAME="your_username" \  # Your Kaggle username
+  -e KAGGLE_API_TOKEN="your_kaggle_api_token" \  # Kaggle API token from https://www.kaggle.com/settings (API section)
   -e KAGGLE_DATASET_REMOTE_NAME="username/dataset-name" \  # Target Kaggle dataset (format: username/dataset-name)
   -e APP_DATA_PATH="/app/app_data" \  # Directory for application data, logs, and heartbeat files
   -e OUTPUT_DESTINATION="mongo" \  # Short-term storage destination (options: mongo, kafka, file)
@@ -147,8 +146,7 @@ docker run -d \
   --name supermarket-api \
   -p 8000:8000 \  # Expose API on port 8000
   -e MONGODB_URI="mongodb://user:password@mongodb:27017/" \  # MongoDB connection string where scraped data is stored
-  -e KAGGLE_KEY="your_kaggle_key" \  # Kaggle API key for accessing published datasets
-  -e KAGGLE_USERNAME="your_username" \  # Your Kaggle username
+  -e KAGGLE_API_TOKEN="your_kaggle_api_token" \  # Kaggle API token from https://www.kaggle.com/settings (API section)
   -e KAGGLE_DATASET_REMOTE_NAME="username/dataset-name" \  # Kaggle dataset to serve (format: username/dataset-name)
   -e SUPABASE_URL="https://your-project.supabase.co" \  # Supabase URL for authentication
   -e SUPABASE_KEY="your_supabase_key" \  # Supabase anonymous key for token validation
@@ -200,16 +198,14 @@ Testing:
 
 ### Required for Data Processing
 - `MONGODB_URI` - MongoDB connection string
-- `KAGGLE_KEY` - Kaggle API key
-- `KAGGLE_USERNAME` - Kaggle username
-- `KAGGLE_DATASET_REMOTE_NAME` - Target Kaggle dataset
+- `KAGGLE_API_TOKEN` - Kaggle API token (from https://www.kaggle.com/settings, API section)
+- `KAGGLE_DATASET_REMOTE_NAME` - Target Kaggle dataset (format: `username/dataset-name`)
 - `APP_DATA_PATH` - Application data directory
 
 ### Required for API
 - `MONGODB_URI` - MongoDB connection string
-- `KAGGLE_KEY` - Kaggle API key
-- `KAGGLE_USERNAME` - Kaggle username
-- `KAGGLE_DATASET_REMOTE_NAME` - Kaggle dataset to serve
+- `KAGGLE_API_TOKEN` - Kaggle API token (from https://www.kaggle.com/settings, API section)
+- `KAGGLE_DATASET_REMOTE_NAME` - Kaggle dataset to serve (format: `username/dataset-name`)
 - `SUPABASE_URL` - Supabase project URL
 - `SUPABASE_KEY` - Supabase anonymous key
 

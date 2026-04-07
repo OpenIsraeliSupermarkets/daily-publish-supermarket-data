@@ -91,14 +91,18 @@ class LargeFilePushManager:
                     if open_file == record["file_name"]:
                         total_expected_records += 1
                     else:
-                        eof_to_send.append({"file_complete": "true",
-                            "file_name": open_file,
-                            "total_expected_records": total_expected_records,
-                        })
+                        eof_to_send.append(
+                            {
+                                "file_complete": "true",
+                                "file_name": open_file,
+                                "total_expected_records": total_expected_records,
+                            }
+                        )
                         open_file = record["file_name"]
                         total_expected_records = 1
 
-                    items.append(DataTable(
+                    items.append(
+                        DataTable(
                             row_index=record["row_index"],
                             found_folder=record["found_folder"],
                             file_name=record["file_name"],
@@ -107,7 +111,8 @@ class LargeFilePushManager:
                                 for k, v in record.items()
                                 if k not in ["row_index", "found_folder", "file_name"]
                             },
-                    ).to_dict())
+                        ).to_dict()
+                    )
             except Exception as e:
                 Logger.error(f"Error processing chunk: {e}")
                 Logger.error(f"Chunk: {chunk}")
@@ -123,15 +128,23 @@ class LargeFilePushManager:
                     for eof in eof_to_send:
                         if eof["file_name"] == last_row_saw.iloc[0].file_name:
                             eof["total_expected_records"] -= 1
-                self.database_manager._insert_to_destinations(target_table_name, eof_to_send)
+                self.database_manager._insert_to_destinations(
+                    target_table_name, eof_to_send
+                )
             # Save last row for next iteration
             last_row_saw = chunk.tail(1).set_index("row_index")
 
         if open_file is not None:
-            self.database_manager._insert_to_destinations(target_table_name, [{"file_complete": "true",
-                                "file_name": open_file,
-                                "total_expected_records": total_expected_records
-                            }])
+            self.database_manager._insert_to_destinations(
+                target_table_name,
+                [
+                    {
+                        "file_complete": "true",
+                        "file_name": open_file,
+                        "total_expected_records": total_expected_records,
+                    }
+                ],
+            )
         # Update cache with last processed row
         local_cache.update_last_processed_row(file, last_row)
         Logger.info(f"Completed pushing {file}")

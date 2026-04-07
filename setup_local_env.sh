@@ -29,11 +29,19 @@ print_info() {
 # Check if Python 3 is installed
 print_info "Step 1: Checking Python installation..."
 if ! command -v python3 &> /dev/null; then
-    print_error "Python 3 is not installed. Please install Python 3.8 or higher."
+    print_error "Python 3 is not installed. Please install Python 3.11.0."
     exit 1
 fi
 
 PYTHON_VERSION=$(python3 --version | cut -d' ' -f2)
+REQUIRED_VERSION="3.11.0"
+
+if [ "$PYTHON_VERSION" != "$REQUIRED_VERSION" ]; then
+    print_error "Python $REQUIRED_VERSION is required, but found $PYTHON_VERSION."
+    print_info "Use pyenv to install the correct version: pyenv install $REQUIRED_VERSION && pyenv local $REQUIRED_VERSION"
+    exit 1
+fi
+
 print_success "Python $PYTHON_VERSION found"
 
 # Check if pip is installed
@@ -96,9 +104,8 @@ print_success "Directories created (app_data, mongo_data)"
 # MONGO_DATA_PATH=./mongo_data
 
 # # Kaggle Configuration (use test values or your actual credentials)
-# KAGGLE_KEY=dummy_key_for_testing
-# KAGGLE_USERNAME=dummy_username
-# KAGGLE_DATASET_REMOTE_NAME=test/dataset
+# KAGGLE_API_TOKEN=dummy_api_token_for_testing
+# KAGGLE_DATASET_REMOTE_NAME=username/test-dataset
 # TEST_DB_NAME=test_dataset
 
 # # Supabase Configuration (use test values or your actual credentials)
@@ -139,8 +146,7 @@ print_success "Directories created (app_data, mongo_data)"
 # MONGO_DATA_PATH=./mongo_data
 
 # # Kaggle Configuration
-# KAGGLE_KEY=your_kaggle_key_here
-# KAGGLE_USERNAME=your_kaggle_username
+# KAGGLE_API_TOKEN=your_kaggle_api_token
 # KAGGLE_DATASET_REMOTE_NAME=your_username/test-dataset
 
 # # Supabase Configuration
@@ -181,8 +187,7 @@ print_success "Directories created (app_data, mongo_data)"
 # MONGO_DATA_PATH=./mongo_data
 
 # # Kaggle Configuration - REPLACE WITH YOUR ACTUAL CREDENTIALS
-# KAGGLE_KEY=your_kaggle_key_here
-# KAGGLE_USERNAME=your_kaggle_username
+# KAGGLE_API_TOKEN=your_kaggle_api_token
 # KAGGLE_DATASET_REMOTE_NAME=your_username/your-dataset
 
 # # Supabase Configuration - REPLACE WITH YOUR ACTUAL CREDENTIALS
@@ -259,7 +264,7 @@ echo "  1. Activate virtual environment:"
 echo "     ${GREEN}source venv/bin/activate${NC}"
 echo ""
 echo "  2. Edit .env file with your actual credentials:"
-echo "     - KAGGLE_KEY and KAGGLE_USERNAME"
+echo "     - KAGGLE_API_TOKEN"
 echo "     - SUPABASE_URL and SUPABASE_KEY"
 echo ""
 echo "  3. Run unit tests:"

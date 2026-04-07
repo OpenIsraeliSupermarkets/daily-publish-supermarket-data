@@ -44,7 +44,7 @@ class TestSupermarketDataPublisher:
     def test_init_defaults(self):
         """Test publisher initialization with default parameters."""
         publisher = SupermarketDataPublisher()
-        
+
         assert publisher.executed_jobs == 0
         assert publisher.last_execution_time is None
 
@@ -52,23 +52,25 @@ class TestSupermarketDataPublisher:
         """Test publisher initialization with custom parameters."""
         custom_long_term = Mock()
         custom_short_term = Mock()
-        
+
         publisher = SupermarketDataPublisher(
             long_term_db_target=custom_long_term,
             short_term_db_target=custom_short_term,
             number_of_scraping_processes=8,
             app_folder="custom_app",
-            enabled_scrapers=["scraper1", "scraper2"]
+            enabled_scrapers=["scraper1", "scraper2"],
         )
-        
+
         assert publisher.long_term_db_target == custom_long_term
         assert publisher.short_term_db_target == custom_short_term
         assert publisher.number_of_scraping_processes == 8
         assert publisher.app_folder == "custom_app"
         assert publisher.enabled_scrapers == ["scraper1", "scraper2"]
 
-    @patch('publishers.dag_simulator.datetime.datetime')
-    def test_run_basic_execution_no_final_operations(self, mock_datetime, mock_publisher, mock_operations, fixed_datetime):
+    @patch("publishers.dag_simulator.datetime.datetime")
+    def test_run_basic_execution_no_final_operations(
+        self, mock_datetime, mock_publisher, mock_operations, fixed_datetime
+    ):
         """Test basic execution flow without final operations."""
         # Setup mocks
         # Simulate time advancing by 1 hour every second in a separate thread
@@ -77,25 +79,33 @@ class TestSupermarketDataPublisher:
         duration_of_execution = 1
         sleep_time = 1
         for i in range(25):
-            # end 
-            end_execution_time = current_time[-1] + datetime.timedelta(hours=duration_of_execution)
+            # end
+            end_execution_time = current_time[-1] + datetime.timedelta(
+                hours=duration_of_execution
+            )
 
-            current_time.extend([end_execution_time, end_execution_time + datetime.timedelta(seconds=sleep_time)])
+            current_time.extend(
+                [
+                    end_execution_time,
+                    end_execution_time + datetime.timedelta(seconds=sleep_time),
+                ]
+            )
 
-        def get_time(): 
+        def get_time():
             return current_time.pop(0)
-        
-        with patch.object(mock_publisher, '_now', side_effect=get_time):
-            with patch('publishers.dag_simulator.SupermarketDataPublisherInterface.run') as mock_super_run:
-                mock_publisher.run(operations="a,b,c",
-                                final_operations="d,e",
-                                second_to_wait_between_opreation=sleep_time,
-                                second_to_wait_after_final_operations=0,
-                                should_execute_final_operations="EOD",
-                                should_stop_dag="ONCE")
-                
+
+        with patch.object(mock_publisher, "_now", side_effect=get_time):
+            with patch(
+                "publishers.dag_simulator.SupermarketDataPublisherInterface.run"
+            ) as mock_super_run:
+                mock_publisher.run(
+                    operations="a,b,c",
+                    final_operations="d,e",
+                    second_to_wait_between_opreation=sleep_time,
+                    second_to_wait_after_final_operations=0,
+                    should_execute_final_operations="EOD",
+                    should_stop_dag="ONCE",
+                )
+
                 # Should execute operations once
                 assert mock_super_run.call_count == 25
-
-
-   

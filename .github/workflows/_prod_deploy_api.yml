@@ -28,11 +28,10 @@ jobs:
           echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> $GITHUB_ENV
           echo "SUPABASE_KEY=${{ secrets.SUPABASE_KEY }}" >> $GITHUB_ENV
           echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> $GITHUB_ENV
-          echo "KAGGLE_USERNAME=${{ secrets.KAGGLE_USERNAME }}" >> $GITHUB_ENV
-          echo "KAGGLE_KEY=${{ secrets.KAGGLE_KEY }}" >> $GITHUB_ENV
+          echo "KAGGLE_API_TOKEN=${{ secrets.KAGGLE_API_TOKEN }}" >> $GITHUB_ENV
           echo "MONGO_USERNAME=${{ secrets.MONGO_USERNAME }}" >> $GITHUB_ENV
           echo "MONGO_PASSWORD=${{ secrets.MONGO_PASSWORD }}" >> $GITHUB_ENV
-          echo "KAGGLE_DATASET_REMOTE_NAME=israeli-supermarkets-2024" >> $GITHUB_ENV
+          echo "KAGGLE_DATASET_REMOTE_NAME=erlichsefi/israeli-supermarkets-2024" >> $GITHUB_ENV
           echo "LOG_LEVEL=WARNING" >> $GITHUB_ENV
 
           

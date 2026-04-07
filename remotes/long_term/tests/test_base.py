@@ -1,34 +1,22 @@
 import unittest
 import os
-import shutil
 import time
-import pytest
 import tempfile
 from datetime import datetime
 from remotes.long_term.file_storage import DummyFileStorage
 from remotes.long_term.kaggle import KaggleUploader
 
 
-def long_term_test_case(
-    long_term_db_target,
-    dataset_path=None,
-    dataset_remote_name=None,
-    when=datetime.now(),
-    **kwargs
-):
+def long_term_test_case(long_term_db_target, when=datetime.now(), **kwargs):
 
     class TestLongTermDatabaseUploader(unittest.TestCase):
 
         def setUp(self):
             # Create temporary directories for testing
             self.temp_dir = tempfile.TemporaryDirectory()
-            self.dataset_path = os.path.join(
-                self.temp_dir.name, dataset_path or "dataset-path"
-            )
-            self.dataset_remote_name = dataset_remote_name or "test-super-dataset"
-
+            self.dataset_path = os.path.join(self.temp_dir.name, "dataset-path")
             self.uploader = long_term_db_target(
-                self.dataset_path, self.dataset_remote_name, when, **kwargs
+                dataset_path=self.dataset_path, when=when, **kwargs
             )
 
         def test_increase_index(self):
@@ -62,11 +50,19 @@ def long_term_test_case(
     return TestLongTermDatabaseUploader
 
 
-class DummyLongTermTest(long_term_test_case(DummyFileStorage)):
+class DummyLongTermTest(
+    long_term_test_case(
+        DummyFileStorage, dataset_remote_path="erlichsefi/test-super-dataset-2"
+    )
+):
     pass
 
 
-class KaggleLongTermTest(long_term_test_case(KaggleUploader)):
+class KaggleLongTermTest(
+    long_term_test_case(
+        KaggleUploader, dataset_remote_name="erlichsefi/test-super-dataset-2"
+    )
+):
     pass
 
 
