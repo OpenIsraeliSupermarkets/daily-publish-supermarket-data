@@ -38,9 +38,7 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
         # Support for larger messages via environment variables
         # promo files can be larger than 1.2B
         # Default: 2MB (2097152 bytes)
-        self.max_request_size = int(
-            os.getenv("KAFKA_MAX_REQUEST_SIZE", "2097152")
-        )
+        self.max_request_size = int(os.getenv("KAFKA_MAX_REQUEST_SIZE", "2097152"))
         self.producer: Optional[AIOKafkaProducer] = None
         self.admin_client: Optional[KafkaAdminClient] = None
         self._connection_tested = False
@@ -56,10 +54,9 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
                 except RuntimeError:
                     self._loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(self._loop)
-            
+
             # Run the async connection in the event loop
             self._loop.run_until_complete(self._connect_to_kafka())
-
 
     async def _connect_to_kafka(self):
         """Establish connection to Kafka"""
@@ -102,7 +99,7 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
                 Logger.error(f"Error stopping Kafka producer: {e}")
             finally:
                 self.producer = None
-        
+
         if self.admin_client:
             try:
                 self.admin_client.close()
@@ -139,14 +136,16 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
             return
 
         self._ensure_connection()
-        
+
         # Ensure we have a producer before proceeding
         if self.producer is None:
             Logger.error("Failed to establish Kafka connection")
             return
-            
+
         # Run the async operation in the event loop
-        self._loop.run_until_complete(self._async_insert_to_destinations(table_target_name, items))
+        self._loop.run_until_complete(
+            self._async_insert_to_destinations(table_target_name, items)
+        )
 
     async def _async_insert_to_destinations(self, table_target_name, items):
         """Async implementation of insert to destinations."""
@@ -170,16 +169,16 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
                 try:
                     await self.producer.send_and_wait(
                         topic=topic_name,
-                        key=item['file_name'].encode("utf-8"),
+                        key=item["file_name"].encode("utf-8"),
                         value=item,
                     )
                     successful_records += 1
                 except KafkaError as inner_e:
                     Logger.error("Failed to send record: %s", str(inner_e))
 
-                if item['file_name'] not in flushs:
-                    flushs.add(item['file_name'])
-            
+                if item["file_name"] not in flushs:
+                    flushs.add(item["file_name"])
+
             # send flush message only if we successfully sent some records
             for file_name in flushs:
                 try:
@@ -191,7 +190,11 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
                 except KafkaError as flush_e:
                     Logger.error("Failed to send flush message: %s", str(flush_e))
 
-            Logger.info("Successfully sent %d/%d records to Kafka", successful_records, len(items))
+            Logger.info(
+                "Successfully sent %d/%d records to Kafka",
+                successful_records,
+                len(items),
+            )
         except Exception as e:
             Logger.error("Unexpected error during message sending: %s", str(e))
             raise
@@ -301,6 +304,7 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
 
             async def _get_messages():
                 import time
+
                 consumer = AIOKafkaConsumer(
                     topic_name,
                     bootstrap_servers=self.bootstrap_servers,
@@ -332,8 +336,10 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
                                     # Filter out warmup and flush messages
                                     if not (
                                         isinstance(deserialized_value, dict)
-                                        and (deserialized_value.get("warmup") == "true" or 
-                                             deserialized_value.get("flush") == "true")
+                                        and (
+                                            deserialized_value.get("warmup") == "true"
+                                            or deserialized_value.get("flush") == "true"
+                                        )
                                     ):
                                         # Create a hash for deduplication
                                         msg_hash = json.dumps(
@@ -349,8 +355,10 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
                                 # Filter out warmup and flush messages for non-bytes values too
                                 if not (
                                     isinstance(msg.value, dict)
-                                    and (msg.value.get("warmup") == "true" or 
-                                         msg.value.get("flush") == "true")
+                                    and (
+                                        msg.value.get("warmup") == "true"
+                                        or msg.value.get("flush") == "true"
+                                    )
                                 ):
                                     # Create a hash for deduplication
                                     msg_hash = json.dumps(msg.value, sort_keys=True)

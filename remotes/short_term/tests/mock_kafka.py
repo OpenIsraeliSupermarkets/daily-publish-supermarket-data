@@ -69,11 +69,13 @@ def mock_kafka_db(func):
             self.uploader.producer = mock_producer
             self.uploader.admin_client = mock_admin
             self.uploader._connection_tested = True
+
             # Create a proper mock event loop that can handle run_until_complete
             class MockEventLoop:
                 def run_until_complete(self, coro):
                     # Create a new event loop to run the coroutine
                     import asyncio
+
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
                     try:
@@ -81,7 +83,7 @@ def mock_kafka_db(func):
                         return result
                     finally:
                         loop.close()
-            
+
             self.uploader._loop = MockEventLoop()
 
             # Override get_destinations_content to return stored messages
@@ -97,7 +99,10 @@ def mock_kafka_db(func):
                 return [
                     msg
                     for msg in messages
-                    if not (isinstance(msg, dict) and (msg.get("warmup") == "true" or msg.get("flush") == "true"))
+                    if not (
+                        isinstance(msg, dict)
+                        and (msg.get("warmup") == "true" or msg.get("flush") == "true")
+                    )
                 ]
 
             # Override clean method to clear our in-memory storage

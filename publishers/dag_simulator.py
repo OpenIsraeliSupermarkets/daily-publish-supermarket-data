@@ -92,7 +92,7 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
         operations,
         final_operations=None,
         second_to_wait_between_opreation=60,
-        second_to_wait_after_final_operations=0,        
+        second_to_wait_after_final_operations=0,
         should_execute_final_operations="EOD",
         should_stop_dag="NEVER",
     ):
@@ -115,7 +115,7 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
         while not self._should_stop_dag(should_stop_dag):
             # execute operations until final operations are executed
             while True:
-                
+
                 # execute operations
                 Logger.info(f"Executing operations")
                 self._execute_operations(operations)
@@ -127,11 +127,15 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
                     break
 
                 # if not, wait for next run
-                Logger.info(f"Waiting {second_to_wait_between_opreation} seconds before next run")
+                Logger.info(
+                    f"Waiting {second_to_wait_between_opreation} seconds before next run"
+                )
                 time.sleep(second_to_wait_between_opreation)
 
             Logger.info(f"Executing final operations")
             if final_operations:
                 self._execute_operations(final_operations)
-                Logger.info(f"Waiting {second_to_wait_after_final_operations} seconds after final operations")
+                Logger.info(
+                    f"Waiting {second_to_wait_after_final_operations} seconds after final operations"
+                )
                 time.sleep(second_to_wait_after_final_operations)

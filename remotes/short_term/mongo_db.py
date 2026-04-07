@@ -88,7 +88,7 @@ class MongoDbUploader(ShortTermDatabaseUploader):
         try:
             self.db.create_collection(table_name)
             self.db[table_name].create_index(
-                [(partition_id, pymongo.ASCENDING)], unique=True
+                [(partition_id, pymongo.ASCENDING)], unique=True, sparse=True
             )
         except pymongo.errors.PyMongoError as e:
             Logger.error("Error creating collection: %s", str(e))

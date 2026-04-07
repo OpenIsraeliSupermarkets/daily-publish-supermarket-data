@@ -90,7 +90,13 @@ class AuthMiddleware(BaseHTTPMiddleware):  # pylint: disable=too-few-public-meth
         """
         try:
             # Allow documentation and health check endpoints without authentication
-            if request.url.path in ("/docs", "/openapi.json", "/service_health", "/short_term_health", "/long_term_health"):
+            if request.url.path in (
+                "/docs",
+                "/openapi.json",
+                "/service_health",
+                "/short_term_health",
+                "/long_term_health",
+            ):
                 return await call_next(request)
 
             # Validate Authorization header

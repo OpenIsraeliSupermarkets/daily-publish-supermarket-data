@@ -57,8 +57,7 @@ class LongTermDatabaseUploader(ABC):
         shutil.rmtree(self.dataset_path, ignore_errors=True)
 
     def download(self):
-        """Download the data from the remote dataset.
-        """
+        """Download the data from the remote dataset."""
         pass
 
     @abstractmethod
@@ -113,10 +112,16 @@ class LongTermDatabaseUploader(ABC):
             folder_or_file (str): Path to the original folder or file that was staged
         """
         if os.path.isdir(os.path.join(self.dataset_path, folder_or_file)):
-            shutil.copytree(os.path.join(self.dataset_path, folder_or_file), os.path.join(target_path, folder_or_file), dirs_exist_ok=True)
+            shutil.copytree(
+                os.path.join(self.dataset_path, folder_or_file),
+                os.path.join(target_path, folder_or_file),
+                dirs_exist_ok=True,
+            )
         else:
-            shutil.copy2(os.path.join(self.dataset_path, folder_or_file), os.path.join(target_path, folder_or_file))
-
+            shutil.copy2(
+                os.path.join(self.dataset_path, folder_or_file),
+                os.path.join(target_path, folder_or_file),
+            )
 
     def _read_index(self, index):
         if index is None:

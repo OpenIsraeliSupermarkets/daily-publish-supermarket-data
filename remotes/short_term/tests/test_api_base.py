@@ -8,6 +8,7 @@ import mongomock
 import os
 import shutil
 import copy
+
 try:
     from .mock_kafka import mock_kafka_db
 except ImportError:
@@ -28,7 +29,10 @@ def short_term_test_case(short_term_db_target):
             self.assertIn("test_table", self.uploader._list_destinations())
 
             # Test data insertion
-            test_items = [{"file_name": "1", "data": "test1"}, {"file_name": "2", "data": "test2"}]
+            test_items = [
+                {"file_name": "1", "data": "test1"},
+                {"file_name": "2", "data": "test2"},
+            ]
             self.uploader._insert_to_destinations(
                 "test_table", copy.deepcopy(test_items)
             )
@@ -43,7 +47,7 @@ def short_term_test_case(short_term_db_target):
         def test_clean_all_destinations(self):
             # Test that cleanup method runs without error
             self.uploader._clean_all_destinations()
-            
+
             # Create some test tables
             self.uploader._create_destinations("id", "table1")
             self.uploader._create_destinations("id", "table2")
@@ -51,22 +55,24 @@ def short_term_test_case(short_term_db_target):
             # Verify tables were created
             destinations = self.uploader._list_destinations()
             self.assertGreaterEqual(len(destinations), 2)
-            
+
             # Clean all tables (this may or may not actually delete them depending on implementation)
             self.uploader._clean_all_destinations()
-            
+
             # For implementations that support actual deletion, verify it worked
             # For implementations that don't support deletion (like Kafka), just verify the method runs
             final_destinations = self.uploader._list_destinations()
-            
+
             # If cleanup actually worked, we should have 0 destinations
             # If cleanup is not supported (like Kafka), we should still have the same number
             # Either way, the test should pass as long as the method runs without error
             if len(final_destinations) == 0:
                 print("✅ Cleanup actually deleted all destinations")
             else:
-                print(f"ℹ️  Cleanup method ran but destinations remain (implementation-specific behavior): {final_destinations}")
-            
+                print(
+                    f"ℹ️  Cleanup method ran but destinations remain (implementation-specific behavior): {final_destinations}"
+                )
+
             # The test passes as long as cleanup runs without error
             # The actual result depends on the implementation's capabilities
 
@@ -159,7 +165,7 @@ class KafkaTestCase(
 #     short_term_test_case(KafkaDbUploader(kafka_bootstrap_servers="localhost:9092"))
 # ):
 #     """Test case for running against real Kafka without mocks."""
-    
+
 #     def setUp(self):
 #         super().setUp()
 #         # Clean up any existing topics before each test
@@ -167,7 +173,7 @@ class KafkaTestCase(
 #             self.uploader._clean_all_destinations()
 #         except Exception as e:
 #             print(f"Warning: Could not clean up before test: {e}")
-        
+
 #     def tearDown(self):
 #         super().tearDown()
 #         # Clean up topics after each test

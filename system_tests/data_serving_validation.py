@@ -19,8 +19,10 @@ class ValidationResult:
     num_of_rows: int
     status: str
 
+
 def get_api_host():
     return "http://${API_IP}:8000/".format(API_IP=os.getenv("API_IP"))
+
 
 class ApiCallValidator:
     def __init__(

@@ -17,7 +17,7 @@ on:
         default: 'production'
       kaggle_dataset_remote_name:
         type: string
-        default: 'test-super-dataset-2'
+        default: 'erlichsefi/test-super-dataset-2'
 jobs:
   build:
 
@@ -48,13 +48,13 @@ jobs:
         echo "MONGO_URL=${{ secrets.MONGO_URL }}" >> $GITHUB_ENV
         echo "MONGO_PORT=${{ secrets.MONGO_PORT }}" >> $GITHUB_ENV
         echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> $GITHUB_ENV
-        echo "KAGGLE_USERNAME=${{ secrets.KAGGLE_USERNAME }}" >> $GITHUB_ENV
-        echo "KAGGLE_KEY=${{ secrets.KAGGLE_KEY }}" >> $GITHUB_ENV
+        echo "KAGGLE_API_TOKEN=${{ secrets.KAGGLE_API_TOKEN }}" >> $GITHUB_ENV
         echo "OPERATION=${{ inputs.operation }}" >> $GITHUB_ENV
         echo "MONGO_USERNAME=${{ secrets.MONGO_USERNAME }}" >> $GITHUB_ENV
         echo "MONGO_PASSWORD=${{ secrets.MONGO_PASSWORD }}" >> $GITHUB_ENV
         echo "KAGGLE_DATASET_REMOTE_NAME=${{ inputs.kaggle_dataset_remote_name }}" >> $GITHUB_ENV
         echo "LOG_LEVEL=WARNING" >> $GITHUB_ENV
+        echo "DISCORD_WEBHOOK_URL=${{ secrets.DISCORD_WEBHOOK_URL }}" >> $GITHUB_ENV
        
         
     - name: Build with Docker

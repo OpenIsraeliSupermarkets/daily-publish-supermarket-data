@@ -21,7 +21,7 @@
 
 # class RealKafkaTestCase(unittest.TestCase):
 #     """Test case for running against real Kafka without mocks."""
-    
+
 #     def setUp(self):
 #         self.uploader = KafkaDbUploader(kafka_bootstrap_servers="localhost:9092")
 #         # Clean up any existing topics before each test
@@ -29,14 +29,14 @@
 #             self.uploader._clean_all_destinations()
 #         except Exception as e:
 #             print(f"Warning: Could not clean up before test: {e}")
-        
+
 #     def tearDown(self):
 #         # Clean up topics after each test (this won't actually delete them in real Kafka)
 #         try:
 #             self.uploader._clean_all_destinations()
 #         except Exception as e:
 #             print(f"Warning: Could not clean up after test: {e}")
-        
+
 #         # Properly disconnect from Kafka
 #         try:
 #             self.uploader.disconnect()
@@ -47,7 +47,7 @@
 #         import time
 #         # Use unique table name to avoid conflicts
 #         table_name = f"test_table_{int(time.time())}"
-        
+
 #         # Test table creation
 #         self.uploader._create_destinations("id", table_name)
 #         self.assertIn(table_name, self.uploader._list_destinations())
@@ -57,16 +57,16 @@
 #         self.uploader._insert_to_destinations(
 #             table_name, copy.deepcopy(test_items)
 #         )
-        
+
 #         # Give some time for messages to be available
 #         time.sleep(1)
-        
+
 #         result = list(self.uploader.get_destinations_content(table_name))
 #         print(f"DEBUG: Got {len(result)} messages: {result}")
-        
+
 #         # Filter only actual data items (not warmup/flush messages)
 #         data_items = [item for item in result if "id" in item and "data" in item]
-        
+
 #         self.assertEqual(
 #             sorted(data_items, key=lambda x: x["id"]),
 #             sorted(test_items, key=lambda x: x["id"]),
@@ -76,25 +76,25 @@
 #         # In real Kafka, topic deletion is disabled for safety
 #         # So we test that the clean method runs without error
 #         initial_topics = self.uploader._list_destinations()
-        
+
 #         # Create some test tables
 #         self.uploader._create_destinations("id", "test_table1_clean")
 #         self.uploader._create_destinations("id", "test_table2_clean")
-        
+
 #         # Call clean (which will log warnings but not actually delete)
 #         self.uploader._clean_all_destinations()
-        
+
 #         # Since deletion is disabled, topics should still exist
 #         final_topics = self.uploader._list_destinations()
 #         self.assertGreaterEqual(len(final_topics), len(initial_topics))
-        
+
 #         print(f"✅ Clean destinations test passed. Topics remain for safety: {final_topics}")
 
 #     def test_get_destinations_content(self):
 #         import time
 #         # Use unique table name
 #         table_name = f"files_{int(time.time())}"
-        
+
 #         # Create test data
 #         self.uploader._create_destinations("id", table_name)
 #         test_items = [
@@ -110,7 +110,7 @@
 #         # Test reading the content we just inserted
 #         files = self.uploader.get_destinations_content(table_name)
 #         print(f"DEBUG: Got {len(files)} files: {files}")
-        
+
 #         # Filter only actual data items
 #         data_items = [item for item in files if "id" in item and "chain" in item]
 #         self.assertEqual(len(data_items), 3)
@@ -119,10 +119,10 @@
 #         import time
 #         # Use unique table name
 #         table_name = f"update_test_{int(time.time())}"
-        
+
 #         # Test recent update
 #         self.uploader._create_destinations("id", table_name)
-        
+
 #         # For real Kafka, topics with only warmup messages are considered "not updated"
 #         # But they might still be considered updated, so let's test the actual functionality
 #         initial_state = self.uploader._is_collection_updated(table_name)
@@ -132,13 +132,13 @@
 #         self.uploader._insert_to_destinations(
 #             table_name, [{"id": "1", "data": "test"}]
 #         )
-        
+
 #         # Give some time for the message to be processed
 #         time.sleep(1)
-        
+
 #         updated_state = self.uploader._is_collection_updated(table_name)
 #         print(f"DEBUG: Updated state for {table_name}: {updated_state}")
-        
+
 #         # After adding real data, it should be considered updated
 #         self.assertTrue(updated_state)
 
@@ -148,7 +148,7 @@
 #     print("🧪 Testing Kafka implementation against real Kafka instance...")
 #     print("📍 Expected Kafka location: localhost:9092")
 #     print("=" * 60)
-    
+
 #     # Test basic connectivity first
 #     try:
 #         uploader = KafkaDbUploader(kafka_bootstrap_servers="localhost:9092")
@@ -159,14 +159,14 @@
 #         print("💡 Make sure Kafka is running at localhost:9092")
 #         print("   You can start it with: docker-compose up -d zookeeper kafka")
 #         return 1
-    
+
 #     # Run the actual tests
 #     loader = unittest.TestLoader()
 #     suite = loader.loadTestsFromTestCase(RealKafkaTestCase)
-    
+
 #     runner = unittest.TextTestRunner(verbosity=2, stream=sys.stdout)
 #     result = runner.run(suite)
-    
+
 #     if result.wasSuccessful():
 #         print("\n✅ All tests passed against real Kafka!")
 #         return 0

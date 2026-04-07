@@ -13,7 +13,7 @@ from utils import Logger
 class HeartbeatManager:
     """
     Manages heartbeat status file for health monitoring.
-    
+
     Tracks individual operations and their execution status,
     allowing health checks to verify the process is running correctly.
     """
@@ -37,7 +37,7 @@ class HeartbeatManager:
         """
         if os.path.exists(self.heartbeat_path):
             try:
-                with open(self.heartbeat_path, 'r', encoding='utf-8') as f:
+                with open(self.heartbeat_path, "r", encoding="utf-8") as f:
                     return json.load(f)
             except Exception as e:
                 Logger.error(f"Error reading heartbeat file: {e}")
@@ -52,7 +52,7 @@ class HeartbeatManager:
             data: Dictionary to write to heartbeat file
         """
         try:
-            with open(self.heartbeat_path, 'w', encoding='utf-8') as f:
+            with open(self.heartbeat_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
         except Exception as e:
             Logger.error(f"Error writing heartbeat file: {e}")
@@ -65,23 +65,25 @@ class HeartbeatManager:
             operation: Name of the operation being started
         """
         data = self._read_heartbeat()
-        data['last_update'] = datetime.now().isoformat()
-        data['current_operation'] = operation
-        
-        if 'operations' not in data:
-            data['operations'] = {}
-        
-        data['operations'][operation] = {
-            'status': 'running',
-            'started_at': datetime.now().isoformat(),
-            'completed_at': None,
-            'error': None
+        data["last_update"] = datetime.now().isoformat()
+        data["current_operation"] = operation
+
+        if "operations" not in data:
+            data["operations"] = {}
+
+        data["operations"][operation] = {
+            "status": "running",
+            "started_at": datetime.now().isoformat(),
+            "completed_at": None,
+            "error": None,
         }
-        
+
         self._write_heartbeat(data)
         Logger.info(f"Heartbeat: Started operation '{operation}'")
 
-    def complete_operation(self, operation: str, success: bool = True, error: Optional[str] = None):
+    def complete_operation(
+        self, operation: str, success: bool = True, error: Optional[str] = None
+    ):
         """
         Mark an operation as completed.
 
@@ -91,28 +93,30 @@ class HeartbeatManager:
             error: Error message if operation failed
         """
         data = self._read_heartbeat()
-        data['last_update'] = datetime.now().isoformat()
-        data['current_operation'] = None
-        
-        if 'operations' not in data:
-            data['operations'] = {}
-        
-        if operation in data['operations']:
-            data['operations'][operation]['status'] = 'success' if success else 'failed'
-            data['operations'][operation]['completed_at'] = datetime.now().isoformat()
+        data["last_update"] = datetime.now().isoformat()
+        data["current_operation"] = None
+
+        if "operations" not in data:
+            data["operations"] = {}
+
+        if operation in data["operations"]:
+            data["operations"][operation]["status"] = "success" if success else "failed"
+            data["operations"][operation]["completed_at"] = datetime.now().isoformat()
             if error:
-                data['operations'][operation]['error'] = str(error)
+                data["operations"][operation]["error"] = str(error)
         else:
             # Operation wasn't started properly, create entry
-            data['operations'][operation] = {
-                'status': 'success' if success else 'failed',
-                'started_at': datetime.now().isoformat(),
-                'completed_at': datetime.now().isoformat(),
-                'error': str(error) if error else None
+            data["operations"][operation] = {
+                "status": "success" if success else "failed",
+                "started_at": datetime.now().isoformat(),
+                "completed_at": datetime.now().isoformat(),
+                "error": str(error) if error else None,
             }
-        
+
         self._write_heartbeat(data)
-        Logger.info(f"Heartbeat: Completed operation '{operation}' with status '{data['operations'][operation]['status']}'")
+        Logger.info(
+            f"Heartbeat: Completed operation '{operation}' with status '{data['operations'][operation]['status']}'"
+        )
 
     def update_heartbeat(self):
         """
@@ -120,11 +124,13 @@ class HeartbeatManager:
         Useful for long-running operations to show the process is still alive.
         """
         data = self._read_heartbeat()
-        data['last_update'] = datetime.now().isoformat()
+        data["last_update"] = datetime.now().isoformat()
         self._write_heartbeat(data)
 
     @staticmethod
-    def check_health(heartbeat_path: str, max_age_seconds: int = 300) -> tuple[bool, str]:
+    def check_health(
+        heartbeat_path: str, max_age_seconds: int = 300
+    ) -> tuple[bool, str]:
         """
         Check if the heartbeat indicates a healthy process.
 
@@ -139,46 +145,54 @@ class HeartbeatManager:
             return False, "Heartbeat file does not exist"
 
         try:
-            with open(heartbeat_path, 'r', encoding='utf-8') as f:
+            with open(heartbeat_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
         except Exception as e:
             return False, f"Error reading heartbeat file: {e}"
 
         # Check if heartbeat file has required fields
-        if 'last_update' not in data:
+        if "last_update" not in data:
             return False, "Heartbeat file missing 'last_update' field"
 
         # Check heartbeat age
         try:
-            last_update = datetime.fromisoformat(data['last_update'])
+            last_update = datetime.fromisoformat(data["last_update"])
             age_seconds = (datetime.now() - last_update).total_seconds()
-            
+
             if age_seconds > max_age_seconds:
-                return False, f"Heartbeat is stale (last update: {age_seconds:.0f}s ago)"
+                return (
+                    False,
+                    f"Heartbeat is stale (last update: {age_seconds:.0f}s ago)",
+                )
         except Exception as e:
             return False, f"Error parsing last_update timestamp: {e}"
 
         # Check for failed operations
-        operations = data.get('operations', {})
+        operations = data.get("operations", {})
         failed_ops = [
-            op for op, status in operations.items() 
-            if status.get('status') == 'failed'
+            op for op, status in operations.items() if status.get("status") == "failed"
         ]
-        
+
         if failed_ops:
-            errors = [operations[op].get('error', 'Unknown error') for op in failed_ops]
-            return False, f"Operations failed: {', '.join(failed_ops)}. Errors: {'; '.join(errors)}"
+            errors = [operations[op].get("error", "Unknown error") for op in failed_ops]
+            return (
+                False,
+                f"Operations failed: {', '.join(failed_ops)}. Errors: {'; '.join(errors)}",
+            )
 
         # Check if there's a long-running operation
-        current_op = data.get('current_operation')
+        current_op = data.get("current_operation")
         if current_op and current_op in operations:
             op_data = operations[current_op]
-            if op_data.get('status') == 'running':
+            if op_data.get("status") == "running":
                 try:
-                    started_at = datetime.fromisoformat(op_data['started_at'])
+                    started_at = datetime.fromisoformat(op_data["started_at"])
                     running_time = (datetime.now() - started_at).total_seconds()
                     # This is just informational, not a failure condition
-                    return True, f"Healthy. Currently running: {current_op} (for {running_time:.0f}s)"
+                    return (
+                        True,
+                        f"Healthy. Currently running: {current_op} (for {running_time:.0f}s)",
+                    )
                 except Exception:
                     pass
 

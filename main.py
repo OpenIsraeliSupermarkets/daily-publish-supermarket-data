@@ -1,4 +1,9 @@
-from remotes import KaggleUploader, KafkaDbUploader, MongoDbUploader, DummyDocumentDbUploader
+from remotes import (
+    KaggleUploader,
+    KafkaDbUploader,
+    MongoDbUploader,
+    DummyDocumentDbUploader,
+)
 from publishers import SupermarketDataPublisherInterface, SupermarketDataPublisher
 import os
 import datetime
@@ -6,7 +11,6 @@ from utils import now
 from utils import Logger
 import datetime
 import pytz
-
 
 
 def output_short_term_destination_from_env(output_destination):
@@ -20,6 +24,7 @@ def output_short_term_destination_from_env(output_destination):
         return DummyDocumentDbUploader("./document_db")
     else:
         raise ValueError(f"Invalid output destination: {output_destination}")
+
 
 if __name__ == "__main__":
 
@@ -63,15 +68,21 @@ if __name__ == "__main__":
     Logger.info(f"Limit: {limit}")
     Logger.info(f"When: {when}")
 
-    second_to_wait_between_opreation = os.environ.get("SECOND_TO_WAIT_BETWEEN_OPERATIONS", 60 * 30)
+    second_to_wait_between_opreation = os.environ.get(
+        "SECOND_TO_WAIT_BETWEEN_OPERATIONS", 60 * 30
+    )
     try:
         second_to_wait_between_opreation = int(second_to_wait_between_opreation)
     except ValueError:
         second_to_wait_between_opreation = 60
 
-    second_to_wait_after_final_operations = os.environ.get("SECOND_TO_WAIT_AFTER_FINAL_OPERATIONS", 0)
+    second_to_wait_after_final_operations = os.environ.get(
+        "SECOND_TO_WAIT_AFTER_FINAL_OPERATIONS", 0
+    )
     try:
-        second_to_wait_after_final_operations = int(second_to_wait_after_final_operations)
+        second_to_wait_after_final_operations = int(
+            second_to_wait_after_final_operations
+        )
     except ValueError:
         second_to_wait_after_final_operations = 0
 
@@ -85,9 +96,6 @@ if __name__ == "__main__":
         enabled_scrapers=enabled_scrapers,
         enabled_file_types=enabled_file_types,
         long_term_db_target=KaggleUploader(
-            dataset_path=os.environ[
-                "KAGGLE_DATASET_REMOTE_NAME"
-            ],  # make the folder the same name
             dataset_remote_name=os.environ["KAGGLE_DATASET_REMOTE_NAME"],
             when=when if when else now(),
         ),
@@ -108,7 +116,9 @@ if __name__ == "__main__":
         publisher.run(
             second_to_wait_between_opreation=second_to_wait_between_opreation,
             second_to_wait_after_final_operations=second_to_wait_after_final_operations,
-            should_execute_final_operations=os.environ.get("EXEC_FINAL_OPERATIONS_CONDITION", "EOD"),
+            should_execute_final_operations=os.environ.get(
+                "EXEC_FINAL_OPERATIONS_CONDITION", "EOD"
+            ),
             should_stop_dag=os.environ.get("STOP_DAG_CONDITION", "NEVER"),
             operations="scraping,converting,api_update,clean_dump_files",
             final_operations="publishing,clean_all_source_data",
