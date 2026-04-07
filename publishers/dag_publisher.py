@@ -83,4 +83,4 @@ class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
                     operation, success=False, error=str(e)
                 )
                 Logger.error(f"Operation {operation} failed: {e}")
-                raise  # Re-raise the exception to maintain original behavior
+                # raise  # Re-raise the exception to maintain original behavior
