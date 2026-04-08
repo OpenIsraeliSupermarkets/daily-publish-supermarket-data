@@ -97,7 +97,7 @@ class ShortTermDBDatasetManager:
         for index, event in enumerate(status_output.events):
             task_id = event.task_id
             event_key = (
-                f"{event.status}@{task_id.isoformat()}"
+                f"{event.status}@{task_id}"
            
                 if task_id
                 else f"{event.status}@{index}"
