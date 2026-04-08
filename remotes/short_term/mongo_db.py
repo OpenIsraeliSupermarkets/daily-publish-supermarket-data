@@ -88,13 +88,14 @@ class MongoDbUploader(ShortTermDatabaseUploader):
         try:
             self.db.create_collection(table_name)
             coll = self.db[table_name]
-            # Data rows use row_index; completion markers omit it. A plain unique index
-            # treats multiple missing keys as duplicate null (E11000 on file_complete).
+            # Data rows include `content`; file_complete markers do not. A sparse unique
+            # index treats multiple missing row_index as duplicate null (E11000).
+            # Use a positive partial filter ($exists: true); $exists: false is not allowed.
             if partition_id == "row_index":
                 coll.create_index(
                     [(partition_id, pymongo.ASCENDING)],
                     unique=True,
-                    partialFilterExpression={"file_complete": {"$exists": False}},
+                    partialFilterExpression={"content": {"$exists": True}},
                 )
             else:
                 coll.create_index(
