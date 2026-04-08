@@ -87,9 +87,20 @@ class MongoDbUploader(ShortTermDatabaseUploader):
         Logger.info("Creating collection: %s", table_name)
         try:
             self.db.create_collection(table_name)
-            self.db[table_name].create_index(
-                [(partition_id, pymongo.ASCENDING)], unique=True, sparse=True
-            )
+            coll = self.db[table_name]
+            # Data rows include `content`; file_complete markers do not. A sparse unique
+            # index treats multiple missing row_index as duplicate null (E11000).
+            # Use a positive partial filter ($exists: true); $exists: false is not allowed.
+            if partition_id == "row_index":
+                coll.create_index(
+                    [(partition_id, pymongo.ASCENDING)],
+                    unique=True,
+                    partialFilterExpression={"content": {"$exists": True}},
+                )
+            else:
+                coll.create_index(
+                    [(partition_id, pymongo.ASCENDING)], unique=True, sparse=True
+                )
         except pymongo.errors.PyMongoError as e:
             Logger.error("Error creating collection: %s", str(e))
 
