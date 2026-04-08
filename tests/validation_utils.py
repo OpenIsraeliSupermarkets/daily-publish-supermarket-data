@@ -289,7 +289,9 @@ def validate_short_term_structure(
     ), f"Expected {chains_batch_count} chains, found {chains_batch_count.keys()}"
 
     for chain, times_to_count in chains_batch_count.items():
-        assert len(times_to_count) > 0, f"Expected at least one occasion for chain {chain}"
+        assert (
+            len(times_to_count) > 0
+        ), f"Expected at least one occasion for chain {chain}"
 
     if num_of_occasions is not None:
         for chain, times_to_count in chains_batch_count.items():

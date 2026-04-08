@@ -97,10 +97,7 @@ class ShortTermDBDatasetManager:
         for index, event in enumerate(status_output.events):
             task_id = event.task_id
             event_key = (
-                f"{event.status}@{task_id}"
-           
-                if task_id
-                else f"{event.status}@{index}"
+                f"{event.status}@{task_id}" if task_id else f"{event.status}@{index}"
             )
 
             if event_key in pushed_keys:
@@ -117,7 +114,9 @@ class ShortTermDBDatasetManager:
                     timestamp=event.system_timestamp,
                     status=event.status,
                     when=event.system_timestamp,
-                    status_data=event.model_dump(mode="json", exclude={"status", "when"}),
+                    status_data=event.model_dump(
+                        mode="json", exclude={"status", "when"}
+                    ),
                 ).to_dict()
             )
             new_keys.append(event_key)
