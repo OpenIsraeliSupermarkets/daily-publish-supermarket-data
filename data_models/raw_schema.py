@@ -250,14 +250,7 @@ class ScraperStatus(CommonModel):
     timestamp: datetime
     status: str
     when: datetime
-    status_data: Union[
-        ScraperStartedStatus,
-        ScraperCollectedStatus,
-        ScraperDownloadedStatus,
-        ScraperEstimatedSizeStatus,
-        ScraperDownloadtTimeException,
-        ScraperScrapingException,
-    ]
+    status_data: dict[str, Any]
     file_name: str = "scraper_status"
 
     @classmethod

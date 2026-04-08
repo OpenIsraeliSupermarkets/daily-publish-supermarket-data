@@ -7,6 +7,7 @@ from managers.cache_manager import CacheManager, CacheState
 from managers.large_file_push_manager import LargeFilePushManager
 from data_models.raw_schema import ParserStatus, ScraperStatus
 from datetime import datetime
+from il_supermarket_scarper.utils.scraper_status_contract import ScraperStatusOutput
 
 
 class ShortTermDBDatasetManager:
@@ -84,46 +85,47 @@ class ShortTermDBDatasetManager:
         with open(os.path.join(self.status_folder, file_name), "r") as f:
             data = json.load(f)
 
-        pushed_timestamp = local_cahce.get_pushed_timestamps(file_name)
-        Logger.info(f"Pushing {file_name}: already pushed {pushed_timestamp}")
+        status_output = ScraperStatusOutput.model_validate(data)
+
+        pushed_keys = local_cahce.get_pushed_timestamps(file_name)
+        Logger.info(f"Pushing {file_name}: already pushed {len(pushed_keys)} events")
+
+        scraper_name = file_name.split(".")[0]
 
         records = []
-        for index, (timestamp, actions) in enumerate(data.items()):
+        new_keys = []
+        for index, event in enumerate(status_output.events):
+            event_when = event.when
+            event_key = (
+                f"{event.status}@{event_when.replace(microsecond=0).isoformat()}"
+           
+                if event_when
+                else f"{event.status}@{index}"
+            )
 
-            if timestamp == "verified_downloads":
+            if event_key in pushed_keys:
                 continue
 
-            if timestamp in pushed_timestamp:
-                continue
+            Logger.info(f"Pushing {file_name}: {event_key}")
 
-            Logger.info(f"Pushing {file_name}: {timestamp}")
-            for action in actions:
-                records.append(
-                    ScraperStatus(
-                        index=ScraperStatus.to_index(
-                            file_name.split(".")[0],
-                            action["status"],
-                            timestamp,
-                            str(index),
-                        ),
-                        file_name=file_name.split(".")[0],
-                        timestamp=datetime.strptime(timestamp, "%Y%m%d%H%M%S").strftime(
-                            "%Y-%m-%d %H:%M:%S.%f%z"
-                        ),
-                        status=action["status"],
-                        when=action["when"],
-                        status_data={
-                            key: value
-                            for key, value in action.items()
-                            if key != "status" and key != "when"
-                        },
-                    ).to_dict()
-                )
+            timestamp_str = (
+                event_when.strftime("%Y%m%d%H%M%S") if event_when else str(index)
+            )
+            records.append(
+                ScraperStatus(
+                    index=ScraperStatus.to_index(
+                        scraper_name, event.status, timestamp_str, str(index)
+                    ),
+                    file_name=scraper_name,
+                    timestamp=event_when,
+                    status=event.status,
+                    when=event_when,
+                    status_data=event.model_dump(mode="json", exclude={"status", "when"}),
+                ).to_dict()
+            )
+            new_keys.append(event_key)
 
-            pushed_timestamp.append(timestamp)
-
-        local_cahce.update_pushed_timestamps(file_name, pushed_timestamp)
-
+        local_cahce.update_pushed_timestamps(file_name, pushed_keys + new_keys)
         self.uploader._insert_to_destinations(ScraperStatus.get_table_name(), records)
 
     def _push_files_data(self, local_cahce: CacheState):

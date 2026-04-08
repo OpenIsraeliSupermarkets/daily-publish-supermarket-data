@@ -4,7 +4,6 @@ Provides validation helpers for scraper output, converter output, and database s
 """
 
 from il_supermarket_scarper import DumpFolderNames, FileTypesFilters
-from il_supermarket_scarper.utils import ScraperStatus as ScraperStatusReport
 from data_models.raw_schema import ScraperStatus, ParserStatus, file_name_to_table
 from managers.cache_manager import CacheManager
 from access.access_layer import AccessLayer
@@ -264,21 +263,10 @@ def validate_short_term_structure(
         enabled_scrapers: List of enabled scrapers
     """
     # Scraper behaviour:
-    # - The should be at least one document.
-    # - All scrapers ran at least once.
-    # - Each iteration was completed  all steps.
-    # - The is at least one itreaion.
-    # - If we know the number of itreations, we expect it. otherwise, we don't.
-    #
-    # Ignore: compraing the number of itreation across scrapers.
-    num_of_documents_in_scraper_status_per_chain = len(
-        [
-            ScraperStatusReport.STARTED,
-            ScraperStatusReport.COLLECTED,
-            ScraperStatusReport.DOWNLOADED,
-            ScraperStatusReport.ESTIMATED_SIZE,
-        ]
-    )
+    # - At least one document; all enabled scrapers ran at least once.
+    # - Status rows use batch timestamps; each run adds many per-file events
+    #   (saw/collected/downloaded/...) so counts per (chain, time) are not fixed.
+    # - Distinct timestamps per chain == number of scrape occasions when known.
 
     scraper_status_table = ScraperStatus.get_table_name()
     table_content = short_term_db_target.get_destinations_content(scraper_status_table)
@@ -300,21 +288,15 @@ def validate_short_term_structure(
         enabled_scrapers
     ), f"Expected {chains_batch_count} chains, found {chains_batch_count.keys()}"
 
-    # each itreation was completed succsufll.
-    for chain, counts in chains_batch_count.items():
-        assert len(counts) > 0, f"Expected at least one occasion for chain {chain}"
-        for time, count in counts.items():
-            assert (
-                count == num_of_documents_in_scraper_status_per_chain
-            ), f"Expected {num_of_documents_in_scraper_status_per_chain} documents for index {chain}@{time}, found {count}"
+    for chain, times_to_count in chains_batch_count.items():
+        assert len(times_to_count) > 0, f"Expected at least one occasion for chain {chain}"
 
-    # the number of occasions is correct
     if num_of_occasions is not None:
-        assert (
-            actual_scraper_status_count
-            / (num_of_documents_in_scraper_status_per_chain * len(enabled_scrapers))
-            == num_of_occasions
-        ), f"Expected {num_of_occasions} occasions, found {actual_no_of_occasions}"
+        for chain, times_to_count in chains_batch_count.items():
+            assert len(times_to_count) == num_of_occasions, (
+                f"Expected {num_of_occasions} occasions for chain {chain}, "
+                f"found {len(times_to_count)}"
+            )
 
     assert short_term_db_target._is_collection_updated(
         scraper_status_table, seconds=60 * 60 * 3
