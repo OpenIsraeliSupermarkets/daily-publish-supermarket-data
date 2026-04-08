@@ -1,4 +1,4 @@
-git+https://github.com/OpenIsraeliSupermarkets/israeli-supermarket-scarpers.git@agent
+git+https://github.com/OpenIsraeliSupermarkets/israeli-supermarket-scarpers.git@some
 il-supermarket-parser==0.2.2
 kagglehub==1.0.0
 schedule==1.2.2

@@ -7,7 +7,7 @@ from managers.cache_manager import CacheManager, CacheState
 from managers.large_file_push_manager import LargeFilePushManager
 from data_models.raw_schema import ParserStatus, ScraperStatus
 from datetime import datetime
-from il_supermarket_scarper.utils.scraper_status_contract import ScraperStatusOutput
+from il_supermarket_scarper import ScraperStatusOutput
 
 
 class ShortTermDBDatasetManager:
@@ -95,11 +95,11 @@ class ShortTermDBDatasetManager:
         records = []
         new_keys = []
         for index, event in enumerate(status_output.events):
-            event_when = event.when
+            task_id = event.task_id
             event_key = (
-                f"{event.status}@{event_when.replace(microsecond=0).isoformat()}"
+                f"{event.status}@{task_id.isoformat()}"
            
-                if event_when
+                if task_id
                 else f"{event.status}@{index}"
             )
 
@@ -108,18 +108,15 @@ class ShortTermDBDatasetManager:
 
             Logger.info(f"Pushing {file_name}: {event_key}")
 
-            timestamp_str = (
-                event_when.strftime("%Y%m%d%H%M%S") if event_when else str(index)
-            )
             records.append(
                 ScraperStatus(
                     index=ScraperStatus.to_index(
-                        scraper_name, event.status, timestamp_str, str(index)
+                        scraper_name, event.status, task_id, str(index)
                     ),
                     file_name=scraper_name,
-                    timestamp=event_when,
+                    timestamp=event.system_timestamp,
                     status=event.status,
-                    when=event_when,
+                    when=event.system_timestamp,
                     status_data=event.model_dump(mode="json", exclude={"status", "when"}),
                 ).to_dict()
             )
