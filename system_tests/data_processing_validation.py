@@ -19,48 +19,65 @@ def connect_to_mongodb(uri="mongodb://192.168.1.129:27017/"):
 
 
 def get_file_timestamps(scraper_status_collection):
-    """אחזור חותמות זמן ייחודיות לכל קובץ"""
-    file_name_dict = defaultdict(set)
+    """אחזור מזהי ריצה ייחודיים לכל קובץ, עם חותמת הזמן המוקדמת ביותר של כל ריצה"""
+    # {chain: {task_id: earliest_timestamp}}
+    file_task_map = defaultdict(dict)
     for doc in scraper_status_collection.find(
-        {}, {"timestamp": 1, "file_name": 1, "_id": 0}
+        {}, {"file_name": 1, "status_data.task_id": 1, "timestamp": 1, "_id": 0}
     ):
-        if "timestamp" in doc and "file_name" in doc:
-            file_name_dict[doc["file_name"]].add(doc["timestamp"])
+        if "file_name" not in doc or "status_data" not in doc:
+            continue
+        task_id = doc["status_data"].get("task_id")
+        timestamp = doc.get("timestamp")
+        if not task_id or not timestamp:
+            continue
+        chain = doc["file_name"]
+        if isinstance(timestamp, datetime.datetime):
+            timestamp_str = timestamp.strftime("%Y-%m-%d %H:%M:%S")
+        else:
+            timestamp_str = str(timestamp)
+        existing = file_task_map[chain].get(task_id)
+        if existing is None or timestamp_str < existing:
+            file_task_map[chain][task_id] = timestamp_str
     return {
-        file_name: sorted(timestamps)
-        for file_name, timestamps in file_name_dict.items()
+        chain: sorted(task_map.items(), key=lambda x: x[1])
+        for chain, task_map in file_task_map.items()
     }
 
 
-def get_scraper_status(scraper_status_collection, chain_name, timestamp):
+def get_scraper_status(scraper_status_collection, chain_name, task_id):
     """ניתוח קבצים של רשת ספציפית"""
-    collected = scraper_status_collection.find_one(
-        {"timestamp": timestamp, "file_name": chain_name.lower(), "status": "collected"}
+    query_base = {"file_name": chain_name.lower(), "status_data.task_id": task_id}
+
+    collected_docs = list(
+        scraper_status_collection.find({**query_base, "status": "collected"})
     )
-    downloaded = scraper_status_collection.find_one(
-        {
-            "timestamp": timestamp,
-            "file_name": chain_name.lower(),
-            "status": "downloaded",
-        }
+    downloaded_docs = list(
+        scraper_status_collection.find({**query_base, "status": "downloaded"})
     )
 
-    if not collected or not downloaded:
+    if not collected_docs or not downloaded_docs:
         return None, None, None
 
     files_saw = [
-        f.replace(".gz", "").replace(".xml", "")
-        for f in collected["status_data"]["file_name_collected_from_site"]
+        doc["status_data"]["file_name"].replace(".gz", "").replace(".xml", "")
+        for doc in collected_docs
     ]
     downloaded_files_success = [
-        f["file_name"].replace(".gz", "").replace(".xml", "")
-        for f in downloaded["status_data"]["results"]
-        if f["downloaded"] == True and f["extract_succefully"] == True
+        doc["status_data"]["file_name"].replace(".gz", "").replace(".xml", "")
+        for doc in downloaded_docs
+        if doc["status_data"].get("downloaded_successfully") is True
+        and doc["status_data"].get("extracted_successfully") is True
     ]
     downloaded_files_failed = {
-        f["file_name"].replace(".gz", "").replace(".xml", ""): f["error"]
-        for f in downloaded["status_data"]["results"]
-        if not (f["downloaded"] == True and f["extract_succefully"] == True)
+        doc["status_data"]["file_name"].replace(".gz", "").replace(".xml", ""): doc[
+            "status_data"
+        ].get("error_message")
+        for doc in downloaded_docs
+        if not (
+            doc["status_data"].get("downloaded_successfully") is True
+            and doc["status_data"].get("extracted_successfully") is True
+        )
     }
 
     return files_saw, downloaded_files_success, downloaded_files_failed
@@ -79,9 +96,7 @@ def match_parsing_timestamps(
         )
     )
 
-    scraping_timestamp = datetime.datetime.strptime(
-        sample_timestamp, "%Y-%m-%d %H:%M:%S"
-    )
+    scraping_timestamp = datetime.datetime.strptime(sample_timestamp, "%Y-%m-%d %H:%M:%S")
 
     min_delta = None
     associated_stamp = None
@@ -197,25 +212,25 @@ def validate_data_processing(uri="mongodb://192.168.1.129:27017/"):
             "overall_lost_files": [],
             "overall_download_files": [],
         }
-        for itreation_timestamp in file_name_dict[folder_name.lower()]:
+        for iteration_task_id, iteration_timestamp in file_name_dict[folder_name.lower()]:
 
-            validation_results[chain_name][itreation_timestamp] = {}
+            validation_results[chain_name][iteration_task_id] = {}
             # ניתוח קבצים
             files_saw, downloaded_files_success, downloaded_files_failed = (
                 get_scraper_status(
-                    scraper_status_collection, folder_name, itreation_timestamp
+                    scraper_status_collection, folder_name, iteration_task_id
                 )
             )
             # התאמת נתוני פרסור
             matched_timestamp, used_timestamp = match_parsing_timestamps(
                 used_timestamp,
                 parser_status_collection,
-                itreation_timestamp,
+                iteration_timestamp,
                 chain_name,
             )
 
             if not matched_timestamp:
-                validation_results[chain_name][itreation_timestamp] = {}
+                validation_results[chain_name][iteration_task_id] = {}
                 continue
             # קבלת נתוני פרסור
             files_to_parse, parsing_results_success, parsing_results_failed = (
@@ -261,7 +276,7 @@ def validate_data_processing(uri="mongodb://192.168.1.129:27017/"):
             chain_errors["overall_file_saw"] = list(
                 set(files_saw) | set(chain_errors["overall_file_saw"])
             )
-            validation_results[chain_name][itreation_timestamp] = pipeline
+            validation_results[chain_name][iteration_task_id] = pipeline
 
         aggregated_errors[chain_name] = chain_errors
 
