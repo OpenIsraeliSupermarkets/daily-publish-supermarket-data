@@ -39,6 +39,19 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
         # promo files can be larger than 1.2B
         # Default: 2MB (2097152 bytes)
         self.max_request_size = int(os.getenv("KAFKA_MAX_REQUEST_SIZE", "2097152"))
+        # Consumer fetch.max.bytes (total fetch size per request); default matches producer cap
+        self.fetch_max_bytes = int(
+            os.getenv("KAFKA_FETCH_MAX_BYTES", str(self.max_request_size))
+        )
+        # Per-partition cap in the consumer; must not exceed fetch_max_bytes
+        default_partition_fetch = min(self.fetch_max_bytes, self.max_request_size)
+        self.max_partition_fetch_bytes = int(
+            os.getenv(
+                "KAFKA_MAX_PARTITION_FETCH_BYTES", str(default_partition_fetch)
+            )
+        )
+        if self.max_partition_fetch_bytes > self.fetch_max_bytes:
+            self.max_partition_fetch_bytes = self.fetch_max_bytes
         self.producer: Optional[AIOKafkaProducer] = None
         self.admin_client: Optional[KafkaAdminClient] = None
         self._connection_tested = False
@@ -313,7 +326,8 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
                     group_id=f"test_consumer_{topic_name}_{int(time.time())}_{id(self)}",  # Unique group ID with timestamp
                     session_timeout_ms=10000,  # Increase session timeout
                     request_timeout_ms=20000,  # Increase request timeout
-                    max_partition_fetch_bytes=self.max_request_size,
+                    fetch_max_bytes=self.fetch_max_bytes,
+                    max_partition_fetch_bytes=self.max_partition_fetch_bytes,
                 )
 
                 await consumer.start()
