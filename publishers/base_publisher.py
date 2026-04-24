@@ -75,6 +75,9 @@ class BaseSupermarketDataPublisher:
             enabled_file_types if enabled_file_types else FileTypesFilters.all_types()
         )
         self.limit = limit
+        self.status_configuration = {
+            "database_type": "mongo"
+        }
 
         Logger.info("app_folder=%s", app_folder)
 
@@ -109,6 +112,7 @@ class BaseSupermarketDataPublisher:
                 when_date=self.when_date if self.when_date else now(backfill_hours=1),
                 limit=self.limit,
                 suppress_exception=True,
+                status_configuration=self.status_database,
             ).start()
             Logger.info("Scraping task is done")
         except Exception as e:
@@ -129,6 +133,7 @@ class BaseSupermarketDataPublisher:
             multiprocessing=self.number_of_parseing_processs,
             output_folder=self.outputs_folder,
             when_date=datetime.datetime.now(),
+            status_configuration=self.status_configuration,
         ).start()
 
         Logger.info("Converting task is done")
