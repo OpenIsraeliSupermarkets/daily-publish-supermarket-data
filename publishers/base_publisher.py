@@ -76,7 +76,8 @@ class BaseSupermarketDataPublisher:
         )
         self.limit = limit
         self.status_configuration = {
-            "database_type": "mongo"
+            "database_type": "mongo",
+            "connection_url": os.environ["MONGODB_URI"],
         }
 
         Logger.info("app_folder=%s", app_folder)
@@ -112,7 +113,10 @@ class BaseSupermarketDataPublisher:
                 when_date=self.when_date if self.when_date else now(backfill_hours=1),
                 limit=self.limit,
                 suppress_exception=True,
-                status_configuration=self.status_database,
+                status_configuration={
+                    **self.status_configuration,
+                    "collection_name": "scraping_status",
+                },
             ).start()
             Logger.info("Scraping task is done")
         except Exception as e:
@@ -133,7 +137,10 @@ class BaseSupermarketDataPublisher:
             multiprocessing=self.number_of_parseing_processs,
             output_folder=self.outputs_folder,
             when_date=datetime.datetime.now(),
-            status_configuration=self.status_configuration,
+            status_configuration={
+                **self.status_configuration,
+                "collection_name": "converting_status",
+            },
         ).start()
 
         Logger.info("Converting task is done")
