@@ -28,6 +28,8 @@ services:
     depends_on:
       - mongodb
     environment:
+      - MONGO_URL=${MONGO_URL}
+      - MONGO_PORT=${MONGO_PORT}
       - MONGODB_URI=mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_URL}:${MONGO_PORT}/
       - SUPABASE_KEY=${SUPABASE_KEY}
       - SUPABASE_URL=${SUPABASE_URL}
@@ -57,6 +59,8 @@ services:
     depends_on:
       - mongodb
     environment:
+      - MONGO_URL=${MONGO_URL}
+      - MONGO_PORT=${MONGO_PORT}
       - MONGODB_URI=mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_URL}:${MONGO_PORT}/
       - OPERATION=${OPERATION}
       - KAGGLE_API_TOKEN=${KAGGLE_API_TOKEN}

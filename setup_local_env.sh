@@ -91,6 +91,12 @@ mkdir -p app_data
 mkdir -p mongo_data
 print_success "Directories created (app_data, mongo_data)"
 
+# Set MongoDB environment variables
+print_info "Step 6: Setting MongoDB environment variables..."
+export MONGO_URL="${MONGO_URL:-localhost}"
+export MONGO_PORT="${MONGO_PORT:-27017}"
+print_success "MONGO_URL=${MONGO_URL}, MONGO_PORT=${MONGO_PORT}"
+
 # # Create .env.unittest if it doesn't exist
 # print_info "Step 6: Setting up environment files..."
 # if [ ! -f ".env.unittest" ]; then
