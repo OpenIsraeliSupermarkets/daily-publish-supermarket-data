@@ -8,6 +8,9 @@ from managers.large_file_push_manager import LargeFilePushManager
 from data_models.raw_schema import ParserStatus, ScraperStatus
 from datetime import datetime
 
+from il_supermarket_parsers import ParserStatusOutput
+from il_supermarket_scarper import ScraperStatusOutput
+
 
 class ShortTermDBDatasetManager:
     def __init__(
@@ -27,7 +30,7 @@ class ShortTermDBDatasetManager:
         self.enabled_file_types = enabled_file_types
 
     def _push_parser_status(self, local_cahce: CacheState):
-        with open(f"{self.outputs_folder}/parser-status.json", "r") as file:
+        with open(os.path.join(self.status_folder, "parser-status.json"), "r") as file:
             records = json.load(file)
 
         pushed_timestamps = local_cahce.get_pushed_timestamps("parser-status.json")

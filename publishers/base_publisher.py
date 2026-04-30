@@ -67,7 +67,13 @@ class BaseSupermarketDataPublisher:
         self.app_folder = app_folder
         self.data_folder = os.path.join(app_folder, data_folder)
         self.outputs_folder = os.path.join(app_folder, outputs_folder)
-        self.status_folder = os.path.join(app_folder, data_folder, status_folder)
+        self.status_folder = os.path.join(app_folder, status_folder)
+        self.scraping_status_folder = os.path.join(
+            self.status_folder, "scraping_status"
+        )
+        self.converting_status_folder = os.path.join(
+            self.status_folder, "converting_status"
+        )
         self.enabled_scrapers = (
             enabled_scrapers if enabled_scrapers else ScraperFactory.all_scrapers_name()
         )
@@ -109,7 +115,7 @@ class BaseSupermarketDataPublisher:
                 multiprocessing=self.number_of_scraping_processes,
                 status_configuration={
                     **self.status_configuration,
-                    "collection_name": "scraping_status",
+                    "base_path": self.scraping_status_folder,
                 },
                 output_configuration={
                     "output_mode": "disk",
@@ -139,7 +145,7 @@ class BaseSupermarketDataPublisher:
             multiprocessing=self.number_of_parseing_processs,
             status_configuration={
                 **self.status_configuration,
-                "collection_name": "converting_status",
+                "base_path": self.converting_status_folder,
             },
             output_configuration={
                 "output_mode": "disk",
