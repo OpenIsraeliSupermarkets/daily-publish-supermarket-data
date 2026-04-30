@@ -100,16 +100,24 @@ class BaseSupermarketDataPublisher:
             os.makedirs(self.data_folder, exist_ok=True)
 
             Logger.info("Starting the scraping task")
-            ScarpingTask(
+            task = ScarpingTask(
                 enabled_scrapers=self.enabled_scrapers,
                 files_types=self.enabled_file_types,
-                dump_folder_name=self.data_folder,
                 multiprocessing=self.number_of_scraping_processes,
-                lookup_in_db=True,
-                when_date=self.when_date if self.when_date else now(backfill_hours=1),
+                status_configuration={
+                    **self.status_configuration,
+                    "base_path": self.scraping_status_folder,
+                },
+                output_configuration={
+                    "output_mode": "disk",
+                    "base_storage_path": self.data_folder,
+                },
+            )
+            task.start(
                 limit=self.limit,
-                suppress_exception=True,
-            ).start()
+                when_date=self.when_date if self.when_date else now(backfill_hours=1),
+            )
+            task.join()
             Logger.info("Scraping task is done")
         except Exception as e:
             Logger.error("An error occurred during scraping: %s", e)
