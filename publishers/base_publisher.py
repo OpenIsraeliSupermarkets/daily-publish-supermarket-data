@@ -26,8 +26,8 @@ class BaseSupermarketDataPublisher:
 
     def __init__(
         self,
-        db_name,
-        db_connection_url,
+        db_name="supermarket_data",
+        db_connection_url="mongodb://host.docker.internal:27017",
         long_term_db_target=KaggleUploader,
         number_of_scraping_processes=3,
         number_of_parseing_processs=None,
@@ -93,13 +93,13 @@ class BaseSupermarketDataPublisher:
 
         Logger.info("app_folder=%s", app_folder)
 
-    def _mongo_output_configuration(self, connection_url, db_name):
+    def _mongo_output_configuration(self):
         """Mongo writer config aligned with ShortTermDBDatasetManager's."""    
         return MongoOutputConfiguration(
             output_mode="mongo",
             mongo_config=MongoConfig(
-                connection_url=connection_url,
-                db_name=db_name,
+                connection_url=self.db_connection_url,
+                db_name=self.db_name,
             ),
         ).model_dump()
 
@@ -160,7 +160,7 @@ class BaseSupermarketDataPublisher:
                 "output_folder": self.outputs_folder,
             },
         ]
-        mongo_output = self._mongo_output_configuration(se)
+        mongo_output = self._mongo_output_configuration()
         if mongo_output is not None:
             output_configuration.append(mongo_output)
 

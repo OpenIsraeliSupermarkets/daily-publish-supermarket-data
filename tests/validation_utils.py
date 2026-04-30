@@ -139,8 +139,10 @@ def validate_state_after_api_update(
     app_folder,
     outputs_folder,
     enabled_scrapers,
-    short_term_db_target,
+    db_connection_url,
+    db_name,
     status_folder=None,
+
 ):
     """
     Validate the state of the system after API update.
@@ -208,7 +210,7 @@ def validate_state_after_api_update(
     # Validate data rows published directly by MongoOutputWriter when the target
     # is a MongoDB instance (collection named {SCRAPER}_{FILE_TYPE} per the default
     # collection_template used by MongoOutputConfiguration)
-    if getattr(short_term_db_target, "connection_url", None):
+    if db_connection_url and db_name:
         for scraper in enabled_scrapers:
             for file_type in FileTypesFilters:
                 mongo_collection = f"{scraper}_{file_type.name}"

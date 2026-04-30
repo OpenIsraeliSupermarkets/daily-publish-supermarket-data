@@ -9,6 +9,8 @@ import pytest
 import tempfile
 from remotes import DummyFileStorage, DummyDocumentDbUploader
 from utils import now
+import mongomock
+from unittest.mock import patch
 from tests.validation_utils import (
     validate_scraper_output,
     validate_converting_output,
@@ -56,53 +58,6 @@ def test_execute_scraping_integration():
         shutil.rmtree(temp_dir)
 
 
-# def test_execute_converting_integration():
-#     """
-#     Integration test for the converting execution.
-
-#     This test depends on data from scraping, so it would normally be run
-#     after test_execute_scraping_integration.
-#     """
-#     # Create a temporary directory for testing
-#     temp_dir = tempfile.mkdtemp(prefix="test_converting_")
-
-#     try:
-#         # Create a publisher with minimum processing
-#         enabled_scrapers = scrapers_to_test()
-#         publisher = BaseSupermarketDataPublisher(
-#             app_folder=temp_dir,
-#             number_of_scraping_processes=5,
-#             number_of_parseing_processs=5,
-#             limit=1,
-#             enabled_scrapers=enabled_scrapers,
-#         )
-
-#         # We need to run scraping first to get data to convert
-#         publisher._execute_scraping()
-
-#         # Execute converting
-#         publisher._execute_converting()
-
-#         # the csv file was created and the parser states
-#         validate_converting_output(
-#             publisher.data_folder,
-#             publisher.outputs_folder,
-#             publisher.converting_status_folder,
-#             enabled_scrapers,
-#         )
-
-#         # status didn't changed
-#         validate_scraper_output(
-#             publisher.data_folder, publisher.scraping_status_folder, enabled_scrapers
-#         )
-
-#     except Exception as e:
-#         pytest.fail(f"Converting function raised an exception: {e}")
-#     finally:
-#         # Clean up
-#         shutil.rmtree(temp_dir)
-
-
 def test_execute_converting_integration():
     """
     Integration test for updating the API database.
@@ -114,42 +69,43 @@ def test_execute_converting_integration():
     temp_dir = tempfile.mkdtemp(prefix="test_api_db_")
 
     try:
-        # Create a publisher with minimum processing
-        enabled_scrapers = scrapers_to_test()
-        short_term_db_target = DummyDocumentDbUploader(db_path=temp_dir)
-        publisher = BaseSupermarketDataPublisher(
-            app_folder=temp_dir,
-            number_of_scraping_processes=5,
-            number_of_parseing_processs=5,
-            limit=1,
-            enabled_scrapers=enabled_scrapers,
-            short_term_db_target=short_term_db_target,
-        )
+        with patch("pymongo.MongoClient", mongomock.MongoClient):
+            # Create a publisher with minimum processing
+            enabled_scrapers = scrapers_to_test()
+            publisher = BaseSupermarketDataPublisher(
+                app_folder=temp_dir,
+                number_of_scraping_processes=5,
+                number_of_parseing_processs=5,
+                limit=1,
+                enabled_scrapers=enabled_scrapers,
+            )
 
-        # We need to run scraping and converting first
-        publisher._execute_scraping()
-        publisher._execute_converting()
-        validate_converting_output(
-            publisher.data_folder,
-            publisher.outputs_folder,
-            publisher.converting_status_folder,
-            enabled_scrapers,
-            dump_files_deleted=False,
-        )
+            # We need to run scraping and converting first
+            publisher._execute_scraping()
+            publisher._execute_converting()
+            validate_converting_output(
+                publisher.data_folder,
+                publisher.outputs_folder,
+                publisher.converting_status_folder,
+                enabled_scrapers,
+                dump_files_deleted=False,
+            )
 
-        # status didn't changed
-        validate_scraper_output(
-            publisher.data_folder,
-            publisher.scraping_status_folder,
-            enabled_scrapers,
-            dump_files_deleted=False,
-        )
-        validate_state_after_api_update(
-            publisher.app_folder,
-            publisher.outputs_folder,
-            enabled_scrapers,
-            short_term_db_target,
-        )
+            # status didn't changed
+            validate_scraper_output(
+                publisher.data_folder,
+                publisher.scraping_status_folder,
+                enabled_scrapers,
+                dump_files_deleted=False,
+            )
+            validate_state_after_api_update(
+                publisher.app_folder,
+                publisher.outputs_folder,
+                enabled_scrapers,
+                publisher.db_connection_url,
+                publisher.db_name,
+                
+            )
 
     finally:
         # Clean up
@@ -169,14 +125,12 @@ def test_dump_files_clean_integration():
     try:
         # Create a publisher with minimum processing
         enabled_scrapers = scrapers_to_test()
-        short_term_db_target = DummyDocumentDbUploader(db_path=temp_dir)
         publisher = BaseSupermarketDataPublisher(
             app_folder=temp_dir,
             number_of_scraping_processes=5,
             number_of_parseing_processs=5,
             limit=1,
             enabled_scrapers=enabled_scrapers,
-            short_term_db_target=short_term_db_target,
         )
 
         # We need to run scraping and converting first
@@ -203,7 +157,8 @@ def test_dump_files_clean_integration():
             publisher.app_folder,
             publisher.outputs_folder,
             enabled_scrapers,
-            short_term_db_target,
+            publisher.db_connection_url,
+            publisher.db_name,
         )
 
         # Check if the DummyDocumentDbUploader was updated
