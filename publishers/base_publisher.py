@@ -76,8 +76,8 @@ class BaseSupermarketDataPublisher:
         )
         self.limit = limit
         self.status_configuration = {
-            "database_type": "mongo",
-            "connection_url": os.environ["MONGODB_URI"],
+            "database_type": "json",
+            "base_path": self.status_folder,
         }
 
         Logger.info("app_folder=%s", app_folder)
@@ -103,7 +103,7 @@ class BaseSupermarketDataPublisher:
         try:
             os.makedirs(self.data_folder, exist_ok=True)
             Logger.info("Starting the scraping task")
-            ScarpingTask(
+            task = ScarpingTask(
                 enabled_scrapers=self.enabled_scrapers,
                 files_types=self.enabled_file_types,
                 multiprocessing=self.number_of_scraping_processes,
@@ -115,10 +115,12 @@ class BaseSupermarketDataPublisher:
                     "output_mode": "disk",
                     "base_storage_path": self.data_folder,
                 },
-            ).start(
+            )
+            task.start(
                 limit=self.limit,
                 when_date=self.when_date if self.when_date else now(backfill_hours=1),
             )
+            task.join()
             Logger.info("Scraping task is done")
         except Exception as e:
             Logger.error("An error occurred during scraping: %s", e)
@@ -131,10 +133,9 @@ class BaseSupermarketDataPublisher:
         Logger.info("Starting the converting task")
         os.makedirs(self.outputs_folder, exist_ok=True)
 
-        ConvertingTask(
+        task = ConvertingTask(
             enabled_parsers=self.enabled_scrapers,
             files_types=self.enabled_file_types,
-            data_folder=self.data_folder,
             multiprocessing=self.number_of_parseing_processs,
             status_configuration={
                 **self.status_configuration,
@@ -142,14 +143,14 @@ class BaseSupermarketDataPublisher:
             },
             output_configuration={
                 "output_mode": "disk",
-                "base_storage_path": self.outputs_folder,
+                "output_folder": self.outputs_folder,
             },
             source_configuration={
                 "folder": self.data_folder,
             },
-        ).start(
-            when_date=datetime.datetime.now(),
         )
+        task.start()
+        task.join()
 
         Logger.info("Converting task is done")
 
