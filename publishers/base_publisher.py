@@ -102,22 +102,23 @@ class BaseSupermarketDataPublisher:
         """
         try:
             os.makedirs(self.data_folder, exist_ok=True)
-
             Logger.info("Starting the scraping task")
             ScarpingTask(
                 enabled_scrapers=self.enabled_scrapers,
                 files_types=self.enabled_file_types,
-                dump_folder_name=self.data_folder,
                 multiprocessing=self.number_of_scraping_processes,
-                lookup_in_db=True,
-                when_date=self.when_date if self.when_date else now(backfill_hours=1),
-                limit=self.limit,
-                suppress_exception=True,
                 status_configuration={
                     **self.status_configuration,
                     "collection_name": "scraping_status",
                 },
-            ).start()
+                output_configuration={
+                    "output_mode": "disk",
+                    "base_storage_path": self.data_folder,
+                },
+            ).start(
+                limit=self.limit,
+                when_date=self.when_date if self.when_date else now(backfill_hours=1),
+            )
             Logger.info("Scraping task is done")
         except Exception as e:
             Logger.error("An error occurred during scraping: %s", e)
@@ -135,13 +136,20 @@ class BaseSupermarketDataPublisher:
             files_types=self.enabled_file_types,
             data_folder=self.data_folder,
             multiprocessing=self.number_of_parseing_processs,
-            output_folder=self.outputs_folder,
-            when_date=datetime.datetime.now(),
             status_configuration={
                 **self.status_configuration,
                 "collection_name": "converting_status",
             },
-        ).start()
+            output_configuration={
+                "output_mode": "disk",
+                "base_storage_path": self.outputs_folder,
+            },
+            source_configuration={
+                "folder": self.data_folder,
+            },
+        ).start(
+            when_date=datetime.datetime.now(),
+        )
 
         Logger.info("Converting task is done")
 

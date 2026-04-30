@@ -46,9 +46,7 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
         # Per-partition cap in the consumer; must not exceed fetch_max_bytes
         default_partition_fetch = min(self.fetch_max_bytes, self.max_request_size)
         self.max_partition_fetch_bytes = int(
-            os.getenv(
-                "KAFKA_MAX_PARTITION_FETCH_BYTES", str(default_partition_fetch)
-            )
+            os.getenv("KAFKA_MAX_PARTITION_FETCH_BYTES", str(default_partition_fetch))
         )
         if self.max_partition_fetch_bytes > self.fetch_max_bytes:
             self.max_partition_fetch_bytes = self.fetch_max_bytes
