@@ -34,6 +34,7 @@ class BaseSupermarketDataPublisher:
         status_folder="status",
         enabled_scrapers=None,
         enabled_file_types=None,
+        status_configuration=None,
         limit=None,
         when_date=None,
     ):
@@ -75,9 +76,8 @@ class BaseSupermarketDataPublisher:
             enabled_file_types if enabled_file_types else FileTypesFilters.all_types()
         )
         self.limit = limit
-        self.status_configuration = {
-            "database_type": "json",
-            "base_path": self.status_folder,
+        self.status_configuration =  status_configuration or {
+            "database_type": "json"
         }
         self.scraping_status_folder = os.path.join(app_folder, "scraping_status")
         self.converting_status_folder = os.path.join(app_folder, "converting_status")
