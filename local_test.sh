@@ -130,8 +130,8 @@ docker compose up -d mongodb api
 echo "Step 8: Starting data processor"
 
 if [ "$TEST_MODE" == "production" ]; then
-    echo "Step 8.1: Running SCRAPE operation (scraping,converting,clean_dump_files,api_update)"
-    export OPERATION="scraping,converting,clean_dump_files,api_update"
+    echo "Step 8.1: Running SCRAPE operation (scraping,converting,clean_dump_files)"
+    export OPERATION="scraping,converting,clean_dump_files"
     docker compose up data_processor
     
     if [ $? -ne 0 ]; then

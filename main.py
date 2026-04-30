@@ -120,6 +120,6 @@ if __name__ == "__main__":
                 "EXEC_FINAL_OPERATIONS_CONDITION", "EOD"
             ),
             should_stop_dag=os.environ.get("STOP_DAG_CONDITION", "NEVER"),
-            operations="scraping,converting,api_update,clean_dump_files",
+            operations="scraping,converting,clean_dump_files",
             final_operations="publishing,clean_all_source_data",
         )

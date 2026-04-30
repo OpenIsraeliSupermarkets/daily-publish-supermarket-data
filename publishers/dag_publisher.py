@@ -40,10 +40,6 @@ class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
             self._clean_all_dump_files()
         elif operation == "publishing":
             self._upload_and_clean()
-        elif operation == "api_update":
-            self._update_api_database()
-        elif operation == "reload_complete_api":
-            self._update_api_database(reset_cache=True)
         elif operation == "upload_compose":
             self._upload_and_clean(compose=True)
         elif operation == "upload_no_compose":

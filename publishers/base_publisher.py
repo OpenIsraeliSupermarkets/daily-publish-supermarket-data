@@ -9,8 +9,10 @@ import os
 import shutil
 from il_supermarket_scarper import ScarpingTask, ScraperFactory
 from il_supermarket_parsers import ConvertingTask, FileTypesFilters
+from il_supermarket_parsers.utils.types import MongoConfig, MongoOutputConfiguration
 from managers.long_term_database_manager import LongTermDatasetManager
-from managers.short_term_database_manager import ShortTermDBDatasetManager
+
+# from managers.short_term_database_manager import ShortTermDBDatasetManager
 from managers.cache_manager import CacheManager
 from remotes import KaggleUploader, MongoDbUploader
 from utils import now
@@ -88,6 +90,22 @@ class BaseSupermarketDataPublisher:
 
         Logger.info("app_folder=%s", app_folder)
 
+    def _mongo_output_configuration(self):
+        """Mongo writer config aligned with ShortTermDBDatasetManager's short_term_db_target."""
+
+        target = self.short_term_db_target
+        connection_url = getattr(target, "connection_url", None)
+        db_name = getattr(target, "db_name", None)
+        if not connection_url or not db_name:
+            return None
+        return MongoOutputConfiguration(
+            output_mode="mongo",
+            mongo_config=MongoConfig(
+                connection_url=connection_url,
+                db_name=db_name,
+            ),
+        ).model_dump()
+
     def _check_tz(self):
         """
         Verify that the system timezone is set to Asia/Jerusalem.
@@ -139,6 +157,16 @@ class BaseSupermarketDataPublisher:
         Logger.info("Starting the converting task")
         os.makedirs(self.outputs_folder, exist_ok=True)
 
+        output_configuration = [
+            {
+                "output_mode": "csv",
+                "output_folder": self.outputs_folder,
+            },
+        ]
+        mongo_output = self._mongo_output_configuration()
+        if mongo_output is not None:
+            output_configuration.append(mongo_output)
+
         task = ConvertingTask(
             enabled_parsers=self.enabled_scrapers,
             files_types=self.enabled_file_types,
@@ -147,10 +175,7 @@ class BaseSupermarketDataPublisher:
                 **self.status_configuration,
                 "base_path": self.converting_status_folder,
             },
-            output_configuration={
-                "output_mode": "disk",
-                "output_folder": self.outputs_folder,
-            },
+            output_configuration=output_configuration,
             source_configuration={
                 "folder": self.data_folder,
             },
@@ -174,23 +199,23 @@ class BaseSupermarketDataPublisher:
         )
         return database.download()
 
-    def _update_api_database(self, reset_cache=False):
-        """
-        Update the short-term database with the converted data.
+    # def _update_api_database(self, reset_cache=False):
+    #     """
+    #     Update the short-term database with the converted data.
 
-        Args:
-            reset_cache: Whether to force a restart of the cache (default: False).
-        """
-        Logger.info("Starting the short term database task")
-        database = ShortTermDBDatasetManager(
-            short_term_db_target=self.short_term_db_target,
-            app_folder=self.app_folder,
-            outputs_folder=self.outputs_folder,
-            status_folder=self.status_folder,
-            enabled_scrapers=self.enabled_scrapers,
-            enabled_file_types=self.enabled_file_types,
-        )
-        database.upload(force_restart=reset_cache)
+    #     Args:
+    #         reset_cache: Whether to force a restart of the cache (default: False).
+    #     """
+    #     Logger.info("Starting the short term database task")
+    #     database = ShortTermDBDatasetManager(
+    #         short_term_db_target=self.short_term_db_target,
+    #         app_folder=self.app_folder,
+    #         outputs_folder=self.outputs_folder,
+    #         status_folder=self.status_folder,
+    #         enabled_scrapers=self.enabled_scrapers,
+    #         enabled_file_types=self.enabled_file_types,
+    #     )
+    #     database.upload(force_restart=reset_cache)
 
     def _upload_to_kaggle(self):
         """

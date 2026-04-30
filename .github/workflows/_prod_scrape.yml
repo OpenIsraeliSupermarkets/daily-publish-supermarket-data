@@ -13,5 +13,5 @@ jobs:
     uses: OpenIsraeliSupermarkets/daily-publish-supermarket-data/.github/workflows/template.yml@main
     with:
       kaggle_dataset_remote_name: "erlichsefi/israeli-supermarkets-2024"
-      operation: "scraping,converting,clean_dump_files,api_update"
+      operation: "scraping,converting,clean_dump_files"
     secrets: inherit

@@ -32,9 +32,15 @@ class MongoDbUploader(ShortTermDatabaseUploader):
         uri = mongodb_uri or os.getenv(
             "MONGODB_URI", "mongodb://host.docker.internal:27017"
         )
+        self.connection_url = uri
         self.client = pymongo.MongoClient(uri)
         self.db = self.client.supermarket_data
         self._test_connection()
+
+    @property
+    def db_name(self):
+        """Mongo database name used for collections (aligns with il_supermarket_parsers MongoConfig)."""
+        return self.db.name
 
     def _test_connection(self):
         """Test the connection to the MongoDB database."""
