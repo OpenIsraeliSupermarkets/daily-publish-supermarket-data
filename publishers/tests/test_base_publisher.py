@@ -103,57 +103,6 @@ def test_execute_scraping_integration():
 #         shutil.rmtree(temp_dir)
 
 
-def test_dump_files_clean_integration():
-    """
-    Integration test for updating the API database.
-
-    This test depends on data from converting, so it would normally be run
-    after test_execute_converting_integration.
-    """
-    # Create a temporary directory for testing
-    temp_dir = tempfile.mkdtemp(prefix="test_api_db_")
-
-    try:
-        # Create a publisher with minimum processing
-        enabled_scrapers = scrapers_to_test()
-        publisher = BaseSupermarketDataPublisher(
-            app_folder=temp_dir,
-            number_of_scraping_processes=5,
-            number_of_parseing_processs=5,
-            limit=1,
-            enabled_scrapers=enabled_scrapers,
-        )
-
-        # We need to run scraping and converting first
-        publisher._execute_scraping()
-        publisher._execute_converting()
-        publisher._clean_all_dump_files()
-
-        validate_converting_output(
-            publisher.data_folder,
-            publisher.outputs_folder,
-            publisher.converting_status_folder,
-            enabled_scrapers,
-            dump_files_deleted=True,
-        )
-
-        # status didn't changed
-        validate_scraper_output(
-            publisher.data_folder,
-            publisher.scraping_status_folder,
-            enabled_scrapers,
-            dump_files_deleted=True,
-        )
-
-        # Check if the DummyDocumentDbUploader was updated
-        # In a real implementation, we would need to check the actual database state
-    except Exception as e:
-        pytest.fail(f"API database update function raised an exception: {e}")
-    finally:
-        # Clean up
-        shutil.rmtree(temp_dir)
-
-
 def test_execute_converting_integration():
     """
     Integration test for updating the API database.
@@ -180,8 +129,61 @@ def test_execute_converting_integration():
         # We need to run scraping and converting first
         publisher._execute_scraping()
         publisher._execute_converting()
+        validate_converting_output(
+            publisher.data_folder,
+            publisher.outputs_folder,
+            publisher.converting_status_folder,
+            enabled_scrapers,
+            dump_files_deleted=False,
+        )
+
+        # status didn't changed
+        validate_scraper_output(
+            publisher.data_folder,
+            publisher.scraping_status_folder,
+            enabled_scrapers,
+            dump_files_deleted=False,
+        )
+        validate_state_after_api_update(
+            publisher.app_folder,
+            publisher.outputs_folder,
+            enabled_scrapers,
+            short_term_db_target,
+        )
+
+    finally:
+        # Clean up
+        shutil.rmtree(temp_dir)
+
+
+def test_dump_files_clean_integration():
+    """
+    Integration test for updating the API database.
+
+    This test depends on data from converting, so it would normally be run
+    after test_execute_converting_integration.
+    """
+    # Create a temporary directory for testing
+    temp_dir = tempfile.mkdtemp(prefix="test_api_db_")
+
+    try:
+        # Create a publisher with minimum processing
+        enabled_scrapers = scrapers_to_test()
+        short_term_db_target = DummyDocumentDbUploader(db_path=temp_dir)
+        publisher = BaseSupermarketDataPublisher(
+            app_folder=temp_dir,
+            number_of_scraping_processes=5,
+            number_of_parseing_processs=5,
+            limit=1,
+            enabled_scrapers=enabled_scrapers,
+            short_term_db_target=short_term_db_target,
+        )
+
+        # We need to run scraping and converting first
+        publisher._execute_scraping()
+        publisher._execute_converting()
         publisher._clean_all_dump_files()
-        publisher._update_api_database()
+
         validate_converting_output(
             publisher.data_folder,
             publisher.outputs_folder,
@@ -204,6 +206,10 @@ def test_execute_converting_integration():
             short_term_db_target,
         )
 
+        # Check if the DummyDocumentDbUploader was updated
+        # In a real implementation, we would need to check the actual database state
+    except Exception as e:
+        pytest.fail(f"API database update function raised an exception: {e}")
     finally:
         # Clean up
         shutil.rmtree(temp_dir)
