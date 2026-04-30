@@ -80,10 +80,10 @@ class BaseSupermarketDataPublisher:
             "base_path": self.status_folder,
         }
         self.scraping_status_folder = os.path.join(
-            self.status_folder, "scraping_status"
+            app_folder, "scraping_status"
         )
         self.converting_status_folder = os.path.join(
-            self.status_folder, "converting_status"
+            app_folder, "converting_status"
         )
 
 
@@ -190,6 +190,8 @@ class BaseSupermarketDataPublisher:
             status_folder=self.status_folder,
             enabled_scrapers=self.enabled_scrapers,
             enabled_file_types=self.enabled_file_types,
+            scraping_status_folder=self.scraping_status_folder,
+            converting_status_folder=self.converting_status_folder,
         )
         database.upload(force_restart=reset_cache)
 

@@ -26,7 +26,9 @@ def scrapers_to_test():
     ]
 
 
-def validate_scraper_output(data_folder, enabled_scrapers, dump_files_deleted=False):
+def validate_scraper_output(
+    data_folder, scraping_status_folder, enabled_scrapers, dump_files_deleted=False
+):
     """
     Validate the output produced by the scraper.
 
@@ -37,24 +39,24 @@ def validate_scraper_output(data_folder, enabled_scrapers, dump_files_deleted=Fa
     assert os.path.exists(data_folder), f"Data folder {data_folder} does not exist"
     # status folder
     assert os.path.exists(
-        os.path.join(data_folder, "status")
+        scraping_status_folder
     ), f"Status folder does not exist in {data_folder}"
-    assert len(os.listdir(os.path.join(data_folder, "status"))) == len(
+
+    assert len(os.listdir(scraping_status_folder)) == len(
         enabled_scrapers
     ), f"Expected scraper status file per chain, found {len(os.listdir(os.path.join(data_folder, 'status')))}"
 
     for scraper in enabled_scrapers:
         status_file = os.path.join(
-            data_folder,
-            "status",
+            scraping_status_folder,
             f"{DumpFolderNames[scraper].value.lower()}.json",
         )
         assert os.path.exists(status_file), f"Status file {status_file} does not exist"
 
     # data folder
     if not dump_files_deleted:
-        assert (
-            len(os.listdir(data_folder)) == len(enabled_scrapers) + 1
+        assert len(os.listdir(data_folder)) == len(
+            enabled_scrapers
         ), f"Expected One folder per chain + status folder, found {len(os.listdir(data_folder))}"
 
         for scraper in enabled_scrapers:
@@ -70,12 +72,11 @@ def validate_scraper_output(data_folder, enabled_scrapers, dump_files_deleted=Fa
             ), f"Expected XML file, found {os.listdir(chain_folder)[0]}"
     else:
         assert (
-            len(os.listdir(data_folder)) == 1
-        ), f"Expected One folder per chain + status folder, found {len(os.listdir(data_folder))}"
-
+            len(os.listdir(data_folder)) == 0
+        ), f"Expected no folders in data folder, found {len(os.listdir(data_folder))}"
 
 def validate_converting_output(
-    data_folder, outputs_folder, enabled_scrapers, dump_files_deleted=False
+    data_folder, converting_status_folder, outputs_folder, enabled_scrapers, dump_files_deleted=False
 ):
     """
     Validate the output produced by the converter.
@@ -85,15 +86,24 @@ def validate_converting_output(
         outputs_folder: Folder containing the converted output
         enabled_scrapers: List of enabled scrapers
     """
+
+
+    assert os.path.exists(
+        converting_status_folder
+    ), f"Converting status folder {converting_status_folder} does not exist"
+
+    assert len(os.listdir(converting_status_folder)) == len(
+        enabled_scrapers
+    ) * len(FileTypesFilters), f"Expected scraper status file per chain, found {len(os.listdir(converting_status_folder))}"
+
+
     assert os.path.exists(
         outputs_folder
     ), f"Outputs folder {outputs_folder} does not exist"
+
     assert (
-        len(os.listdir(outputs_folder)) == len(enabled_scrapers) + 1
+        len(os.listdir(outputs_folder)) == len(enabled_scrapers)
     ), f"Expected csv files per chain + parser-status.json, found {len(os.listdir(outputs_folder))}"
-    assert os.path.exists(
-        os.path.join(outputs_folder, "parser-status.json")
-    ), f"parser-status.json not found in {outputs_folder}"
 
     if not dump_files_deleted:
         for scraper in enabled_scrapers:

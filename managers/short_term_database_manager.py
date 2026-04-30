@@ -18,6 +18,8 @@ class ShortTermDBDatasetManager:
         short_term_db_target: ShortTermDatabaseUploader,
         enabled_scrapers: list[str],
         enabled_file_types: list[str],
+        scraping_status_folder,
+        converting_status_folder,
     ):
         self.app_folder = app_folder
         self.uploader = short_term_db_target
@@ -25,9 +27,11 @@ class ShortTermDBDatasetManager:
         self.status_folder = status_folder
         self.enabled_scrapers = enabled_scrapers
         self.enabled_file_types = enabled_file_types
+        self.scraping_status_folder = scraping_status_folder
+        self.converting_status_folder = converting_status_folder
 
     def _push_parser_status(self, local_cahce: CacheState):
-        with open(f"{self.outputs_folder}/parser-status.json", "r") as file:
+        with open(f"{self.converting_status_folder}/parser-status.json", "r") as file:
             records = json.load(file)
 
         pushed_timestamps = local_cahce.get_pushed_timestamps("parser-status.json")
@@ -70,7 +74,7 @@ class ShortTermDBDatasetManager:
         Logger.info("Parser status stored in DynamoDB successfully.")
 
     def _push_status_files(self, local_cahce: CacheState):
-        for file in os.listdir(self.status_folder):
+        for file in os.listdir(self.scraping_status_folder):
             if not file.endswith(".json") or file == "index.json":
                 Logger.warning(f"Skipping '{file}', should we store it?")
                 continue
