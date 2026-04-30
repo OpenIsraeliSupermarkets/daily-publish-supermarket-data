@@ -1,5 +1,5 @@
 il-supermarket-scraper>=1.0.0
-git+https://github.com/OpenIsraeliSupermarkets/il-supermarket-parsers.git@faster
+git+https://github.com/OpenIsraeliSupermarkets/israeli-supermarket-parsers.git@faster
 kagglehub==1.0.0
 schedule==1.2.2
 fastapi[all]==0.109.2
