@@ -119,18 +119,27 @@ class BaseSupermarketDataPublisher:
         """
         Execute the converting task to parse scraped data into structured format.
         """
-        Logger.info("Starting the converting task")
-        os.makedirs(self.outputs_folder, exist_ok=True)
-
-        ConvertingTask(
+        output_configuration = [
+            {
+                "output_mode": "csv",
+                "output_folder": self.outputs_folder,
+            }
+        ]
+        task = ConvertingTask(
             enabled_parsers=self.enabled_scrapers,
             files_types=self.enabled_file_types,
-            data_folder=self.data_folder,
             multiprocessing=self.number_of_parseing_processs,
-            output_folder=self.outputs_folder,
-            when_date=datetime.datetime.now(),
-        ).start()
-
+            status_configuration={
+                **self.status_configuration,
+                "base_path": self.converting_status_folder,
+            },
+            output_configuration=output_configuration,
+            source_configuration={
+                "folder": self.data_folder,
+            },
+        )
+        task.start()
+        task.join()
         Logger.info("Converting task is done")
 
     def _download_from_long_term_database(self):
