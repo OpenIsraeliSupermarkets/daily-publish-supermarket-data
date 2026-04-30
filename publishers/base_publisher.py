@@ -279,6 +279,3 @@ class BaseSupermarketDataPublisher:
         for folder in [self.data_folder, self.outputs_folder, self.status_folder]:
             if os.path.exists(folder):
                 shutil.rmtree(folder)
-
-        with CacheManager(self.app_folder) as cache:
-            cache.clear()
