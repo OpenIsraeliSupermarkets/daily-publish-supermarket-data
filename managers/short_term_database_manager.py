@@ -67,68 +67,68 @@ class ShortTermDBDatasetManager:
             ParserStatus.get_table_name(), processed_records
         )
 
-        local_cahce.update_pushed_timestamps(
-            "parser-status.json", list(set(added_timestamps)) + pushed_timestamps
-        )
+        # local_cahce.update_pushed_timestamps(
+        #     "parser-status.json", list(set(added_timestamps)) + pushed_timestamps
+        # )
 
         Logger.info("Parser status stored in DynamoDB successfully.")
 
-    def _push_status_files(self, local_cahce: CacheState):
-        for file in os.listdir(self.scraping_status_folder):
-            if not file.endswith(".json") or file == "index.json":
-                Logger.warning(f"Skipping '{file}', should we store it?")
-                continue
+    # def _push_status_files(self, local_cahce: CacheState):
+    #     for file in os.listdir(self.scraping_status_folder):
+    #         if not file.endswith(".json") or file == "index.json":
+    #             Logger.warning(f"Skipping '{file}', should we store it?")
+    #             continue
 
-            self._push_scraper_status(file, local_cahce)
+    #         self._push_scraper_status(file, local_cahce)
 
-        self._push_parser_status(local_cahce)
+    #     self._push_parser_status(local_cahce)
 
-    def _push_scraper_status(self, file_name: str, local_cahce: CacheState):
+    # def _push_scraper_status(self, file_name: str, local_cahce: CacheState):
 
-        with open(os.path.join(self.status_folder, file_name), "r") as f:
-            data = json.load(f)
+    #     with open(os.path.join(self.status_folder, file_name), "r") as f:
+    #         data = json.load(f)
 
-        pushed_timestamp = local_cahce.get_pushed_timestamps(file_name)
-        Logger.info(f"Pushing {file_name}: already pushed {pushed_timestamp}")
+    #     pushed_timestamp = local_cahce.get_pushed_timestamps(file_name)
+    #     Logger.info(f"Pushing {file_name}: already pushed {pushed_timestamp}")
 
-        records = []
-        for index, (timestamp, actions) in enumerate(data.items()):
+    #     records = []
+    #     for index, (timestamp, actions) in enumerate(data.items()):
 
-            if timestamp == "verified_downloads":
-                continue
+    #         if timestamp == "verified_downloads":
+    #             continue
 
-            if timestamp in pushed_timestamp:
-                continue
+    #         if timestamp in pushed_timestamp:
+    #             continue
 
-            Logger.info(f"Pushing {file_name}: {timestamp}")
-            for action in actions:
-                records.append(
-                    ScraperStatus(
-                        index=ScraperStatus.to_index(
-                            file_name.split(".")[0],
-                            action["status"],
-                            timestamp,
-                            str(index),
-                        ),
-                        file_name=file_name.split(".")[0],
-                        timestamp=datetime.strptime(timestamp, "%Y%m%d%H%M%S").strftime(
-                            "%Y-%m-%d %H:%M:%S.%f%z"
-                        ),
-                        status=action["status"],
-                        when=action["when"],
-                        status_data={
-                            key: value
-                            for key, value in action.items()
-                            if key != "status" and key != "when"
-                        },
-                    ).to_dict()
-                )
+    #         Logger.info(f"Pushing {file_name}: {timestamp}")
+    #         for action in actions:
+    #             records.append(
+    #                 ScraperStatus(
+    #                     index=ScraperStatus.to_index(
+    #                         file_name.split(".")[0],
+    #                         action["status"],
+    #                         timestamp,
+    #                         str(index),
+    #                     ),
+    #                     file_name=file_name.split(".")[0],
+    #                     timestamp=datetime.strptime(timestamp, "%Y%m%d%H%M%S").strftime(
+    #                         "%Y-%m-%d %H:%M:%S.%f%z"
+    #                     ),
+    #                     status=action["status"],
+    #                     when=action["when"],
+    #                     status_data={
+    #                         key: value
+    #                         for key, value in action.items()
+    #                         if key != "status" and key != "when"
+    #                     },
+    #                 ).to_dict()
+    #             )
 
-            pushed_timestamp.append(timestamp)
+    #         pushed_timestamp.append(timestamp)
 
-        local_cahce.update_pushed_timestamps(file_name, pushed_timestamp)
+    #     local_cahce.update_pushed_timestamps(file_name, pushed_timestamp)
 
-        self.uploader._insert_to_destinations(ScraperStatus.get_table_name(), records)
+    #     self.uploader._insert_to_destinations(ScraperStatus.get_table_name(), records)
 
     def _push_files_data(self, local_cahce: CacheState):
         #
@@ -152,8 +152,6 @@ class ShortTermDBDatasetManager:
                     self.enabled_scrapers, self.enabled_file_types
                 )
 
-            # push
-            self._push_status_files(local_cache)
             self._push_files_data(local_cache)
 
         Logger.info("Upload completed successfully.")

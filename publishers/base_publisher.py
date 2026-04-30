@@ -79,13 +79,8 @@ class BaseSupermarketDataPublisher:
             "database_type": "json",
             "base_path": self.status_folder,
         }
-        self.scraping_status_folder = os.path.join(
-            app_folder, "scraping_status"
-        )
-        self.converting_status_folder = os.path.join(
-            app_folder, "converting_status"
-        )
-
+        self.scraping_status_folder = os.path.join(app_folder, "scraping_status")
+        self.converting_status_folder = os.path.join(app_folder, "converting_status")
 
         Logger.info("app_folder=%s", app_folder)
 
@@ -205,7 +200,8 @@ class BaseSupermarketDataPublisher:
             enabled_scrapers=self.enabled_scrapers,
             enabled_file_types=self.enabled_file_types,
             outputs_folder=self.outputs_folder,
-            status_folder=self.status_folder,
+            scraping_status_folder=self.scraping_status_folder,
+            converting_status_folder=self.converting_status_folder,
         )
         database.compose()
         database.upload()

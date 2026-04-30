@@ -75,8 +75,13 @@ def validate_scraper_output(
             len(os.listdir(data_folder)) == 0
         ), f"Expected no folders in data folder, found {len(os.listdir(data_folder))}"
 
+
 def validate_converting_output(
-    data_folder, converting_status_folder, outputs_folder, enabled_scrapers, dump_files_deleted=False
+    data_folder,
+    converting_status_folder,
+    outputs_folder,
+    enabled_scrapers,
+    dump_files_deleted=False,
 ):
     """
     Validate the output produced by the converter.
@@ -87,22 +92,20 @@ def validate_converting_output(
         enabled_scrapers: List of enabled scrapers
     """
 
-
     assert os.path.exists(
         converting_status_folder
     ), f"Converting status folder {converting_status_folder} does not exist"
 
-    assert len(os.listdir(converting_status_folder)) == len(
-        enabled_scrapers
-    ) * len(FileTypesFilters), f"Expected scraper status file per chain, found {len(os.listdir(converting_status_folder))}"
-
+    assert len(os.listdir(converting_status_folder)) == len(enabled_scrapers) * len(
+        FileTypesFilters
+    ), f"Expected scraper status file per chain, found {len(os.listdir(converting_status_folder))}"
 
     assert os.path.exists(
         outputs_folder
     ), f"Outputs folder {outputs_folder} does not exist"
 
-    assert (
-        len(os.listdir(outputs_folder)) == len(enabled_scrapers)
+    assert len(os.listdir(outputs_folder)) == len(
+        enabled_scrapers
     ), f"Expected csv files per chain + parser-status.json, found {len(os.listdir(outputs_folder))}"
 
     if not dump_files_deleted:
@@ -145,24 +148,24 @@ def validate_state_after_api_update(
         short_term_db_target: The short-term database target
     """
     # document_db folder
-    scraper_status_table = ScraperStatus.get_table_name()
-    scraper_status_count = len(
-        short_term_db_target.get_destinations_content(scraper_status_table)
-    )
-    assert scraper_status_count == 4 * len(
-        enabled_scrapers
-    ), f"Expected 4 documents in {scraper_status_table}, found {scraper_status_count}"
+    # scraper_status_table = ScraperStatus.get_table_name()
+    # scraper_status_count = len(
+    #     short_term_db_target.get_destinations_content(scraper_status_table)
+    # )
+    # assert scraper_status_count == 4 * len(
+    #     enabled_scrapers
+    # ), f"Expected 4 documents in {scraper_status_table}, found {scraper_status_count}"
 
-    parser_status_table = ParserStatus.get_table_name()
-    parser_status_count = len(
-        short_term_db_target.get_destinations_content(parser_status_table)
-    )
-    expected_parser_count = len(FileTypesFilters) * 1 * len(enabled_scrapers)  # limit
-    assert (
-        parser_status_count == expected_parser_count
-    ), f"Expected {expected_parser_count} documents in {parser_status_table}, found {parser_status_count}"
+    # parser_status_table = ParserStatus.get_table_name()
+    # parser_status_count = len(
+    #     short_term_db_target.get_destinations_content(parser_status_table)
+    # )
+    # expected_parser_count = len(FileTypesFilters) * 1 * len(enabled_scrapers)  # limit
+    # assert (
+    #     parser_status_count == expected_parser_count
+    # ), f"Expected {expected_parser_count} documents in {parser_status_table}, found {parser_status_count}"
 
-    # read the csv file
+    # # read the csv file
     csv_files = glob.glob(os.path.join(outputs_folder, "*.csv"))
     assert len(csv_files) == len(
         enabled_scrapers
@@ -205,15 +208,19 @@ def validate_long_term_structure(
     assert (
         "index.json" in files
     ), f"index.json not found in long-term database files: {files}"
-    assert (
-        "parser-status.json" in files
-    ), f"parser-status.json not found in long-term database files: {files}"
 
     for scraper in enabled_scrapers:
         chain_status_file = f"{DumpFolderNames[scraper].value.lower()}.json"
         assert (
             chain_status_file in files
         ), f"{chain_status_file} not found in long-term database files: {files}"
+
+    for scraper in enabled_scrapers:
+        for file_type in FileTypesFilters:
+            file_type_file = f"{scraper.lower()}_{file_type.name.lower()}.json"
+            assert (
+                file_type_file in files
+            ), f"{file_type_file} not found in long-term database files: {files}"
 
     csv_files = long_term_db_target.list_files(extension="csv")
     assert len(csv_files) > 0, f"No CSV files found in long-term database"
