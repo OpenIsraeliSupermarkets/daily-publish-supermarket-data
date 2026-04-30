@@ -29,10 +29,11 @@ def mock_db_uploader():
 def sample_manager(mock_db_uploader):
     return LongTermDatasetManager(
         outputs_folder="/test/outputs",
-        status_folder="/test/status",
         long_term_db_target=mock_db_uploader,
         enabled_scrapers=["scraper1", "scraper2"],
         enabled_file_types=["type1", "type2"],
+        scraping_status_folder="/test/scraping_status",
+        converting_status_folder="/test/converting_status",
     )
 
 
@@ -86,23 +87,6 @@ def test_read_scraper_status_files(mock_listdir, sample_manager):
     )
 
 
-@patch("builtins.open")
-def test_read_parser_status(mock_open, sample_manager):
-    single_file_data = mock_single_file_data(
-        "store1", "/test/outputs/file1.csv", "type1", ["file1.xml", "file2.xml"]
-    )
-
-    mock_file = Mock()
-    mock_file.read.return_value = json.dumps([single_file_data])
-    mock_open.return_value.__enter__.return_value = mock_file
-
-    result = sample_manager._read_parser_status()
-
-    assert len(result) == 1
-    assert result[0]["path"] == "file1.csv"
-    assert (
-        result[0]["description"] == "2 XML files from type type1 published by 'store1'"
-    )
 
 
 def test_compose(sample_manager):
@@ -153,7 +137,7 @@ def test_integration():
 
         manager = LongTermDatasetManager(
             outputs_folder=os.path.join(temp_dir, "outputs"),
-            status_folder=os.path.join(temp_dir, "status"),
+            # status_folder=os.path.join(temp_dir, "status"),
             long_term_db_target=DummyFileStorage(
                 dataset_remote_path=remote_name,
                 dataset_path=os.path.join(temp_dir, "dataset"),
@@ -161,6 +145,8 @@ def test_integration():
             ),
             enabled_scrapers=["scraper1", "scraper2"],
             enabled_file_types=["type1", "type2"],
+            scraping_status_folder=os.path.join(temp_dir, "scraping_status"),
+            converting_status_folder=os.path.join(temp_dir, "converting_status"),
         )
 
         manager.compose()
