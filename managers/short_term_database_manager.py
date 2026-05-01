@@ -1,3 +1,4 @@
+import hashlib
 import os
 import pandas as pd
 import json
@@ -5,8 +6,9 @@ from utils import Logger
 from remotes import ShortTermDatabaseUploader
 from managers.cache_manager import CacheManager, CacheState
 from managers.large_file_push_manager import LargeFilePushManager
-from data_models.raw_schema import ParserStatus, ScraperStatus
-from datetime import datetime
+from il_supermarket_parsers import ParserStatusOutput
+from il_supermarket_scarper import ScraperStatusOutput
+from typing import Union
 
 
 class ShortTermDBDatasetManager:
@@ -30,105 +32,81 @@ class ShortTermDBDatasetManager:
         self.scraping_status_folder = scraping_status_folder
         self.converting_status_folder = converting_status_folder
 
-    def _push_parser_status(self, local_cahce: CacheState):
-        with open(f"{self.converting_status_folder}/parser-status.json", "r") as file:
-            records = json.load(file)
+    @staticmethod
+    def _status_event_index(event_json: dict, source_file: str) -> str:
+        """Stable document id for status rows (partition key in short-term DB)."""
+        canonical = json.dumps(event_json, sort_keys=True, default=str)
+        digest = hashlib.sha256(f"{source_file}\0{canonical}".encode()).hexdigest()
+        return digest
 
-        pushed_timestamps = local_cahce.get_pushed_timestamps("parser-status.json")
-        added_timestamps = []
-        processed_records = []
+    def _push_a_status_files(
+        self,
+        status_folder,
+        model_type: Union[ParserStatusOutput, ScraperStatusOutput],
+        target_table: str,
+        local_cahce: CacheState,
+        *,
+        one_document_per_file: bool = False,
+    ):
+        for file_name in os.listdir(status_folder):
+            if file_name.endswith(".json"):
 
-        for record in records:
-            if record["when_date"] not in pushed_timestamps:
-                try:
-                    processed_records.append(
-                        ParserStatus(
-                            index=ParserStatus.to_index(
-                                record["file_type"],
-                                record["store_enum"],
-                                record["when_date"],
-                            ),
-                            when_date=record["when_date"],
-                            requested_limit=record["limit"],
-                            requested_store_enum=record["store_enum"],
-                            requested_file_type=record["file_type"],
-                            scaned_data_folder=record["data_folder"],
-                            output_folder=record["output_folder"],
-                            status=record["status"],
-                            response=record["response"],
-                        ).to_dict()
+                pushed_ids = list(local_cahce.get_pushed_timestamps(file_name))
+                pushed_set = set(pushed_ids)
+                added_ids: list = []
+                processed_events = []
+
+                with open(os.path.join(status_folder, file_name), "r") as file:
+                    records = json.load(file)
+
+                    model = model_type(**records)
+
+                    for event in model.events:
+                        try:
+                            event_json = json.loads(event.model_dump_json())
+                            row_index = self._status_event_index(
+                                event_json, file_name
+                            )
+                        except Exception as e:
+                            Logger.error(f"Error processing event: {e}")
+                            continue
+                        if row_index in pushed_set:
+                            continue
+                        processed_events.append(
+                            {"index": row_index, **event_json}
+                        )
+                        pushed_set.add(row_index)
+                        added_ids.append(row_index)
+                    self.uploader._insert_to_destinations(
+                        target_table, processed_events
                     )
-                except Exception as e:
-                    Logger.error(f"Error processing record: {e}")
-                    continue
-                added_timestamps.append(record["when_date"])
 
-        self.uploader._insert_to_destinations(
-            ParserStatus.get_table_name(), processed_records
+                merged = pushed_ids + [i for i in added_ids if i not in pushed_ids]
+                local_cahce.update_pushed_timestamps(file_name, merged)
+
+    def _push_parser_status(self, local_cahce: CacheState):
+        self._push_a_status_files(
+            self.converting_status_folder,
+            ParserStatusOutput,
+            "ParserStatus",
+            local_cahce,
+            one_document_per_file=True,
         )
-
-        # local_cahce.update_pushed_timestamps(
-        #     "parser-status.json", list(set(added_timestamps)) + pushed_timestamps
-        # )
-
         Logger.info("Parser status stored in DynamoDB successfully.")
 
-    # def _push_status_files(self, local_cahce: CacheState):
-    #     for file in os.listdir(self.scraping_status_folder):
-    #         if not file.endswith(".json") or file == "index.json":
-    #             Logger.warning(f"Skipping '{file}', should we store it?")
-    #             continue
+    def _push_scraper_status(self, local_cahce: CacheState):
+        self._push_a_status_files(
+            self.scraping_status_folder,
+            ScraperStatusOutput,
+            "ScraperStatus",
+            local_cahce,
+        )
+        Logger.info("Scraper status stored in DynamoDB successfully.")
 
-    #         self._push_scraper_status(file, local_cahce)
+    def _push_status_files(self, local_cahce: CacheState):
+        self._push_scraper_status(local_cahce)
 
-    #     self._push_parser_status(local_cahce)
-
-    # def _push_scraper_status(self, file_name: str, local_cahce: CacheState):
-
-    #     with open(os.path.join(self.status_folder, file_name), "r") as f:
-    #         data = json.load(f)
-
-    #     pushed_timestamp = local_cahce.get_pushed_timestamps(file_name)
-    #     Logger.info(f"Pushing {file_name}: already pushed {pushed_timestamp}")
-
-    #     records = []
-    #     for index, (timestamp, actions) in enumerate(data.items()):
-
-    #         if timestamp == "verified_downloads":
-    #             continue
-
-    #         if timestamp in pushed_timestamp:
-    #             continue
-
-    #         Logger.info(f"Pushing {file_name}: {timestamp}")
-    #         for action in actions:
-    #             records.append(
-    #                 ScraperStatus(
-    #                     index=ScraperStatus.to_index(
-    #                         file_name.split(".")[0],
-    #                         action["status"],
-    #                         timestamp,
-    #                         str(index),
-    #                     ),
-    #                     file_name=file_name.split(".")[0],
-    #                     timestamp=datetime.strptime(timestamp, "%Y%m%d%H%M%S").strftime(
-    #                         "%Y-%m-%d %H:%M:%S.%f%z"
-    #                     ),
-    #                     status=action["status"],
-    #                     when=action["when"],
-    #                     status_data={
-    #                         key: value
-    #                         for key, value in action.items()
-    #                         if key != "status" and key != "when"
-    #                     },
-    #                 ).to_dict()
-    #             )
-
-    #         pushed_timestamp.append(timestamp)
-
-    #     local_cahce.update_pushed_timestamps(file_name, pushed_timestamp)
-
-    #     self.uploader._insert_to_destinations(ScraperStatus.get_table_name(), records)
+        self._push_parser_status(local_cahce)
 
     def _push_files_data(self, local_cahce: CacheState):
         #
@@ -153,5 +131,6 @@ class ShortTermDBDatasetManager:
                 )
 
             self._push_files_data(local_cache)
+            self._push_status_files(local_cache)
 
         Logger.info("Upload completed successfully.")

@@ -87,8 +87,6 @@ def test_read_scraper_status_files(mock_listdir, sample_manager):
     )
 
 
-
-
 def test_compose(sample_manager):
     sample_manager.compose()
     sample_manager.remote_database_manager.stage.assert_any_call("/test/outputs")

@@ -76,9 +76,7 @@ class BaseSupermarketDataPublisher:
             enabled_file_types if enabled_file_types else FileTypesFilters.all_types()
         )
         self.limit = limit
-        self.status_configuration =  status_configuration or {
-            "database_type": "json"
-        }
+        self.status_configuration = status_configuration or {"database_type": "json"}
         self.scraping_status_folder = os.path.join(app_folder, "scraping_status")
         self.converting_status_folder = os.path.join(app_folder, "converting_status")
 

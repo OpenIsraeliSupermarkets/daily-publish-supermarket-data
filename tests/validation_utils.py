@@ -148,22 +148,24 @@ def validate_state_after_api_update(
         short_term_db_target: The short-term database target
     """
     # document_db folder
-    # scraper_status_table = ScraperStatus.get_table_name()
-    # scraper_status_count = len(
-    #     short_term_db_target.get_destinations_content(scraper_status_table)
-    # )
-    # assert scraper_status_count == 4 * len(
-    #     enabled_scrapers
-    # ), f"Expected 4 documents in {scraper_status_table}, found {scraper_status_count}"
+    scraper_status_table = ScraperStatus.get_table_name()
+    scraper_status_count = len(
+        short_term_db_target.get_destinations_content(scraper_status_table)
+    )
+    expected_scraper_count = 4 * len(enabled_scrapers)
+    assert scraper_status_count == expected_scraper_count, (
+        f"Expected {expected_scraper_count} documents in {scraper_status_table}, "
+        f"found {scraper_status_count}"
+    )
 
-    # parser_status_table = ParserStatus.get_table_name()
-    # parser_status_count = len(
-    #     short_term_db_target.get_destinations_content(parser_status_table)
-    # )
-    # expected_parser_count = len(FileTypesFilters) * 1 * len(enabled_scrapers)  # limit
-    # assert (
-    #     parser_status_count == expected_parser_count
-    # ), f"Expected {expected_parser_count} documents in {parser_status_table}, found {parser_status_count}"
+    parser_status_table = ParserStatus.get_table_name()
+    parser_status_count = len(
+        short_term_db_target.get_destinations_content(parser_status_table)
+    )
+    expected_parser_count = len(FileTypesFilters) * 1 * len(enabled_scrapers)  # limit
+    assert (
+        parser_status_count == expected_parser_count
+    ), f"Expected {expected_parser_count} documents in {parser_status_table}, found {parser_status_count}"
 
     # # read the csv file
     csv_files = glob.glob(os.path.join(outputs_folder, "*.csv"))
@@ -175,7 +177,11 @@ def validate_state_after_api_update(
         df = pd.read_csv(csv_file)
 
         data_table = file_name_to_table(csv_file)
-        data_count = len(short_term_db_target.get_destinations_content(data_table))
+        table_docs = short_term_db_target.get_destinations_content(data_table)
+        # LargeFilePushManager also inserts file_complete markers without row data
+        data_count = len(
+            [d for d in table_docs if isinstance(d.get("content"), dict)]
+        )
         assert (
             data_count == df.shape[0]
         ), f"Expected {df.shape[0]} rows in {data_table}, found {data_count}"
