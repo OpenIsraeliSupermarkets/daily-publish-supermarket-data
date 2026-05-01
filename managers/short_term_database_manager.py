@@ -45,8 +45,6 @@ class ShortTermDBDatasetManager:
         model_type: Union[ParserStatusOutput, ScraperStatusOutput],
         target_table: str,
         local_cahce: CacheState,
-        *,
-        one_document_per_file: bool = False,
     ):
         for file_name in os.listdir(status_folder):
             if file_name.endswith(".json"):
@@ -90,7 +88,6 @@ class ShortTermDBDatasetManager:
             ParserStatusOutput,
             "ParserStatus",
             local_cahce,
-            one_document_per_file=True,
         )
         Logger.info("Parser status stored in DynamoDB successfully.")
 
