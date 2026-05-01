@@ -305,7 +305,8 @@ def test_clean_all_source_data_integration():
             publisher.app_folder,
             publisher.data_folder,
             publisher.outputs_folder,
-            publisher.status_folder,
+            publisher.scraping_status_folder,
+            publisher.converting_status_folder,
         )
     except Exception as e:
         pytest.fail(f"Upload and clean function raised an exception: {e}")

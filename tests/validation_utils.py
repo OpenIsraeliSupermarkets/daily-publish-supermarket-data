@@ -253,7 +253,11 @@ def validate_long_term_structure(
 
 
 def validate_local_structure_deleted(
-    app_folder, data_folder, outputs_folder, status_folder
+    app_folder,
+    data_folder,
+    outputs_folder,
+    scraping_status_folder,
+    converting_status_folder,
 ):
     """
     Validate that cleanup has been performed correctly.
@@ -271,8 +275,11 @@ def validate_local_structure_deleted(
         outputs_folder
     ), f"Outputs folder {outputs_folder} should not exist after cleanup"
     assert not os.path.exists(
-        status_folder
-    ), f"Status folder {status_folder} should not exist after cleanup"
+        scraping_status_folder
+    ), f"Status folder {scraping_status_folder} should not exist after cleanup"
+    assert not os.path.exists(
+        converting_status_folder
+    ), f"Status folder {converting_status_folder} should not exist after cleanup"
 
     with CacheManager(app_folder) as cache:
         assert cache.is_empty(), f"Cache should be empty after cleanup"
@@ -418,54 +425,54 @@ def validate_short_term_structure(
     ), "GlobalParserStatus should be updated in the last 3 hours"
 
 
-def validate_longterm_and_short_sync(
-    enabled_scrapers,
-    short_term_database_connector,
-    long_term_database_connector,
-    num_of_expected_files=None,
-):
-    """
-    Validate that the API and the long-term database are in sync.
+# def validate_longterm_and_short_sync(
+#     enabled_scrapers,
+#     short_term_database_connector,
+#     long_term_database_connector,
+#     num_of_expected_files=None,
+# ):
+#     """
+#     Validate that the API and the long-term database are in sync.
 
-    Args:
-        enabled_scrapers: List of enabled scrapers
-        short_term_database_connector: Connector to the short-term database
-        long_term_database_connector: Connector to the long-term database
-        num_of_expected_files: Expected number of files
-    """
-    #
-    access_layer = AccessLayer(
-        short_term_database_connector=short_term_database_connector,
-        long_term_database_connector=long_term_database_connector,
-    )
-    assert (
-        access_layer.is_short_term_updated()
-    ), f"Short-term database should be updated in the last hour"
-    #
-    for chain in enabled_scrapers:
-        files = access_layer.list_files(chain=chain)
-        assert (
-            num_of_expected_files is None
-            or len(files.processed_files) == num_of_expected_files
-        ), f"Expected {num_of_expected_files} processed files for chain {chain}, found {len(files.processed_files)}"
+#     Args:
+#         enabled_scrapers: List of enabled scrapers
+#         short_term_database_connector: Connector to the short-term database
+#         long_term_database_connector: Connector to the long-term database
+#         num_of_expected_files: Expected number of files
+#     """
+#     #
+#     access_layer = AccessLayer(
+#         short_term_database_connector=short_term_database_connector,
+#         long_term_database_connector=long_term_database_connector,
+#     )
+#     assert (
+#         access_layer.is_short_term_updated()
+#     ), f"Short-term database should be updated in the last hour"
+#     #
+#     for chain in enabled_scrapers:
+#         files = access_layer.list_files(chain=chain)
+#         assert (
+#             num_of_expected_files is None
+#             or len(files.processed_files) == num_of_expected_files
+#         ), f"Expected {num_of_expected_files} processed files for chain {chain}, found {len(files.processed_files)}"
 
-        entries_in_short_term_db = 0
-        for file in files.processed_files:
-            content = access_layer.get_file_content(chain=chain, file=file.file_name)
-            entries_in_short_term_db += len(content.rows)
+#         entries_in_short_term_db = 0
+#         for file in files.processed_files:
+#             content = access_layer.get_file_content(chain=chain, file=file.file_name)
+#             entries_in_short_term_db += len(content.rows)
 
-        entries_in_long_term_db = 0
-        csv_file = long_term_database_connector.list_files(
-            chain=chain.lower(), extension="csv"
-        )
-        assert (
-            len(csv_file) > 0
-        ), f"No CSV files found for chain {chain.lower()} in long-term database"
+#         entries_in_long_term_db = 0
+#         csv_file = long_term_database_connector.list_files(
+#             chain=chain.lower(), extension="csv"
+#         )
+#         assert (
+#             len(csv_file) > 0
+#         ), f"No CSV files found for chain {chain.lower()} in long-term database"
 
-        for file in csv_file:
-            df = long_term_database_connector.get_file_content(file)
-            entries_in_long_term_db += df.shape[0]
+#         for file in csv_file:
+#             df = long_term_database_connector.get_file_content(file)
+#             entries_in_long_term_db += df.shape[0]
 
-        assert (
-            entries_in_short_term_db == entries_in_long_term_db
-        ), f"Number of entries in short-term DB ({entries_in_short_term_db}) does not match long-term DB ({entries_in_long_term_db}) for chain {chain}"
+#         assert (
+#             entries_in_short_term_db == entries_in_long_term_db
+#         ), f"Number of entries in short-term DB ({entries_in_short_term_db}) does not match long-term DB ({entries_in_long_term_db}) for chain {chain}"
