@@ -53,13 +53,13 @@ class ShortTermDBDatasetManager:
                 pushed_ids = list(local_cahce.get_pushed_timestamps(file_name))
                 pushed_set = set(pushed_ids)
                 added_ids: list = []
-                processed_events = []
 
                 with open(os.path.join(status_folder, file_name), "r") as file:
                     records = json.load(file)
 
                     model = model_type(**records)
 
+                    processed_events = []
                     for event in model.events:
                         try:
                             event_json = json.loads(event.model_dump_json())
@@ -70,12 +70,11 @@ class ShortTermDBDatasetManager:
                         if row_index in pushed_set:
                             continue
                         processed_events.append({"index": row_index, **event_json})
-                        pushed_set.add(row_index)
-                        added_ids.append(row_index)
                     self.uploader._insert_to_destinations(
                         target_table, processed_events
                     )
 
+                    processed_events = []
                     for event in model.global_status:
                         try:
                             event_json = json.loads(event.model_dump_json())
@@ -88,6 +87,7 @@ class ShortTermDBDatasetManager:
                         processed_events.append({"index": row_index, **event_json})
                         pushed_set.add(row_index)
                         added_ids.append(row_index)
+
                     self.uploader._insert_to_destinations(
                         global_target_table, processed_events
                     )
