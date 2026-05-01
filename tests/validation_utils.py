@@ -3,8 +3,8 @@ Utility functions for validating the state of the system during and after tests.
 Provides validation helpers for scraper output, converter output, and database state.
 """
 
-from il_supermarket_scarper import DumpFolderNames, FileTypesFilters
-from il_supermarket_scarper.utils import ScraperStatus as ScraperStatusReport
+from il_supermarket_scarper import DumpFolderNames, FileTypesFilters, ScraperStatusOutput
+from il_supermarket_parsers import ParserStatusOutput
 from data_models.raw_schema import ScraperStatus, ParserStatus, file_name_to_table
 from managers.cache_manager import CacheManager
 from access.access_layer import AccessLayer
@@ -282,117 +282,127 @@ def validate_short_term_structure(
     """
     Validate the structure of the short-term database.
 
+    Collects all published records from the four DB tables, reconstructs the
+    canonical ScraperStatusOutput / ParserStatusOutput objects per task_id, and
+    delegates lifecycle validation to each model's built-in method.
+
     Args:
         short_term_db_target: The short-term database target
         enabled_scrapers: List of enabled scrapers
+        num_of_occasions: Expected number of scraping occasions (None = any)
     """
-    # Scraper behaviour:
-    # - The should be at least one document.
-    # - All scrapers ran at least once.
-    # - Each iteration was completed  all steps.
-    # - The is at least one itreaion.
-    # - If we know the number of itreations, we expect it. otherwise, we don't.
-    #
-    # Ignore: compraing the number of itreation across scrapers.
-    num_of_documents_in_scraper_status_per_chain = len(
-        [
-            ScraperStatusReport.STARTED,
-            ScraperStatusReport.COLLECTED,
-            ScraperStatusReport.DOWNLOADED,
-            ScraperStatusReport.ESTIMATED_SIZE,
-        ]
+    # ------------------------------------------------------------------ #
+    # Scraper                                                              #
+    # ------------------------------------------------------------------ #
+    scraper_events_docs = short_term_db_target.get_destinations_content(
+        ScraperStatus.get_table_name()
+    )
+    scraper_global_docs = short_term_db_target.get_destinations_content(
+        "GlobalScraperStatus"
     )
 
-    scraper_status_table = ScraperStatus.get_table_name()
-    table_content = short_term_db_target.get_destinations_content(scraper_status_table)
-    actual_scraper_status_count = len(table_content)
+    assert len(scraper_events_docs) > 0, "Expected at least one ScraperStatus document."
+    assert (
+        len(scraper_global_docs) > 0
+    ), "Expected at least one GlobalScraperStatus document."
 
-    assert actual_scraper_status_count > 0, "Expected at least one document."
+    # group by task_id — one group per chain per occasion
+    scraper_by_task: dict = {}
+    for doc in scraper_global_docs + scraper_events_docs:
+        tid = doc["task_id"]
+        scraper_by_task.setdefault(tid, {"events": [], "global_status": []})
+        payload = {k: v for k, v in doc.items() if k != "index"}
+        if doc["status"] in ("started", "estimated_size"):
+            scraper_by_task[tid]["global_status"].append(payload)
+        else:
+            scraper_by_task[tid]["events"].append(payload)
 
-    # Check that we have 4 documents for each index
-    chains_batch_count = {}
-    for doc in table_content:
-        chain, _, time, _ = ScraperStatus.decomposite_index(
-            doc["index"]
-        )  # Get timestamp part
-        chains_batch_count[chain] = chains_batch_count.get(chain, {})
-        chains_batch_count[chain][time] = chains_batch_count[chain].get(time, 0) + 1
-
-    # all the expected scraper was ran
-    assert len(chains_batch_count) == len(
+    # all scrapers ran at least once
+    assert len(scraper_by_task) >= len(
         enabled_scrapers
-    ), f"Expected {chains_batch_count} chains, found {chains_batch_count.keys()}"
+    ), f"Expected at least {len(enabled_scrapers)} scraper tasks, found {len(scraper_by_task)}"
 
-    # each itreation was completed succsufll.
-    for chain, counts in chains_batch_count.items():
-        assert len(counts) > 0, f"Expected at least one occasion for chain {chain}"
-        for time, count in counts.items():
-            assert (
-                count == num_of_documents_in_scraper_status_per_chain
-            ), f"Expected {num_of_documents_in_scraper_status_per_chain} documents for index {chain}@{time}, found {count}"
-
-    # the number of occasions is correct
-    if num_of_occasions is not None:
-        assert (
-            actual_scraper_status_count
-            / (num_of_documents_in_scraper_status_per_chain * len(enabled_scrapers))
-            == num_of_occasions
-        ), f"Expected {num_of_occasions} occasions, found {actual_no_of_occasions}"
-
-    assert short_term_db_target._is_collection_updated(
-        scraper_status_table, seconds=60 * 60 * 3
-    ), f"Short-term database should be updated in the last hour"
-
-    #
-    # Parser behaviour:
-    # - There should be at least one document.
-    # - All parsers ran at least once.
-    # - Each iteration was completed for all file types.
-    # - There is at least one iteration.
-    # - If we know the number of iterations, we expect it. Otherwise, we don't.
-    #
-    num_of_documents_in_parser_status_per_chain = len(FileTypesFilters)
-
-    parser_status_table = ParserStatus.get_table_name()
-    table_content = short_term_db_target.get_destinations_content(parser_status_table)
-    actual_parser_status_count = len(table_content)
-
-    assert actual_parser_status_count > 0, "Expected at least one document."
-
-    # Check that we have documents for each file type
-    chains_batch_count = {}
-    for doc in table_content:
-        _, chain, time = ParserStatus.decomposite_index(
-            doc["index"]
-        )  # Get timestamp part
-        chains_batch_count[chain] = chains_batch_count.get(chain, {})
-        chains_batch_count[chain][time] = chains_batch_count[chain].get(time, 0) + 1
-
-    # All the expected parsers ran
-    assert len(chains_batch_count) == len(
-        enabled_scrapers
-    ), f"Expected {len(enabled_scrapers)} chains, found {len(chains_batch_count)}"
-
-    # Each iteration was completed successfully
-    for chain, counts in chains_batch_count.items():
-        assert len(counts) > 0, f"Expected at least one occasion for chain {chain}"
-        for time, count in counts.items():
-            assert (
-                count == num_of_documents_in_parser_status_per_chain
-            ), f"Expected {num_of_documents_in_parser_status_per_chain} documents for index {chain}@{time}, found {count}"
-
-    # The number of occasions is correct
-    if num_of_occasions is not None:
-        actual_no_of_occasions = actual_parser_status_count / (
-            num_of_documents_in_parser_status_per_chain * len(enabled_scrapers)
+    # each task forms a valid lifecycle
+    for tid, parts in scraper_by_task.items():
+        model = ScraperStatusOutput(
+            events=parts["events"],
+            global_status=parts["global_status"],
         )
-        assert (
-            actual_no_of_occasions == num_of_occasions
-        ), f"Expected {num_of_occasions} occasions, found {actual_no_of_occasions}"
+        assert model.validate_file_status(), (
+            f"ScraperStatusOutput invalid for task {tid}"
+        )
+
+    if num_of_occasions is not None:
+        expected_tasks = len(enabled_scrapers) * num_of_occasions
+        assert len(scraper_by_task) == expected_tasks, (
+            f"Expected {expected_tasks} scraper tasks, found {len(scraper_by_task)}"
+        )
 
     assert short_term_db_target._is_collection_updated(
-        parser_status_table, seconds=60 * 60 * 3
-    ), f"Short-term database should be updated in the last hour"
+        ScraperStatus.get_table_name(), seconds=60 * 60 * 3
+    ), "ScraperStatus should be updated in the last 3 hours"
+    assert short_term_db_target._is_collection_updated(
+        "GlobalScraperStatus", seconds=60 * 60 * 3
+    ), "GlobalScraperStatus should be updated in the last 3 hours"
+
+    # ------------------------------------------------------------------ #
+    # Parser                                                               #
+    # ------------------------------------------------------------------ #
+    parser_events_docs = short_term_db_target.get_destinations_content(
+        ParserStatus.get_table_name()
+    )
+    parser_global_docs = short_term_db_target.get_destinations_content(
+        "GlobalParserStatus"
+    )
+
+    assert len(parser_events_docs) > 0, "Expected at least one ParserStatus document."
+    assert (
+        len(parser_global_docs) > 0
+    ), "Expected at least one GlobalParserStatus document."
+
+    # group by task_id — one group per (chain, file_type) per occasion
+    parser_by_task: dict = {}
+    for doc in parser_global_docs + parser_events_docs:
+        tid = doc["task_id"]
+        parser_by_task.setdefault(tid, {"events": [], "global_status": []})
+        payload = {k: v for k, v in doc.items() if k != "index"}
+        if doc["status"] in ("started", "completed"):
+            parser_by_task[tid]["global_status"].append(payload)
+        else:
+            parser_by_task[tid]["events"].append(payload)
+
+    # all enabled scrapers are represented in the started events
+    scrapers_seen = {
+        event["scraper"]
+        for parts in parser_by_task.values()
+        for event in parts["global_status"]
+        if event.get("status") == "started" and "scraper" in event
+    }
+    assert scrapers_seen == set(enabled_scrapers), (
+        f"Expected scrapers {set(enabled_scrapers)}, found {scrapers_seen}"
+    )
+
+    # each task forms a valid lifecycle
+    for tid, parts in parser_by_task.items():
+        model = ParserStatusOutput(
+            events=parts["events"],
+            global_status=parts["global_status"],
+        )
+        valid, reason = model.validate_parsing_run()
+        assert valid, f"ParserStatusOutput invalid for task {tid}: {reason}"
+
+    if num_of_occasions is not None:
+        expected_tasks = len(enabled_scrapers) * len(FileTypesFilters) * num_of_occasions
+        assert len(parser_by_task) == expected_tasks, (
+            f"Expected {expected_tasks} parser tasks, found {len(parser_by_task)}"
+        )
+
+    assert short_term_db_target._is_collection_updated(
+        ParserStatus.get_table_name(), seconds=60 * 60 * 3
+    ), "ParserStatus should be updated in the last 3 hours"
+    assert short_term_db_target._is_collection_updated(
+        "GlobalParserStatus", seconds=60 * 60 * 3
+    ), "GlobalParserStatus should be updated in the last 3 hours"
 
 
 def validate_longterm_and_short_sync(
