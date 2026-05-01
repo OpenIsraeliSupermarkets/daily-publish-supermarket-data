@@ -44,6 +44,7 @@ class ShortTermDBDatasetManager:
         status_folder,
         model_type: Union[ParserStatusOutput, ScraperStatusOutput],
         target_table: str,
+        global_target_table: str,
         local_cahce: CacheState,
     ):
         for file_name in os.listdir(status_folder):
@@ -62,21 +63,33 @@ class ShortTermDBDatasetManager:
                     for event in model.events:
                         try:
                             event_json = json.loads(event.model_dump_json())
-                            row_index = self._status_event_index(
-                                event_json, file_name
-                            )
+                            row_index = self._status_event_index(event_json, file_name)
                         except Exception as e:
                             Logger.error(f"Error processing event: {e}")
                             continue
                         if row_index in pushed_set:
                             continue
-                        processed_events.append(
-                            {"index": row_index, **event_json}
-                        )
+                        processed_events.append({"index": row_index, **event_json})
                         pushed_set.add(row_index)
                         added_ids.append(row_index)
                     self.uploader._insert_to_destinations(
                         target_table, processed_events
+                    )
+
+                    for event in model.global_status:
+                        try:
+                            event_json = json.loads(event.model_dump_json())
+                            row_index = self._status_event_index(event_json, file_name)
+                        except Exception as e:
+                            Logger.error(f"Error processing event: {e}")
+                            continue
+                        if row_index in pushed_set:
+                            continue
+                        processed_events.append({"index": row_index, **event_json})
+                        pushed_set.add(row_index)
+                        added_ids.append(row_index)
+                    self.uploader._insert_to_destinations(
+                        global_target_table, processed_events
                     )
 
                 merged = pushed_ids + [i for i in added_ids if i not in pushed_ids]
@@ -87,6 +100,7 @@ class ShortTermDBDatasetManager:
             self.converting_status_folder,
             ParserStatusOutput,
             "ParserStatus",
+            "GlobalParserStatus",
             local_cahce,
         )
         Logger.info("Parser status stored in DynamoDB successfully.")
@@ -96,6 +110,7 @@ class ShortTermDBDatasetManager:
             self.scraping_status_folder,
             ScraperStatusOutput,
             "ScraperStatus",
+            "GlobalScraperStatus",
             local_cahce,
         )
         Logger.info("Scraper status stored in DynamoDB successfully.")

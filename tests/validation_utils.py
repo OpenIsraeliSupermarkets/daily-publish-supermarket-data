@@ -162,7 +162,9 @@ def validate_state_after_api_update(
     parser_status_count = len(
         short_term_db_target.get_destinations_content(parser_status_table)
     )
-    expected_parser_count = len(FileTypesFilters) * 1 * len(enabled_scrapers)  # limit
+    expected_parser_count = (
+        1 * len(enabled_scrapers) * 2
+    )  # start -> (failed or completed)
     assert (
         parser_status_count == expected_parser_count
     ), f"Expected {expected_parser_count} documents in {parser_status_table}, found {parser_status_count}"
@@ -179,9 +181,7 @@ def validate_state_after_api_update(
         data_table = file_name_to_table(csv_file)
         table_docs = short_term_db_target.get_destinations_content(data_table)
         # LargeFilePushManager also inserts file_complete markers without row data
-        data_count = len(
-            [d for d in table_docs if isinstance(d.get("content"), dict)]
-        )
+        data_count = len([d for d in table_docs if isinstance(d.get("content"), dict)])
         assert (
             data_count == df.shape[0]
         ), f"Expected {df.shape[0]} rows in {data_table}, found {data_count}"
