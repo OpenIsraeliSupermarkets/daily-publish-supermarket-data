@@ -248,7 +248,12 @@ class BaseSupermarketDataPublisher:
         Clean all source data, including the data, outputs, and status folders.
         """
         # Clean the folders in case of an error
-        for folder in [self.data_folder, self.outputs_folder, self.status_folder]:
+        for folder in [
+            self.data_folder,
+            self.outputs_folder,
+            self.converting_status_folder,
+            self.scraping_status_folder,
+        ]:
             if os.path.exists(folder):
                 shutil.rmtree(folder)
 
