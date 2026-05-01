@@ -308,14 +308,16 @@ def validate_short_term_structure(
 
     # group by task_id — one group per chain per occasion
     scraper_by_task: dict = {}
-    for doc in scraper_global_docs + scraper_events_docs:
+    for doc in scraper_global_docs:
         tid = doc["task_id"]
         scraper_by_task.setdefault(tid, {"events": [], "global_status": []})
         payload = {k: v for k, v in doc.items() if k != "index"}
-        if doc["status"] in ("started", "estimated_size"):
-            scraper_by_task[tid]["global_status"].append(payload)
-        else:
-            scraper_by_task[tid]["events"].append(payload)
+        scraper_by_task[tid]["global_status"].append(payload)
+        
+    for doc in scraper_events_docs:
+        tid = doc["task_id"]
+        payload = {k: v for k, v in doc.items() if k != "index"}
+        scraper_by_task[tid]["events"].append(payload)
 
     # all scrapers ran at least once
     assert len(scraper_by_task) >= len(
@@ -362,15 +364,17 @@ def validate_short_term_structure(
 
     # group by task_id — one group per (chain, file_type) per occasion
     parser_by_task: dict = {}
-    for doc in parser_global_docs + parser_events_docs:
+    for doc in parser_global_docs :
         tid = doc["task_id"]
         parser_by_task.setdefault(tid, {"events": [], "global_status": []})
         payload = {k: v for k, v in doc.items() if k != "index"}
-        if doc["status"] in ("started", "completed"):
-            parser_by_task[tid]["global_status"].append(payload)
-        else:
-            parser_by_task[tid]["events"].append(payload)
+        parser_by_task[tid]["global_status"].append(payload)
 
+    for doc in parser_events_docs:
+        tid = doc["task_id"]
+        payload = {k: v for k, v in doc.items() if k != "index"}
+        parser_by_task[tid]["events"].append(payload)   
+        
     # all enabled scrapers are represented in the started events
     scrapers_seen = {
         event["scraper"]
@@ -388,8 +392,8 @@ def validate_short_term_structure(
             events=parts["events"],
             global_status=parts["global_status"],
         )
-        valid, reason = model.validate_parsing_run()
-        assert valid, f"ParserStatusOutput invalid for task {tid}: {reason}"
+        valid = model.validate_file_status()
+        assert valid, f"ParserStatusOutput invalid for task {tid}"
 
     if num_of_occasions is not None:
         expected_tasks = len(enabled_scrapers) * len(FileTypesFilters) * num_of_occasions
