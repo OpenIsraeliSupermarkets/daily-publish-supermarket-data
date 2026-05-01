@@ -39,32 +39,20 @@ def sample_manager(mock_db_uploader):
 
 def expected_app_folder_stracture(folder_path):
     os.makedirs(folder_path, exist_ok=True)
-    os.makedirs(os.path.join(folder_path, "status"), exist_ok=True)
+    os.makedirs(os.path.join(folder_path, "scraping_status"), exist_ok=True)
+    os.makedirs(os.path.join(folder_path, "converting_status"), exist_ok=True)
 
-    with open(os.path.join(folder_path, "status", "scraper1.json"), "w") as f:
+    with open(os.path.join(folder_path, "scraping_status", "scraper1.json"), "w") as f:
         f.write("scraper1_logs")
-    with open(os.path.join(folder_path, "status", "scraper2.json"), "w") as f:
+    with open(os.path.join(folder_path, "scraping_status", "scraper2.json"), "w") as f:
         f.write("scraper2_logs")
 
     os.makedirs(os.path.join(folder_path, "outputs"), exist_ok=True)
-    with open(os.path.join(folder_path, "outputs", "parser-status.json"), "w") as f:
-        json.dump(
-            [
-                mock_single_file_data(
-                    "store1",
-                    "/test/outputs/file1.csv",
-                    "type1",
-                    ["file1.xml", "file2.xml"],
-                ),
-                mock_single_file_data(
-                    "store2",
-                    "/test/outputs/file2.csv",
-                    "type2",
-                    ["file3.xml", "file4.xml"],
-                ),
-            ],
-            f,
-        )
+    with open(os.path.join(folder_path, "converting_status", "scraper_file_type1.json"), "w") as f:
+        f.write("scraper1_parser_logs")
+    with open(os.path.join(folder_path, "converting_status", "scraper_file_type2.json"), "w") as f:
+        f.write("scraper2_parser_logs")
+
     with open(os.path.join(folder_path, "outputs", "file1.csv"), "w") as f:
         f.write("file1_content")
     with open(os.path.join(folder_path, "outputs", "file2.csv"), "w") as f:
@@ -90,7 +78,8 @@ def test_read_scraper_status_files(mock_listdir, sample_manager):
 def test_compose(sample_manager):
     sample_manager.compose()
     sample_manager.remote_database_manager.stage.assert_any_call("/test/outputs")
-    sample_manager.remote_database_manager.stage.assert_any_call("/test/status")
+    sample_manager.remote_database_manager.stage.assert_any_call("/test/scraping_status")
+    sample_manager.remote_database_manager.stage.assert_any_call("/test/converting_status")
     sample_manager.remote_database_manager.increase_index.assert_called_once()
 
 
@@ -152,4 +141,4 @@ def test_integration():
         manager.clean()
 
         assert len(os.listdir(temp_dir)) == 1
-        assert len(os.listdir(remote_name)) == 6
+        assert len(os.listdir(remote_name)) == 7
