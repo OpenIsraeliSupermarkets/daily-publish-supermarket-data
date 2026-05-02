@@ -47,8 +47,11 @@ if __name__ == "__main__":
         num_of_processes = os.cpu_count()
 
     limit = os.environ.get("LIMIT", None)
-    if limit:
-        limit = int(limit)
+    if limit is not None:
+        try:
+            limit = int(limit)
+        except ValueError:
+            limit = None
 
     enabled_scrapers = os.environ.get("ENABLED_SCRAPERS", "")
     if enabled_scrapers == "":
