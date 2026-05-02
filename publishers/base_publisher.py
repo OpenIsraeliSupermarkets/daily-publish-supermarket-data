@@ -34,6 +34,7 @@ class BaseSupermarketDataPublisher:
         status_folder="status",
         enabled_scrapers=None,
         enabled_file_types=None,
+        status_configuration=None,
         limit=None,
         when_date=None,
     ):
@@ -75,6 +76,9 @@ class BaseSupermarketDataPublisher:
             enabled_file_types if enabled_file_types else FileTypesFilters.all_types()
         )
         self.limit = limit
+        self.status_configuration = status_configuration or {"database_type": "json"}
+        self.scraping_status_folder = os.path.join(app_folder, "scraping_status")
+        self.converting_status_folder = os.path.join(app_folder, "converting_status")
 
         Logger.info("app_folder=%s", app_folder)
 
@@ -100,16 +104,24 @@ class BaseSupermarketDataPublisher:
             os.makedirs(self.data_folder, exist_ok=True)
 
             Logger.info("Starting the scraping task")
-            ScarpingTask(
+            task = ScarpingTask(
                 enabled_scrapers=self.enabled_scrapers,
                 files_types=self.enabled_file_types,
-                dump_folder_name=self.data_folder,
                 multiprocessing=self.number_of_scraping_processes,
-                lookup_in_db=True,
-                when_date=self.when_date if self.when_date else now(backfill_hours=1),
+                status_configuration={
+                    **self.status_configuration,
+                    "base_path": self.scraping_status_folder,
+                },
+                output_configuration={
+                    "output_mode": "disk",
+                    "base_storage_path": self.data_folder,
+                },
+            )
+            task.start(
                 limit=self.limit,
-                suppress_exception=True,
-            ).start()
+                when_date=self.when_date if self.when_date else now(backfill_hours=1),
+            )
+            task.join()
             Logger.info("Scraping task is done")
         except Exception as e:
             Logger.error("An error occurred during scraping: %s", e)
@@ -119,18 +131,27 @@ class BaseSupermarketDataPublisher:
         """
         Execute the converting task to parse scraped data into structured format.
         """
-        Logger.info("Starting the converting task")
-        os.makedirs(self.outputs_folder, exist_ok=True)
-
-        ConvertingTask(
+        output_configuration = [
+            {
+                "output_mode": "csv",
+                "output_folder": self.outputs_folder,
+            }
+        ]
+        task = ConvertingTask(
             enabled_parsers=self.enabled_scrapers,
             files_types=self.enabled_file_types,
-            data_folder=self.data_folder,
             multiprocessing=self.number_of_parseing_processs,
-            output_folder=self.outputs_folder,
-            when_date=datetime.datetime.now(),
-        ).start()
-
+            status_configuration={
+                **self.status_configuration,
+                "base_path": self.converting_status_folder,
+            },
+            output_configuration=output_configuration,
+            source_configuration={
+                "folder": self.data_folder,
+            },
+        )
+        task.start()
+        task.join()
         Logger.info("Converting task is done")
 
     def _download_from_long_term_database(self):
@@ -162,6 +183,8 @@ class BaseSupermarketDataPublisher:
             status_folder=self.status_folder,
             enabled_scrapers=self.enabled_scrapers,
             enabled_file_types=self.enabled_file_types,
+            scraping_status_folder=self.scraping_status_folder,
+            converting_status_folder=self.converting_status_folder,
         )
         database.upload(force_restart=reset_cache)
 
@@ -175,7 +198,8 @@ class BaseSupermarketDataPublisher:
             enabled_scrapers=self.enabled_scrapers,
             enabled_file_types=self.enabled_file_types,
             outputs_folder=self.outputs_folder,
-            status_folder=self.status_folder,
+            scraping_status_folder=self.scraping_status_folder,
+            converting_status_folder=self.converting_status_folder,
         )
         database.compose()
         database.upload()
@@ -224,7 +248,12 @@ class BaseSupermarketDataPublisher:
         Clean all source data, including the data, outputs, and status folders.
         """
         # Clean the folders in case of an error
-        for folder in [self.data_folder, self.outputs_folder, self.status_folder]:
+        for folder in [
+            self.data_folder,
+            self.outputs_folder,
+            self.converting_status_folder,
+            self.scraping_status_folder,
+        ]:
             if os.path.exists(folder):
                 shutil.rmtree(folder)
 

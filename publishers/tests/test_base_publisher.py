@@ -45,7 +45,9 @@ def test_execute_scraping_integration():
         publisher._execute_scraping()
 
         # Check if the data folder was created
-        validate_scraper_output(publisher.data_folder, enabled_scrapers)
+        validate_scraper_output(
+            publisher.data_folder, publisher.scraping_status_folder, enabled_scrapers
+        )
 
     except Exception as e:
         pytest.fail(f"Scraping function raised an exception: {e}")
@@ -83,11 +85,16 @@ def test_execute_converting_integration():
 
         # the csv file was created and the parser states
         validate_converting_output(
-            publisher.data_folder, publisher.outputs_folder, enabled_scrapers
+            publisher.data_folder,
+            publisher.converting_status_folder,
+            publisher.outputs_folder,
+            enabled_scrapers,
         )
 
         # status didn't changed
-        validate_scraper_output(publisher.data_folder, enabled_scrapers)
+        validate_scraper_output(
+            publisher.data_folder, publisher.scraping_status_folder, enabled_scrapers
+        )
 
     except Exception as e:
         pytest.fail(f"Converting function raised an exception: {e}")
@@ -124,6 +131,7 @@ def test_dump_files_clean_integration():
 
         validate_converting_output(
             publisher.data_folder,
+            publisher.converting_status_folder,
             publisher.outputs_folder,
             enabled_scrapers,
             dump_files_deleted=True,
@@ -131,7 +139,10 @@ def test_dump_files_clean_integration():
 
         # status didn't changed
         validate_scraper_output(
-            publisher.data_folder, enabled_scrapers, dump_files_deleted=True
+            publisher.data_folder,
+            publisher.scraping_status_folder,
+            enabled_scrapers,
+            dump_files_deleted=True,
         )
 
         # Check if the DummyDocumentDbUploader was updated
@@ -173,6 +184,7 @@ def test_update_api_database_integration():
         publisher._update_api_database()
         validate_converting_output(
             publisher.data_folder,
+            publisher.converting_status_folder,
             publisher.outputs_folder,
             enabled_scrapers,
             dump_files_deleted=True,
@@ -180,7 +192,10 @@ def test_update_api_database_integration():
 
         # status didn't changed
         validate_scraper_output(
-            publisher.data_folder, enabled_scrapers, dump_files_deleted=True
+            publisher.data_folder,
+            publisher.scraping_status_folder,
+            enabled_scrapers,
+            dump_files_deleted=True,
         )
         validate_state_after_api_update(
             publisher.app_folder,
@@ -231,11 +246,16 @@ def test_upload_to_kaggle_integration():
 
         # the csv file was created and the parser states
         validate_converting_output(
-            publisher.data_folder, publisher.outputs_folder, enabled_scrapers
+            publisher.data_folder,
+            publisher.converting_status_folder,
+            publisher.outputs_folder,
+            enabled_scrapers,
         )
 
         # status didn't changed
-        validate_scraper_output(publisher.data_folder, enabled_scrapers)
+        validate_scraper_output(
+            publisher.data_folder, publisher.scraping_status_folder, enabled_scrapers
+        )
         # Upload to Kaggle
         publisher._upload_to_kaggle()
 
@@ -285,7 +305,8 @@ def test_clean_all_source_data_integration():
             publisher.app_folder,
             publisher.data_folder,
             publisher.outputs_folder,
-            publisher.status_folder,
+            publisher.scraping_status_folder,
+            publisher.converting_status_folder,
         )
     except Exception as e:
         pytest.fail(f"Upload and clean function raised an exception: {e}")

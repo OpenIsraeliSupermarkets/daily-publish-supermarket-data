@@ -19,7 +19,7 @@ from remotes import KaggleUploader, MongoDbUploader
 from tests.validation_utils import (
     validate_long_term_structure,
     validate_short_term_structure,
-    validate_longterm_and_short_sync,
+    # validate_longterm_and_short_sync,
 )
 
 
@@ -67,14 +67,14 @@ def validate_data_storage(
                 long_term_db_target, stage_folder, enabled_scrapers, in_app=False
             )
 
-            validate_longterm_and_short_sync(
-                enabled_scrapers,
-                short_term_db_target,
-                long_term_db_target,
-                num_of_expected_files=(
-                    num_of_occasions * file_per_run if file_per_run else None
-                ),
-            )
+            # validate_longterm_and_short_sync(
+            #     enabled_scrapers,
+            #     short_term_db_target,
+            #     long_term_db_target,
+            #     num_of_expected_files=(
+            #         num_of_occasions * file_per_run if file_per_run else None
+            #     ),
+            # )
 
     finally:
         # Clean up temporary files

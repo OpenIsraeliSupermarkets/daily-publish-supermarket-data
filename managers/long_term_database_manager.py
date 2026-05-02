@@ -26,8 +26,9 @@ class LongTermDatasetManager:
     def __init__(
         self,
         outputs_folder,
-        status_folder,
         long_term_db_target: LongTermDatabaseUploader,
+        scraping_status_folder,
+        converting_status_folder,
         enabled_scrapers=None,
         enabled_file_types=None,
     ):
@@ -50,7 +51,8 @@ class LongTermDatasetManager:
         )
         self.remote_database_manager = long_term_db_target
         self.outputs_folder = outputs_folder
-        self.status_folder = status_folder
+        self.scraping_status_folder = scraping_status_folder
+        self.converting_status_folder = converting_status_folder
 
     def _read_parser_status(self):
         """
@@ -60,35 +62,15 @@ class LongTermDatasetManager:
             list: List of dictionaries containing file paths and descriptions
                   for successfully created files
         """
-        with open(f"{self.outputs_folder}/parser-status.json", "r") as file:
-            data = json.load(file)
-
-        collector = {}
-        for entry in data:
-
-            if "response" in entry and entry["response"]["file_was_created"]:
-                file_name = os.path.split(entry["response"]["file_created_path"])[-1]
-
-                if file_name not in collector:
-                    collector[file_name] = {
-                        "path": file_name,
-                        "store": entry["store_enum"],
-                        "files_types": entry["response"]["files_types"],
-                        "files_in_csv": entry["response"]["files_to_process"],
-                    }
-                else:
-                    collector[file_name]["files_in_csv"].extend(
-                        entry["response"]["files_to_process"]
-                    )
-
         descriptions = []
-        for file_name, file_info in collector.items():
-            descriptions.append(
-                {
-                    "path": file_name,
-                    "description": f"{len(file_info['files_in_csv'])} XML files from type {file_info['files_types']} published by '{file_info['store']}'",
-                }
-            )
+        for file in os.listdir(self.converting_status_folder):
+            if file.endswith(".json"):
+                descriptions.append(
+                    {
+                        "path": file,
+                        "description": f"Parser status file for '{file}' execution.",
+                    }
+                )
         return descriptions
 
     def _read_scraper_status_files(self):
@@ -100,7 +82,7 @@ class LongTermDatasetManager:
                   for each scraper status file
         """
         descriptions = []
-        for file in os.listdir(self.status_folder):
+        for file in os.listdir(self.scraping_status_folder):
             if file.endswith(".json"):
                 descriptions.append(
                     {
@@ -118,7 +100,8 @@ class LongTermDatasetManager:
         and increments the dataset version index.
         """
         self.remote_database_manager.stage(self.outputs_folder)
-        self.remote_database_manager.stage(self.status_folder)
+        self.remote_database_manager.stage(self.scraping_status_folder)
+        self.remote_database_manager.stage(self.converting_status_folder)
         self.remote_database_manager.increase_index()
 
     def upload(self):
@@ -160,7 +143,8 @@ class LongTermDatasetManager:
         Clean up temporary files and resources used during the upload process.
         """
         shutil.rmtree(self.outputs_folder, ignore_errors=True)
-        shutil.rmtree(self.status_folder, ignore_errors=True)
+        shutil.rmtree(self.scraping_status_folder, ignore_errors=True)
+        shutil.rmtree(self.converting_status_folder, ignore_errors=True)
         self.remote_database_manager.clean()
 
     def reverse(self, dataset_path):

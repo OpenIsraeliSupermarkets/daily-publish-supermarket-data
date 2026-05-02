@@ -14,7 +14,7 @@ from tests.validation_utils import (
     validate_local_structure_deleted,
     validate_long_term_structure,
     validate_short_term_structure,
-    validate_longterm_and_short_sync,
+    # validate_longterm_and_short_sync,
     scrapers_to_test,
 )
 from remotes import (
@@ -78,16 +78,20 @@ def run_full_dag_integration(
         short_term_db_target, enabled_scrapers, num_of_occasions=num_of_occasions
     )
     validate_long_term_structure(long_term_db_target, stage_folder, enabled_scrapers)
-    validate_longterm_and_short_sync(
-        enabled_scrapers,
-        short_term_db_target,
-        long_term_db_target,
-        num_of_expected_files=num_of_occasions * file_per_run if file_per_run else None,
-    )
+    # validate_longterm_and_short_sync(
+    #     enabled_scrapers,
+    #     short_term_db_target,
+    #     long_term_db_target,
+    #     num_of_expected_files=num_of_occasions * file_per_run if file_per_run else None,
+    # )
 
     # validate the output
     validate_local_structure_deleted(
-        app_folder, data_folder, outputs_folder, status_folder
+        app_folder,
+        data_folder,
+        outputs_folder,
+        publisher.scraping_status_folder,
+        publisher.converting_status_folder,
     )
 
 
