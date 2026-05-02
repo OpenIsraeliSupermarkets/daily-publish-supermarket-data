@@ -64,6 +64,12 @@ class LargeFilePushManager:
                 Logger.warning(f"Chunk is empty,exiting... ")
                 break
 
+            if last_row_saw is None:
+                if pd.isna(chunk.iloc[0]['file_name']) or pd.isna(chunk.iloc[0]['found_folder']):
+                    Logger.critical(f"First row is empty, critical error,exiting... ")
+                    break
+                
+
             # Set index releative to the 'last_row'
             stop_index = last_row + 1 + chunk.shape[0]
             chunk.index = range(last_row + 1, stop_index)
