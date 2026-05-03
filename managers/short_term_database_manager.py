@@ -70,6 +70,7 @@ class ShortTermDBDatasetManager:
                         if row_index in pushed_set:
                             continue
                         pushed_set.add(row_index)
+                        added_ids.append(row_index)
                         processed_events.append({"index": row_index, **event_json})
                     self.uploader._insert_to_destinations(
                         target_table, processed_events
