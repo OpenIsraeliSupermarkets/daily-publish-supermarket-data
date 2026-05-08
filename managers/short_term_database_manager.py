@@ -11,6 +11,22 @@ from il_supermarket_scarper import ScraperStatusOutput
 from typing import Union
 
 
+_MONGO_INT_MAX = 2**63 - 1
+_MONGO_INT_MIN = -(2**63)
+
+
+def _sanitize_for_mongo(obj):
+    """Recursively convert integers that exceed MongoDB's 8-byte limit to strings."""
+    if isinstance(obj, dict):
+        return {k: _sanitize_for_mongo(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitize_for_mongo(v) for v in obj]
+    if isinstance(obj, int) and not isinstance(obj, bool):
+        if obj > _MONGO_INT_MAX or obj < _MONGO_INT_MIN:
+            return str(obj)
+    return obj
+
+
 class ShortTermDBDatasetManager:
     def __init__(
         self,
@@ -71,7 +87,7 @@ class ShortTermDBDatasetManager:
                             continue
                         pushed_set.add(row_index)
                         added_ids.append(row_index)
-                        processed_events.append({"index": row_index, **event_json})
+                        processed_events.append(_sanitize_for_mongo({"index": row_index, **event_json}))
                     self.uploader._insert_to_destinations(
                         target_table, processed_events
                     )
@@ -86,7 +102,7 @@ class ShortTermDBDatasetManager:
                             continue
                         if row_index in pushed_set:
                             continue
-                        processed_events.append({"index": row_index, **event_json})
+                        processed_events.append(_sanitize_for_mongo({"index": row_index, **event_json}))
                         pushed_set.add(row_index)
                         added_ids.append(row_index)
 
