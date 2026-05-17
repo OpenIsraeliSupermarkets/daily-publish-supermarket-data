@@ -114,9 +114,15 @@ class HeartbeatManager:
             }
 
         self._write_heartbeat(data)
-        Logger.info(
-            f"Heartbeat: Completed operation '{operation}' with status '{data['operations'][operation]['status']}'"
+        status = data["operations"][operation]["status"]
+        msg = (
+            f"Heartbeat: Completed operation '{operation}' with status '{status}'"
         )
+        if success:
+            Logger.info(msg)
+        else:
+            err_text = data["operations"][operation].get("error") or "(no message)"
+            Logger.error("%s. Error detail: %s", msg, err_text)
 
     def update_heartbeat(self):
         """
