@@ -63,7 +63,8 @@ class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
         Logger.info("Starting executing DAG = %s", operations)
         self._check_tz()
 
-        for operation in operations.split(","):
+        for raw_op in operations.split(","):
+            operation = raw_op.strip()
             Logger.info(f"DAG is {operations} starting the operation=%s", operation)
 
             # Mark operation as started in heartbeat
@@ -78,9 +79,22 @@ class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
                 Logger.info("Done the operation=%s", operation)
 
             except Exception as e:
-                # Mark operation as failed
+                err_parts = [str(e)]
+                if hasattr(e, "errors"):
+                    try:
+                        err_parts.append(f"errors={e.errors()}")
+                    except Exception:
+                        pass
+                if isinstance(e, KeyError) and e.args:
+                    err_parts.append(f"missing_key={e.args[0]!r}")
+                err_detail = " | ".join(err_parts)
                 self.heartbeat.complete_operation(
-                    operation, success=False, error=str(e)
+                    operation, success=False, error=err_detail
                 )
-                Logger.error(f"Operation {operation} failed: {e}")
+                Logger.error(
+                    "Operation %s failed; detail: %s",
+                    operation,
+                    err_detail,
+                    exc_info=True,
+                )
                 # raise  # Re-raise the exception to maintain original behavior

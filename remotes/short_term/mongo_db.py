@@ -5,11 +5,14 @@ handling large integers, collection management, and status tracking.
 """
 
 from utils import Logger
+from utils.mongo_sanitize import sanitize_for_mongo
 import os
 import re
 from datetime import datetime, timedelta
 
 import pymongo
+from bson import encode as bson_encode
+from bson.errors import InvalidDocument
 
 from .api_base import ShortTermDatabaseUploader
 
@@ -55,12 +58,34 @@ class MongoDbUploader(ShortTermDatabaseUploader):
         if not items:
             return
 
+        items = [sanitize_for_mongo(item) for item in items]
+
         Logger.info("Pushing to table %s, %d items", table_target_name, len(items))
         collection = self.db[table_target_name]
 
         try:
             collection.insert_many(items, ordered=False)
             Logger.info("Successfully inserted %d records to MongoDB", len(items))
+        except InvalidDocument as e:
+            for idx, record in enumerate(items):
+                try:
+                    bson_encode(record)
+                except Exception as doc_err:
+                    Logger.error(
+                        "BSON encoding failed for table %s at item index %s: %s. "
+                        "Offending document (truncated repr, first 2000 chars): %s",
+                        table_target_name,
+                        idx,
+                        doc_err,
+                        repr(record)[:2000],
+                    )
+                    raise doc_err from e
+            Logger.error(
+                "BSON InvalidDocument for table %s but per-record encode did not isolate: %s",
+                table_target_name,
+                e,
+            )
+            raise
         except pymongo.errors.BulkWriteError as e:
             Logger.warning("Bulk insert failed, trying individual inserts: %s", str(e))
             successful_records = 0
@@ -71,6 +96,10 @@ class MongoDbUploader(ShortTermDatabaseUploader):
                         successful_records += 1
                     except pymongo.errors.PyMongoError as inner_e:
                         Logger.error("Failed to insert record: %s", str(inner_e))
+                        Logger.error(
+                            "Offending record (truncated repr): %s",
+                            repr(record)[:2000],
+                        )
             Logger.info(
                 "Successfully inserted %d/%d records individually",
                 successful_records,
