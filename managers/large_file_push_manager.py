@@ -4,6 +4,7 @@ import pandas as pd
 from remotes import ShortTermDatabaseUploader
 from managers.cache_manager import CacheState
 from data_models.raw_schema import DataTable, file_name_to_table
+from utils.mongo_bson import sanitize_for_mongo
 
 
 class LargeFilePushManager:
@@ -68,7 +69,7 @@ class LargeFilePushManager:
                 if pd.isna(chunk.iloc[0]['file_name']) or pd.isna(chunk.iloc[0]['found_folder']):
                     Logger.critical(f"First row is empty, critical error,exiting... ")
                     break
-                
+
 
             # Set index releative to the 'last_row'
             stop_index = last_row + 1 + chunk.shape[0]
@@ -128,14 +129,17 @@ class LargeFilePushManager:
             if last_row_saw is not None:
                 items = items[1:]
 
-            self.database_manager._insert_to_destinations(target_table_name, items)
+            self.database_manager._insert_to_destinations(
+                target_table_name, [sanitize_for_mongo(item) for item in items]
+            )
             if eof_to_send:
                 if last_row_saw is not None:
                     for eof in eof_to_send:
                         if eof["file_name"] == last_row_saw.iloc[0].file_name:
                             eof["total_expected_records"] -= 1
                 self.database_manager._insert_to_destinations(
-                    target_table_name, eof_to_send
+                    target_table_name,
+                    [sanitize_for_mongo(e) for e in eof_to_send],
                 )
             # Save last row for next iteration
             last_row_saw = chunk.tail(1).set_index("row_index")
@@ -144,11 +148,13 @@ class LargeFilePushManager:
             self.database_manager._insert_to_destinations(
                 target_table_name,
                 [
-                    {
-                        "file_complete": "true",
-                        "file_name": open_file,
-                        "total_expected_records": total_expected_records,
-                    }
+                    sanitize_for_mongo(
+                        {
+                            "file_complete": "true",
+                            "file_name": open_file,
+                            "total_expected_records": total_expected_records,
+                        }
+                    )
                 ],
             )
         # Update cache with last processed row
