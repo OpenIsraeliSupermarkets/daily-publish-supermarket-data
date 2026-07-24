@@ -1,0 +1,35 @@
+name: Weekly dependency bump
+
+# Coordinator: runs when a library weekly-release signals completion (or manually).
+# Opens a requirements bump PR only after both scrapers and parsers weeklies succeeded
+# this ISO week, and only if floors are behind latest releases. PR is left open.
+
+on:
+  repository_dispatch:
+    types: [weekly-release-completed]
+  workflow_dispatch:
+    inputs:
+      iso_week:
+        description: ISO week to check (default current UTC), e.g. 2026-W30
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.WEEKLY_COORDINATOR_TOKEN || github.token }}
+      - name: Ensure both weeklies succeeded then open PR if needed
+        env:
+          GH_TOKEN: ${{ secrets.WEEKLY_COORDINATOR_TOKEN || github.token }}
+          ISO_WEEK: ${{ github.event.client_payload.iso_week || inputs.iso_week }}
+        run: |
+          chmod +x .github/scripts/weekly_dependency_bump.sh
+          .github/scripts/weekly_dependency_bump.sh
