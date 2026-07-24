@@ -1,29 +1,36 @@
 #!/usr/bin/env bash
-# After both library weeklies succeed this ISO week, open a requirements bump PR if needed.
+# Once both libraries' most recent weekly-release run is green, open a requirements
+# bump PR if the pinned floors are behind the latest releases.
+#
+# Triggered by (any of, all idempotent):
+#   - scrapers/parsers weekly-release.yml finishing (noop or released)
+#   - parsers release: published (covers scraper-sync releases)
+#   - parsers sync issue closed (covers "no new version needed" sync outcomes)
+#
 # Env: GH_TOKEN with repo access to scrapers, parsers, and this repo.
 set -euo pipefail
 
 SCRAPERS_REPO="${SCRAPERS_REPO:-OpenIsraeliSupermarkets/israeli-supermarket-scarpers}"
 PARSERS_REPO="${PARSERS_REPO:-OpenIsraeliSupermarkets/israeli-supermarket-parsers}"
-ISO_WEEK="${ISO_WEEK:-$(date -u +%G-W%V)}"
 
-week_has_success() {
+latest_weekly_release_ok() {
   local repo="$1"
-  gh run list --repo "$repo" --workflow=weekly-release.yml --limit 20 \
-    --json conclusion,createdAt,status \
-    | jq --arg week "$ISO_WEEK" '
-      map(select(.conclusion == "success" and .status == "completed"))
-      | map(select((.createdAt | fromdateiso8601 | strftime("%G-W%V")) == $week))
-      | length
+  gh run list --repo "$repo" --workflow=weekly-release.yml --limit 1 \
+    --json conclusion,status \
+    | jq -r '
+      if length == 0 then "no"
+      elif (.[0].status == "completed" and .[0].conclusion == "success") then "yes"
+      else "no"
+      end
     '
 }
 
-SCRAPERS_OK=$(week_has_success "$SCRAPERS_REPO")
-PARSERS_OK=$(week_has_success "$PARSERS_REPO")
-echo "ISO week ${ISO_WEEK}: scrapers_success_runs=${SCRAPERS_OK} parsers_success_runs=${PARSERS_OK}"
+SCRAPERS_OK=$(latest_weekly_release_ok "$SCRAPERS_REPO")
+PARSERS_OK=$(latest_weekly_release_ok "$PARSERS_REPO")
+echo "Latest weekly-release status: scrapers=${SCRAPERS_OK} parsers=${PARSERS_OK}"
 
-if [ "${SCRAPERS_OK}" -lt 1 ] || [ "${PARSERS_OK}" -lt 1 ]; then
-  echo "Both weeklies have not succeeded yet this ISO week; exiting."
+if [ "${SCRAPERS_OK}" != "yes" ] || [ "${PARSERS_OK}" != "yes" ]; then
+  echo "At least one repo's latest weekly-release run is not green (or has never run); exiting."
   exit 0
 fi
 
@@ -78,7 +85,7 @@ gh pr create --base main --head "$BRANCH" \
   --title "chore: bump il-supermarket-scraper>=${SCRAPER_VER}, il-supermarket-parser>=${PARSER_VER}" \
   --body "$(cat <<EOF
 ## Summary
-- Bump dependency floors after weekend weekly-release completion (${ISO_WEEK}).
+- Bump dependency floors: the latest weekly-release run on both libraries is green.
 - Scrapers: \`${WANT_SCRAPER}\`
 - Parsers: \`${WANT_PARSER}\`
 
