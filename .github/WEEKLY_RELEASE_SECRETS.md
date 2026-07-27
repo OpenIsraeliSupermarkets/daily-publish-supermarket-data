@@ -9,7 +9,7 @@
 | `PARSERS_MAINTAINER_WEBHOOK` | for sync | parsers maintainer webhook URL (same as parsers `CURSOR_MAINTAINER_WEBHOOK`) |
 | `PARSERS_MAINTAINER_WEBHOOK_SECRET` | optional | Bearer for that webhook |
 | `RELEASE_GITHUB_TOKEN` | if main protected | PAT to push version bump + tags |
-| `DAILY_PUBLISH_DISPATCH_TOKEN` | for coordinator signal | PAT with `actions:write` (repo dispatch) on daily-publish |
+| `DAILY_PUBLISH_DISPATCH_TOKEN` | for coordinator signal + deps issues | PAT with `actions:write` and `issues:write` on daily-publish |
 
 ## israeli-supermarket-parsers
 | Secret | Required | Purpose |
@@ -17,13 +17,16 @@
 | `CURSOR_MAINTAINER_WEBHOOK` | for maintainer | POST after new CI / sync issue |
 | `CURSOR_WEBHOOK_SECRET` | optional | Bearer token |
 | `RELEASE_GITHUB_TOKEN` | if main protected | PAT to push version bump + tags |
-| `DAILY_PUBLISH_DISPATCH_TOKEN` | for coordinator signal | same as scrapers |
+| `DAILY_PUBLISH_DISPATCH_TOKEN` | for coordinator signal + deps issues | same as scrapers |
 
 ## daily-publish-supermarket-data
 | Secret | Required | Purpose |
 |--------|----------|---------|
 | `WEEKLY_COORDINATOR_TOKEN` | yes | PAT: read Actions on scrapers+parsers; push branch + open PR here |
+| `CURSOR_MAINTAINER_WEBHOOK` | for maintainer | POST when a new automation/deps issue is opened |
+| `CURSOR_WEBHOOK_SECRET` | optional | Bearer token for that webhook |
 
 ## Cursor Automations (manual)
 1. Scrapers: webhook trigger → maintainer (CI issues).
 2. Parsers: webhook trigger → maintainer (CI + `[sync]` issues; may noop).
+3. Daily-publish: webhook trigger → maintainer (`[deps]` issues from scrapers/parsers releases).
