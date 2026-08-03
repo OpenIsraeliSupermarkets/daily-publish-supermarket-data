@@ -1,0 +1,30 @@
+name: Weekly dependency bump
+
+# Coordinator: runs when a library weekly-release or a parsers scraper-sync signals
+# completion (or manually). Opens a requirements bump PR only when each repo's most
+# recent weekly-release run is green and floors are behind latest releases. Idempotent
+# across repeated pings; PR is left open for human merge.
+
+on:
+  repository_dispatch:
+    types: [weekly-release-completed, parsers-sync-completed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.WEEKLY_COORDINATOR_TOKEN || github.token }}
+      - name: Ensure both weeklies are green then open PR if needed
+        env:
+          GH_TOKEN: ${{ secrets.WEEKLY_COORDINATOR_TOKEN || github.token }}
+        run: |
+          chmod +x .github/scripts/weekly_dependency_bump.sh
+          .github/scripts/weekly_dependency_bump.sh
