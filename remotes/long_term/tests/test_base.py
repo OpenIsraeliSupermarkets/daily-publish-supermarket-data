@@ -33,8 +33,16 @@ def long_term_test_case(long_term_db_target, when=datetime.now(), **kwargs):
             self.uploader.stage(test_file_path)
             self.assertFalse(self.uploader.was_updated_in_last(seconds=1))
             self.uploader.upload_to_dataset("test_message", **{"test": "test"})
-            time.sleep(3)  # kaggle need a moment
-            self.assertTrue(self.uploader.was_updated_in_last(seconds=120))
+            
+            # Kaggle API may take time to refresh the last_updated timestamp
+            # Retry with exponential backoff to handle API timing variability
+            max_retries = 5
+            for attempt in range(max_retries):
+                time.sleep(3 * (attempt + 1))  # 3s, 6s, 9s, 12s, 15s
+                if self.uploader.was_updated_in_last(seconds=120):
+                    break
+            else:
+                self.fail("Dataset was not updated within expected time after upload")
             files = self.uploader.list_files()
             self.assertEqual(len(files), 1)
             self.assertEqual(os.path.basename(files[0]), "test.txt")
