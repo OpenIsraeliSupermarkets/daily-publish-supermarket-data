@@ -1,0 +1,32 @@
+name: Webhook maintainer on automation issue
+
+# When scrapers/parsers open a [deps] automation issue here, notify the
+# daily-publish Cursor maintainer automation.
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+
+jobs:
+  webhook:
+    if: >
+      contains(github.event.issue.labels.*.name, 'automation') ||
+      contains(github.event.issue.labels.*.name, 'dependencies')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout scripts
+        uses: actions/checkout@v4
+      - name: POST maintainer webhook
+        env:
+          CURSOR_MAINTAINER_WEBHOOK: ${{ secrets.CURSOR_MAINTAINER_WEBHOOK }}
+          CURSOR_WEBHOOK_SECRET: ${{ secrets.CURSOR_WEBHOOK_SECRET }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          chmod +x .github/scripts/webhook_maintainer.sh
+          .github/scripts/webhook_maintainer.sh

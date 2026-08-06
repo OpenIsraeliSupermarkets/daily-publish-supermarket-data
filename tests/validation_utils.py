@@ -14,8 +14,29 @@ from managers.cache_manager import CacheManager
 from access.access_layer import AccessLayer
 import os
 import glob
+import time
 import pandas as pd
 from il_supermarket_scarper import ScraperFactory
+
+
+def _list_kaggle_files_after_upload(long_term_db_target, timeout_seconds=120, poll_seconds=5):
+    """Kaggle dataset versions can lag behind successful uploads; poll until index.json is visible."""
+    deadline = time.monotonic() + timeout_seconds
+    last_files = []
+    while time.monotonic() < deadline:
+        if long_term_db_target.was_updated_in_last(seconds=60 * 60 * 24):
+            last_files = long_term_db_target.list_files()
+            if "index.json" in last_files:
+                return last_files
+        time.sleep(poll_seconds)
+    assert long_term_db_target.was_updated_in_last(
+        seconds=60 * 60 * 24
+    ), "Long-term database was not updated in the last 24 hours"
+    last_files = long_term_db_target.list_files()
+    assert (
+        "index.json" in last_files
+    ), f"index.json not found in long-term database files: {last_files}"
+    return last_files
 
 
 def scrapers_to_test():
@@ -210,14 +231,7 @@ def validate_long_term_structure(
         stage_folder: Path to the staging folder
         enabled_scrapers: List of enabled scrapers
     """
-    assert long_term_db_target.was_updated_in_last(
-        seconds=60 * 60 * 24
-    ), f"Long-term database was not updated in the last 24 hours"
-
-    files = long_term_db_target.list_files()
-    assert (
-        "index.json" in files
-    ), f"index.json not found in long-term database files: {files}"
+    files = _list_kaggle_files_after_upload(long_term_db_target)
 
     for scraper in enabled_scrapers:
         chain_status_file = f"{DumpFolderNames[scraper].value.lower()}.json"
