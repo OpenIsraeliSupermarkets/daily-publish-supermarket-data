@@ -58,8 +58,8 @@ if [ -f .env.test ]; then
 fi
 
 echo "Step 2: Setting up test environment variables"
-# limit the run time
-export ENABLED_SCRAPERS=BAREKET
+# limit the run time — keep in sync with tests.validation_utils.scrapers_to_test()
+export ENABLED_SCRAPERS=BAREKET,WOLT
 export LIMIT=10
 export OUTPUT_DESTINATION=mongo
 # -- should correspond to the number of times the data should be validated

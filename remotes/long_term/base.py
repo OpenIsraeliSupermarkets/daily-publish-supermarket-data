@@ -105,6 +105,26 @@ class LongTermDatabaseUploader(ABC):
         else:
             shutil.copy2(folder_or_file, self.dataset_path)
 
+    def pack_staged_files(self):
+        """Optionally pack staged files before upload.
+
+        Default is a no-op. Backends that benefit from fewer staged artifacts
+        (e.g. Kaggle's 50-file parallel-upload limit) can override this.
+        """
+        return
+
+    def fetch_file(self, file_name, dest_dir):
+        """Fetch a remote dataset file into dest_dir and return its local path.
+
+        Args:
+            file_name (str): Remote file name
+            dest_dir (str): Local directory to place the file in
+
+        Returns:
+            str: Absolute path to the fetched file
+        """
+        raise NotImplementedError
+
     def unstage(self, folder_or_file, target_path):
         """Unstage a folder or file from the staged dataset path.
 

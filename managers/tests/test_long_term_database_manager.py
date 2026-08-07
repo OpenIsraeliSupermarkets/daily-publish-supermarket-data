@@ -89,6 +89,7 @@ def test_compose(sample_manager):
         "/test/converting_status"
     )
     sample_manager.remote_database_manager.increase_index.assert_called_once()
+    sample_manager.remote_database_manager.pack_staged_files.assert_called_once()
 
 
 @patch("utils.logging_config.Logger.critical")
