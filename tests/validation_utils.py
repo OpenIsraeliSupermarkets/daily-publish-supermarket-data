@@ -227,19 +227,29 @@ def _scraper_zip_name(scraper):
     return f"{DumpFolderNames[scraper].value.lower()}.zip"
 
 
+def _scraper_prefix(scraper):
+    return f"{DumpFolderNames[scraper].value.lower()}/"
+
+
 def _assert_long_term_content_files(files, enabled_scrapers):
-    """Assert expected status/output filenames exist in a flat file list."""
+    """Assert expected status/output filenames exist in a file list.
+
+    Accepts flat names (`wolt.json`), zip member names, or Kaggle's post-upload
+    expansion of per-scraper zips (`wolt/wolt.json`).
+    """
+    basenames = {os.path.basename(name) for name in files}
+
     for scraper in enabled_scrapers:
         chain_status_file = f"{DumpFolderNames[scraper].value.lower()}.json"
         assert (
-            chain_status_file in files
+            chain_status_file in basenames
         ), f"{chain_status_file} not found in long-term database files: {files}"
 
     for scraper in enabled_scrapers:
         for file_type in FileTypesFilters:
             file_type_file = f"{scraper.lower()}_{file_type.name.lower()}.json"
             assert (
-                file_type_file in files
+                file_type_file in basenames
             ), f"{file_type_file} not found in long-term database files: {files}"
 
     csv_files = [name for name in files if name.endswith(".csv")]
@@ -270,15 +280,21 @@ def validate_long_term_structure(
     """
     Validate the structure of the long-term dataset.
 
-    For Kaggle packed uploads, asserts one zip per scraper exists, unpacks them,
-    then validates the extracted content. Flat layouts (e.g. DummyFileStorage)
-    are validated directly.
+    Packed uploads may appear as:
+    - literal `{scraper}.zip` archives (DummyFileStorage / pre-expansion), or
+    - Kaggle-expanded folders `{scraper}/...` after zip upload (zip is not listed).
+
+    Flat layouts are validated directly.
     """
     files = _list_kaggle_files_after_upload(long_term_db_target)
     expected_zips = [_scraper_zip_name(scraper) for scraper in enabled_scrapers]
-    packed_layout = any(zip_name in files for zip_name in expected_zips)
+    expected_prefixes = [_scraper_prefix(scraper) for scraper in enabled_scrapers]
+    zip_layout = any(zip_name in files for zip_name in expected_zips)
+    kaggle_expanded_layout = any(
+        any(name.startswith(prefix) for name in files) for prefix in expected_prefixes
+    )
 
-    if packed_layout:
+    if zip_layout:
         for zip_name in expected_zips:
             assert (
                 zip_name in files
@@ -292,6 +308,12 @@ def validate_long_term_structure(
                 long_term_db_target, zips_to_unpack, unpack_dir
             )
             _assert_long_term_content_files(unpacked_files, enabled_scrapers)
+    elif kaggle_expanded_layout:
+        for scraper, prefix in zip(enabled_scrapers, expected_prefixes):
+            assert any(
+                name.startswith(prefix) for name in files
+            ), f"Expected Kaggle-expanded prefix {prefix!r} for {scraper} in {files}"
+        _assert_long_term_content_files(files, enabled_scrapers)
     else:
         _assert_long_term_content_files(files, enabled_scrapers)
         csv_files = long_term_db_target.list_files(extension="csv")

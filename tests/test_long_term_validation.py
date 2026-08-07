@@ -73,3 +73,34 @@ def test_validate_long_term_structure_flat_layout():
         validate_long_term_structure(
             uploader, stage_dir, scrapers, in_app=False
         )
+
+
+class _ListingStub:
+    """Minimal remote stub that returns Kaggle-style relative paths."""
+
+    def __init__(self, files):
+        self._files = list(files)
+
+    def was_updated_in_last(self, seconds=24 * 60 * 60):
+        return True
+
+    def list_files(self, chain=None, extension=None):
+        files = self._files
+        if extension is not None:
+            files = [name for name in files if name.endswith(extension)]
+        return files
+
+
+def test_validate_long_term_structure_kaggle_expanded_layout():
+    """Kaggle expands uploaded {scraper}.zip into {scraper}/member paths."""
+    scrapers = ["WOLT"]
+    stem = DumpFolderNames["WOLT"].value.lower()
+    files = ["index.json", f"{stem}/{stem}.json", f"{stem}/store_file_wolt.csv"]
+    for file_type in FileTypesFilters:
+        files.append(f"{stem}/wolt_{file_type.name.lower()}.json")
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        stage_dir = os.path.join(temp_dir, "stage")
+        validate_long_term_structure(
+            _ListingStub(files), stage_dir, scrapers, in_app=False
+        )
