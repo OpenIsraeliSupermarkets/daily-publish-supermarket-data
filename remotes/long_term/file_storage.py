@@ -87,11 +87,11 @@ class DummyFileStorage(LongTermDatabaseUploader):
         shutil.copytree(self.dataset_remote_path, self.dataset_path)
 
     def fetch_file(self, file_name, dest_dir):
-        """Copy a stored file into dest_dir and return its local path."""
+        """Move a stored file into dest_dir and return its local path."""
         os.makedirs(dest_dir, exist_ok=True)
         source = os.path.join(self.dataset_remote_path, file_name)
         destination = os.path.join(dest_dir, file_name)
-        shutil.copy2(source, destination)
+        shutil.move(source, destination)
         return destination
 
     def was_updated_in_last(self, seconds: int = 24 * 60 * 60) -> bool:

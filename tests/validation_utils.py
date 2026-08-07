@@ -7,7 +7,6 @@ import os
 import glob
 import time
 import tempfile
-import zipfile
 
 import pandas as pd
 from il_supermarket_scarper import (
@@ -263,17 +262,6 @@ def _assert_long_term_content_files(files, enabled_scrapers):
         ), f"No CSV files for chain {scraper} found in {csv_files}"
 
 
-def _unpack_long_term_zips(long_term_db_target, zip_names, dest_dir):
-    """Download scraper zips and extract them into dest_dir; return unpacked names."""
-    unpacked = []
-    for zip_name in zip_names:
-        local_zip = long_term_db_target.fetch_file(zip_name, dest_dir)
-        with zipfile.ZipFile(local_zip, "r") as zip_ref:
-            zip_ref.extractall(dest_dir)
-            unpacked.extend(zip_ref.namelist())
-    return unpacked
-
-
 def validate_long_term_structure(
     long_term_db_target, stage_folder, enabled_scrapers, in_app=True
 ):
@@ -304,8 +292,8 @@ def validate_long_term_structure(
             zips_to_unpack = list(expected_zips)
             if "misc.zip" in files:
                 zips_to_unpack.append("misc.zip")
-            unpacked_files = _unpack_long_term_zips(
-                long_term_db_target, zips_to_unpack, unpack_dir
+            unpacked_files = long_term_db_target.unpack_files(
+                zips_to_unpack, unpack_dir
             )
             _assert_long_term_content_files(unpacked_files, enabled_scrapers)
     elif kaggle_expanded_layout:

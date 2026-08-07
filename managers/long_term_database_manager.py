@@ -97,8 +97,8 @@ class LongTermDatasetManager:
         Stage data for upload to the remote database.
 
         This method stages both the outputs folder and status folder,
-        increments the dataset version index, and asks the remote backend
-        to pack staged files when needed (e.g. Kaggle parallel upload).
+        increments the dataset version index, and packs staged files into
+        one zip per scraper.
         """
         self.remote_database_manager.stage(self.outputs_folder)
         self.remote_database_manager.stage(self.scraping_status_folder)

@@ -150,4 +150,5 @@ def test_integration():
         manager.clean()
 
         assert len(os.listdir(temp_dir)) == 1
-        assert len(os.listdir(remote_name)) == 7
+        remote_files = sorted(os.listdir(remote_name))
+        assert remote_files == ["index.json", "misc.zip"]

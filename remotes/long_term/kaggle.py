@@ -12,12 +12,9 @@ from utils import Logger
 import shutil
 import json
 import tempfile
-import zipfile
 import pandas as pd
 from datetime import datetime, timedelta
-from collections import defaultdict
 from .base import LongTermDatabaseUploader
-from il_supermarket_scarper import DumpFolderNames, ScraperFactory
 
 KAGGLEHUB_AVAILABLE = None
 try:
@@ -29,9 +26,6 @@ try:
     )
 except Exception as e:
     KAGGLEHUB_AVAILABLE = e
-
-# kagglehub zips the whole folder when file count exceeds this (no parallel upload).
-KAGGLE_MAX_FILES_FOR_PARALLEL_UPLOAD = 50
 
 
 class KaggleUploader(LongTermDatabaseUploader):
@@ -60,104 +54,6 @@ class KaggleUploader(LongTermDatabaseUploader):
             raise ImportError("Failed to import kagglehub: \n%s" % KAGGLEHUB_AVAILABLE)
 
         Logger.info(f"Kaggle dataset handle: {self.dataset_remote_name}")
-
-    @staticmethod
-    def _normalize_name(value: str) -> str:
-        return re.sub(r"[^a-z0-9]", "", value.lower())
-
-    def _scraper_prefixes(self):
-        """Return (normalized_prefix, zip_stem) pairs per scraper, longest first."""
-        prefixes = []
-        for scraper in ScraperFactory.all_scrapers_name():
-            dump_name = DumpFolderNames[scraper].value
-            stem = dump_name.lower()
-            prefixes.append((self._normalize_name(dump_name), stem))
-        prefixes.sort(key=lambda item: len(item[0]), reverse=True)
-        return prefixes
-
-    def _group_files_by_scraper(self, filenames):
-        """Group staged filenames into one bucket per scraper.
-
-        Matches dump-folder prefixes at the start or end of the filename stem so both
-        `bareket_price_file.json` and `price_file_bareket.csv` map to the same zip.
-        """
-        groups = defaultdict(list)
-        prefixes = self._scraper_prefixes()
-        for filename in filenames:
-            normalized = self._normalize_name(os.path.splitext(filename)[0])
-            matched_stem = None
-            for prefix, stem in prefixes:
-                if (
-                    normalized == prefix
-                    or normalized.startswith(prefix)
-                    or normalized.endswith(prefix)
-                ):
-                    matched_stem = stem
-                    break
-            groups[matched_stem or "misc"].append(filename)
-        return groups
-
-    def pack_staged_files(self):
-        """Pack staged files into one zip per scraper during compose.
-
-        kagglehub only parallelizes uploads when there are <= 50 files. Above that it
-        builds one giant archive.zip. Packing here keeps index.json and one zip per
-        scraper so dataset_upload can use parallel blob uploads.
-        """
-        if not os.path.isdir(self.dataset_path):
-            return
-
-        staged_files = sorted(
-            name
-            for name in os.listdir(self.dataset_path)
-            if os.path.isfile(os.path.join(self.dataset_path, name))
-        )
-        keep_as_is = {"index.json"}
-        to_pack = [
-            name
-            for name in staged_files
-            if name not in keep_as_is and not name.endswith(".zip")
-        ]
-        if not to_pack:
-            return
-
-        if len(staged_files) <= KAGGLE_MAX_FILES_FOR_PARALLEL_UPLOAD:
-            Logger.info(
-                "Staged file count (%s) within Kaggle parallel limit; packing per scraper anyway",
-                len(staged_files),
-            )
-
-        groups = self._group_files_by_scraper(to_pack)
-        Logger.info(
-            "Packing %s staged files into %s per-scraper zip archives",
-            len(to_pack),
-            len(groups),
-        )
-
-        for stem, filenames in groups.items():
-            zip_name = f"{stem}.zip"
-            zip_path = os.path.join(self.dataset_path, zip_name)
-            with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zipf:
-                for filename in filenames:
-                    file_path = os.path.join(self.dataset_path, filename)
-                    zipf.write(file_path, arcname=filename)
-            for filename in filenames:
-                os.remove(os.path.join(self.dataset_path, filename))
-
-        packed_count = len(
-            [
-                name
-                for name in os.listdir(self.dataset_path)
-                if os.path.isfile(os.path.join(self.dataset_path, name))
-            ]
-        )
-        Logger.info("Staged dataset now has %s files after per-scraper packing", packed_count)
-        if packed_count > KAGGLE_MAX_FILES_FOR_PARALLEL_UPLOAD:
-            Logger.warning(
-                "Packed file count (%s) still exceeds Kaggle parallel limit (%s)",
-                packed_count,
-                KAGGLE_MAX_FILES_FOR_PARALLEL_UPLOAD,
-            )
 
     def _sync_n_load_index(self):
         """Sync the index of the dataset."""

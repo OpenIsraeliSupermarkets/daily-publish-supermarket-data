@@ -5,9 +5,11 @@ ensuring consistent interface across different implementations.
 """
 
 from abc import ABC, abstractmethod
-import shutil
-import os
 import datetime
+import os
+import shutil
+
+from .packer import StagedDatasetPacker
 
 
 class LongTermDatabaseUploader(ABC):
@@ -23,6 +25,7 @@ class LongTermDatabaseUploader(ABC):
     def __init__(self, dataset_path: str, when: datetime.datetime):
         self.dataset_path = dataset_path
         self.when = when
+        self._packer = StagedDatasetPacker()
 
     @abstractmethod
     def increase_index(self):
@@ -106,12 +109,17 @@ class LongTermDatabaseUploader(ABC):
             shutil.copy2(folder_or_file, self.dataset_path)
 
     def pack_staged_files(self):
-        """Optionally pack staged files before upload.
+        """Pack staged files into one zip per scraper during compose."""
+        self._packer.pack(self.dataset_path)
 
-        Default is a no-op. Backends that benefit from fewer staged artifacts
-        (e.g. Kaggle's 50-file parallel-upload limit) can override this.
-        """
-        return
+    def unpack_files(self, zip_names, dest_dir):
+        """Fetch remote zips into dest_dir, extract them, and return member names."""
+        os.makedirs(dest_dir, exist_ok=True)
+        unpacked = []
+        for zip_name in zip_names:
+            local_zip = self.fetch_file(zip_name, dest_dir)
+            unpacked.extend(self._packer.unpack_zip(local_zip, dest_dir))
+        return unpacked
 
     def fetch_file(self, file_name, dest_dir):
         """Fetch a remote dataset file into dest_dir and return its local path.
