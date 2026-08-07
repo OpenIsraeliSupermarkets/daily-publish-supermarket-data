@@ -3,20 +3,22 @@ Utility functions for validating the state of the system during and after tests.
 Provides validation helpers for scraper output, converter output, and database state.
 """
 
+import os
+import glob
+import time
+import tempfile
+
+import pandas as pd
 from il_supermarket_scarper import (
     DumpFolderNames,
     FileTypesFilters,
     ScraperStatusOutput,
+    ScraperFactory,
 )
 from il_supermarket_parsers import ParserStatusOutput
 from data_models.raw_schema import ScraperStatus, ParserStatus, file_name_to_table
 from managers.cache_manager import CacheManager
 from access.access_layer import AccessLayer
-import os
-import glob
-import time
-import pandas as pd
-from il_supermarket_scarper import ScraperFactory
 
 
 def _list_kaggle_files_after_upload(long_term_db_target, timeout_seconds=120, poll_seconds=5):
@@ -220,45 +222,90 @@ def validate_state_after_api_update(
             ), f"Expected last processed row to be {expected_last_row}, found {last_processed}"
 
 
-def validate_long_term_structure(
-    long_term_db_target, stage_folder, enabled_scrapers, in_app=True
-):
-    """
-    Validate the structure of the long-term dataset.
+def _scraper_zip_name(scraper):
+    return f"{DumpFolderNames[scraper].value.lower()}.zip"
 
-    Args:
-        remote_dataset_path: Path to the remote dataset
-        stage_folder: Path to the staging folder
-        enabled_scrapers: List of enabled scrapers
+
+def _scraper_prefix(scraper):
+    return f"{DumpFolderNames[scraper].value.lower()}/"
+
+
+def _assert_long_term_content_files(files, enabled_scrapers):
+    """Assert expected status/output filenames exist in a file list.
+
+    Accepts flat names (`wolt.json`), zip member names, or Kaggle's post-upload
+    expansion of per-scraper zips (`wolt/wolt.json`).
     """
-    files = _list_kaggle_files_after_upload(long_term_db_target)
+    basenames = {os.path.basename(name) for name in files}
 
     for scraper in enabled_scrapers:
         chain_status_file = f"{DumpFolderNames[scraper].value.lower()}.json"
         assert (
-            chain_status_file in files
+            chain_status_file in basenames
         ), f"{chain_status_file} not found in long-term database files: {files}"
 
     for scraper in enabled_scrapers:
         for file_type in FileTypesFilters:
             file_type_file = f"{scraper.lower()}_{file_type.name.lower()}.json"
             assert (
-                file_type_file in files
+                file_type_file in basenames
             ), f"{file_type_file} not found in long-term database files: {files}"
 
-    csv_files = long_term_db_target.list_files(extension="csv")
+    csv_files = [name for name in files if name.endswith(".csv")]
     assert len(csv_files) > 0, f"No CSV files found in long-term database"
 
     for scraper in enabled_scrapers:
         chain_pattern = f"{scraper.lower()}.csv"
-        found_chain_file = False
-        for csv_file in csv_files:
-            if chain_pattern in csv_file:
-                found_chain_file = True
-                break
+        found_chain_file = any(chain_pattern in csv_file for csv_file in csv_files)
         assert (
             found_chain_file
         ), f"No CSV files for chain {scraper} found in {csv_files}"
+
+
+def validate_long_term_structure(
+    long_term_db_target, stage_folder, enabled_scrapers, in_app=True
+):
+    """
+    Validate the structure of the long-term dataset.
+
+    Packed uploads may appear as:
+    - literal `{scraper}.zip` archives (DummyFileStorage / pre-expansion), or
+    - Kaggle-expanded folders `{scraper}/...` after zip upload (zip is not listed).
+
+    Flat layouts are validated directly.
+    """
+    files = _list_kaggle_files_after_upload(long_term_db_target)
+    expected_zips = [_scraper_zip_name(scraper) for scraper in enabled_scrapers]
+    expected_prefixes = [_scraper_prefix(scraper) for scraper in enabled_scrapers]
+    zip_layout = any(zip_name in files for zip_name in expected_zips)
+    kaggle_expanded_layout = any(
+        any(name.startswith(prefix) for name in files) for prefix in expected_prefixes
+    )
+
+    if zip_layout:
+        for zip_name in expected_zips:
+            assert (
+                zip_name in files
+            ), f"{zip_name} not found in long-term database files: {files}"
+
+        with tempfile.TemporaryDirectory(prefix="long_term_unpack_") as unpack_dir:
+            zips_to_unpack = list(expected_zips)
+            if "misc.zip" in files:
+                zips_to_unpack.append("misc.zip")
+            unpacked_files = long_term_db_target.unpack_files(
+                zips_to_unpack, unpack_dir
+            )
+            _assert_long_term_content_files(unpacked_files, enabled_scrapers)
+    elif kaggle_expanded_layout:
+        for scraper, prefix in zip(enabled_scrapers, expected_prefixes):
+            assert any(
+                name.startswith(prefix) for name in files
+            ), f"Expected Kaggle-expanded prefix {prefix!r} for {scraper} in {files}"
+        _assert_long_term_content_files(files, enabled_scrapers)
+    else:
+        _assert_long_term_content_files(files, enabled_scrapers)
+        csv_files = long_term_db_target.list_files(extension="csv")
+        assert len(csv_files) > 0, f"No CSV files found in long-term database"
 
     if in_app:
         assert not os.path.exists(

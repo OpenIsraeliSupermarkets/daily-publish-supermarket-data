@@ -2,6 +2,7 @@ import os
 import tempfile
 from datetime import datetime
 from remotes.long_term.kaggle import KaggleUploader
+from remotes.long_term.packer import StagedDatasetPacker
 
 # Set dataset names
 SRC_DATASET = "test-super-dataset-2"
@@ -18,16 +19,8 @@ with tempfile.TemporaryDirectory() as temp_dir:
         f"erlichsefi/{SRC_DATASET}", force=True, path=temp_dir
     )
 
-    # Unzip all downloaded files
-    for file in os.listdir(temp_dir):
-        if file.endswith(".zip"):
-            import zipfile
-
-            zip_path = os.path.join(temp_dir, file)
-            print(f"Extracting {zip_path}...")
-            with zipfile.ZipFile(zip_path, "r") as zip_ref:
-                zip_ref.extractall(temp_dir)
-            os.remove(zip_path)
+    print("Extracting downloaded archives...")
+    StagedDatasetPacker().unpack(temp_dir, remove_zips=True)
     # Delete index.json if it exists
     index_path = os.path.join(temp_dir, "index.json")
     if os.path.exists(index_path):

@@ -15,7 +15,6 @@ import tempfile
 import pandas as pd
 from datetime import datetime, timedelta
 from .base import LongTermDatabaseUploader
-from il_supermarket_scarper import DumpFolderNames
 
 KAGGLEHUB_AVAILABLE = None
 try:
@@ -113,6 +112,23 @@ class KaggleUploader(LongTermDatabaseUploader):
             version_notes=message,
         )
         time.sleep(3)  # wait for kaggle to process the request.
+
+    def fetch_file(self, file_name, dest_dir):
+        """Download a dataset file from Kaggle into dest_dir."""
+        os.makedirs(dest_dir, exist_ok=True)
+        downloaded = kagglehub.dataset_download(
+            self.dataset_remote_name,
+            path=file_name,
+            force_download=True,
+        )
+        local_path = (
+            downloaded
+            if os.path.isfile(downloaded)
+            else os.path.join(downloaded, file_name)
+        )
+        destination = os.path.join(dest_dir, os.path.basename(file_name))
+        shutil.copy2(local_path, destination)
+        return destination
 
     def clean(self):
         """Clean up temporary files."""

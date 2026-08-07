@@ -97,12 +97,14 @@ class LongTermDatasetManager:
         Stage data for upload to the remote database.
 
         This method stages both the outputs folder and status folder,
-        and increments the dataset version index.
+        increments the dataset version index, and packs staged files into
+        one zip per scraper.
         """
         self.remote_database_manager.stage(self.outputs_folder)
         self.remote_database_manager.stage(self.scraping_status_folder)
         self.remote_database_manager.stage(self.converting_status_folder)
         self.remote_database_manager.increase_index()
+        self.remote_database_manager.pack_staged_files()
 
     def upload(self):
         """
