@@ -53,6 +53,41 @@ def test_group_files_by_scraper(packer):
     assert groups["misc"] == ["parser-status.json"]
 
 
+def test_group_files_by_scraper_name_aliases_and_temp_suffix(packer):
+    """Files use scraper enum spelling; zips use DumpFolderNames stems."""
+    meshmat_zip = DumpFolderNames["MESHMAT_YOSEF_1"].value.lower()
+    yayno_zip = DumpFolderNames["YAYNO_BITAN_AND_CARREFOUR"].value.lower()
+    hazi_zip = DumpFolderNames["HAZI_HINAM"].value.lower()
+    keshet_zip = DumpFolderNames["KESHET"].value.lower()
+    rami_zip = DumpFolderNames["RAMI_LEVY"].value.lower()
+
+    groups = packer.group_files_by_scraper(
+        [
+            "meshmat_yosef_1_price_file.json",
+            "price_file_meshmat_yosef_2.csv",
+            "yayno_bitan_and_carrefour_store_file.json",
+            "price_full_file_yayno_bitan_and_carrefour.csv",
+            "promo_full_file_hazi_hinam_temp.csv",
+            "promo_full_file_keshet_temp.csv",
+            "promo_full_file_rami_levy_temp.csv",
+            "parser-status.json",
+        ]
+    )
+
+    assert groups[meshmat_zip] == ["meshmat_yosef_1_price_file.json"]
+    assert groups[DumpFolderNames["MESHMAT_YOSEF_2"].value.lower()] == [
+        "price_file_meshmat_yosef_2.csv"
+    ]
+    assert set(groups[yayno_zip]) == {
+        "yayno_bitan_and_carrefour_store_file.json",
+        "price_full_file_yayno_bitan_and_carrefour.csv",
+    }
+    assert groups[hazi_zip] == ["promo_full_file_hazi_hinam_temp.csv"]
+    assert groups[keshet_zip] == ["promo_full_file_keshet_temp.csv"]
+    assert groups[rami_zip] == ["promo_full_file_rami_levy_temp.csv"]
+    assert groups["misc"] == ["parser-status.json"]
+
+
 def test_pack_staged_files_creates_one_zip_per_scraper(long_term_uploader):
     bareket = DumpFolderNames["BAREKET"].value.lower()
     shufersal = DumpFolderNames["SHUFERSAL"].value.lower()

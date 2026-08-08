@@ -19,33 +19,53 @@ class StagedDatasetPacker:
         return re.sub(r"[^a-z0-9]", "", value.lower())
 
     def scraper_prefixes(self):
-        """Return (normalized_prefix, zip_stem) pairs per scraper, longest first."""
+        """Return (normalized_prefix, zip_stem) pairs per scraper, longest first.
+
+        Zip stems always use DumpFolderNames. Matching also accepts scraper enum
+        names when they differ in spelling (e.g. meshmat_yosef vs MeshnatYosef).
+        """
         prefixes = []
         for scraper in ScraperFactory.all_scrapers_name():
             dump_name = DumpFolderNames[scraper].value
             stem = dump_name.lower()
-            prefixes.append((self.normalize_name(dump_name), stem))
+            dump_norm = self.normalize_name(dump_name)
+            prefixes.append((dump_norm, stem))
+            scraper_norm = self.normalize_name(scraper)
+            if scraper_norm != dump_norm:
+                prefixes.append((scraper_norm, stem))
         prefixes.sort(key=lambda item: len(item[0]), reverse=True)
         return prefixes
+
+    def _match_candidates(self, filename: str):
+        """Normalized filename stems to try when matching a scraper prefix."""
+        normalized = self.normalize_name(os.path.splitext(filename)[0])
+        candidates = [normalized]
+        # Parser outputs sometimes append `_temp` after the chain name.
+        if normalized.endswith("temp"):
+            candidates.append(normalized[: -len("temp")])
+        return candidates
 
     def group_files_by_scraper(self, filenames):
         """Group staged filenames into one bucket per scraper.
 
-        Matches dump-folder prefixes at the start or end of the filename stem so both
-        `bareket_price_file.json` and `price_file_bareket.csv` map to the same zip.
+        Matches dump-folder (or scraper-name) prefixes at the start or end of the
+        filename stem so both `bareket_price_file.json` and `price_file_bareket.csv`
+        map to the same zip.
         """
         groups = defaultdict(list)
         prefixes = self.scraper_prefixes()
         for filename in filenames:
-            normalized = self.normalize_name(os.path.splitext(filename)[0])
             matched_stem = None
-            for prefix, stem in prefixes:
-                if (
-                    normalized == prefix
-                    or normalized.startswith(prefix)
-                    or normalized.endswith(prefix)
-                ):
-                    matched_stem = stem
+            for candidate in self._match_candidates(filename):
+                for prefix, stem in prefixes:
+                    if (
+                        candidate == prefix
+                        or candidate.startswith(prefix)
+                        or candidate.endswith(prefix)
+                    ):
+                        matched_stem = stem
+                        break
+                if matched_stem is not None:
                     break
             groups[matched_stem or "misc"].append(filename)
         return groups
