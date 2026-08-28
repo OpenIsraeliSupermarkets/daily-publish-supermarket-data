@@ -27,6 +27,7 @@ def _scraper_status(
     started_at: datetime,
     saw_files: list[str],
     downloaded_files: list[str],
+    failed_downloads: list[tuple[str, str]] | None = None,
 ) -> dict:
     events = [
         {
@@ -52,6 +53,19 @@ def _scraper_status(
         }
         for name in downloaded_files
     )
+    for file_name, error in failed_downloads or []:
+        events.append(
+            {
+                "task_id": task_id,
+                "status": "downloaded",
+                "system_timestamp": started_at.isoformat(),
+                "file_name": file_name,
+                "downloaded_successfully": False,
+                "extracted_successfully": False,
+                "error_message": error,
+                "restart_and_retry": False,
+            }
+        )
     verified = [
         {
             "task_id": task_id,
@@ -166,6 +180,7 @@ def test_compute_scraper_quality_counts_saw_and_downloaded(status_dirs):
             started,
             saw_files=["Price123.xml", "Price456.xml", "Promo789.xml"],
             downloaded_files=["Price123.xml"],
+            failed_downloads=[("Price456.xml", "timeout")],
         ),
     )
 
@@ -173,10 +188,16 @@ def test_compute_scraper_quality_counts_saw_and_downloaded(status_dirs):
 
     assert len(result["iterations"]) == 1
     iteration = result["iterations"][0]
-    assert iteration["scrapers"]["BAREKET"]["saw"] == 3
-    assert iteration["scrapers"]["BAREKET"]["downloaded"] == 1
-    assert iteration["scrapers"]["BAREKET"]["no_data"] is False
+    bareket = iteration["scrapers"]["BAREKET"]
+    assert bareket["saw"] == 3
+    assert bareket["downloaded"] == 1
+    assert bareket["no_data"] is False
+    assert bareket["saw_not_downloaded"] == [
+        {"file_name": "Price456", "error": "timeout"},
+        {"file_name": "Promo789", "error": "not downloaded"},
+    ]
     assert iteration["scrapers"]["WOLT"]["no_data"] is True
+    assert iteration["scrapers"]["WOLT"]["saw_not_downloaded"] == []
     assert iteration["scrapers_with_no_data"] == 1
 
 
@@ -229,6 +250,10 @@ def test_compute_scraper_quality_two_iterations(status_dirs):
     assert len(result["iterations"]) == 2
     assert result["iterations"][0]["scrapers"]["BAREKET"]["downloaded"] == 1
     assert result["iterations"][1]["scrapers"]["BAREKET"]["downloaded"] == 0
+    assert result["iterations"][1]["scrapers"]["BAREKET"]["saw_not_downloaded"] == [
+        {"file_name": "Price2", "error": "not downloaded"},
+        {"file_name": "Price3", "error": "not downloaded"},
+    ]
     assert result["iterations"][1]["scrapers_with_no_data"] == 1
 
 
@@ -264,8 +289,8 @@ def test_compute_parser_quality_zero_records_and_not_parsed(status_dirs):
 
     assert len(result["iterations"]) == 1
     parser_metrics = result["iterations"][0]["parsers"]["bareket_price_file"]
-    assert parser_metrics["zero_record_files"] == 1
-    assert parser_metrics["downloaded_not_parsed"] == 1
+    assert parser_metrics["zero_record_files"] == ["Price123"]
+    assert parser_metrics["downloaded_not_parsed"] == ["Price456"]
 
 
 def test_write_quality_indicators_creates_files(status_dirs):

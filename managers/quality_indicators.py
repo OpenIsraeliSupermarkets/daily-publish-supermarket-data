@@ -8,6 +8,8 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
+import pytz
+
 from il_supermarket_parsers import ParserStatusOutput
 from il_supermarket_parsers.utils.status.parser_status_contract import (
     FailedFileStatus,
@@ -21,6 +23,7 @@ from il_supermarket_scarper import (
 )
 from il_supermarket_scarper.utils.scraper_status_contract import (
     DownloadedStatus,
+    FailedStatus,
     SawStatus,
 )
 
@@ -29,6 +32,15 @@ from utils import Logger, now
 SCRAPER_QUALITY_FILENAME = "scraper_quality.json"
 PARSER_QUALITY_FILENAME = "parser_quality.json"
 ITERATION_CLUSTER_WINDOW = timedelta(hours=2)
+_TZ = pytz.timezone("Asia/Jerusalem")
+
+
+def _normalize_timestamp(value: Optional[datetime]) -> Optional[datetime]:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return _TZ.localize(value)
+    return value.astimezone(_TZ)
 
 
 def normalize_filename(file_name: str) -> str:
@@ -64,7 +76,7 @@ def _task_started_at_scraper(
 ) -> Optional[datetime]:
     for event in status.global_status:
         if event.task_id == task_id and event.status == "started":
-            return event.system_timestamp
+            return _normalize_timestamp(event.system_timestamp)
     return None
 
 
@@ -82,7 +94,7 @@ def _task_started_at_parser(
 ) -> Optional[datetime]:
     for event in status.global_status:
         if event.task_id == task_id and event.status == "started":
-            return event.system_timestamp
+            return _normalize_timestamp(event.system_timestamp)
     return None
 
 
@@ -108,14 +120,70 @@ def _scraper_downloaded_files(status: ScraperStatusOutput, task_id: str) -> Set[
     return downloaded
 
 
-def _parser_zero_record_files(status: ParserStatusOutput, task_id: str) -> int:
+def _scraper_download_errors(
+    status: ScraperStatusOutput, task_id: str
+) -> Dict[str, str]:
+    """Map normalized file name to the best available download failure reason."""
+    errors: Dict[str, str] = {}
+    for event in status.events:
+        if event.task_id != task_id:
+            continue
+        if isinstance(event, DownloadedStatus):
+            file_name = normalize_filename(event.file_name)
+            if event.downloaded_successfully and event.extracted_successfully:
+                continue
+            message = event.error_message or "download or extraction failed"
+            errors[file_name] = message
+        elif isinstance(event, FailedStatus):
+            file_name = normalize_filename(event.file_name)
+            message = event.execption or event.traceback or "download failed"
+            errors[file_name] = message
+    return errors
+
+
+def _scraper_saw_not_downloaded(
+    status: ScraperStatusOutput, task_id: str
+) -> List[Dict[str, str]]:
+    saw_files = _scraper_saw_files(status, task_id)
+    downloaded_files = _scraper_downloaded_files(status, task_id)
+    download_errors = _scraper_download_errors(status, task_id)
+
+    not_downloaded = sorted(saw_files - downloaded_files)
+    return [
+        {
+            "file_name": file_name,
+            "error": download_errors.get(file_name, "not downloaded"),
+        }
+        for file_name in not_downloaded
+    ]
+
+
+def _parser_zero_record_file_names(
+    status: ParserStatusOutput, task_id: str
+) -> List[str]:
     zero_record: Set[str] = set()
     for event in status.events:
         if event.task_id != task_id or not isinstance(event, ProcessedFileStatus):
             continue
         if event.row_count == 0:
             zero_record.add(normalize_filename(event.file_name))
-    return len(zero_record)
+    return sorted(zero_record)
+
+
+def _parser_downloaded_not_parsed_file_names(
+    status: ParserStatusOutput,
+    task_id: str,
+    scraper_status: Optional[ScraperStatusOutput],
+    scraper_task_id: Optional[str],
+    file_type: str,
+) -> List[str]:
+    if scraper_status is None or scraper_task_id is None:
+        return []
+
+    downloaded = _scraper_downloaded_files(scraper_status, scraper_task_id)
+    downloaded_for_type = _filter_files_by_type(downloaded, file_type)
+    resolved = _parser_resolved_files(status, task_id)
+    return sorted(downloaded_for_type - resolved)
 
 
 def _parser_resolved_files(status: ParserStatusOutput, task_id: str) -> Set[str]:
@@ -203,17 +271,19 @@ def compute_scraper_quality(
                     "saw": 0,
                     "downloaded": 0,
                     "no_data": True,
+                    "saw_not_downloaded": [],
                 }
                 continue
 
             status = scraper_status[scraper]
-            saw_count = len(_scraper_saw_files(status, task_id))
-            downloaded_count = len(_scraper_downloaded_files(status, task_id))
+            saw_files = _scraper_saw_files(status, task_id)
+            downloaded_files = _scraper_downloaded_files(status, task_id)
             scrapers_metrics[scraper] = {
                 "task_id": task_id,
-                "saw": saw_count,
-                "downloaded": downloaded_count,
-                "no_data": downloaded_count == 0,
+                "saw": len(saw_files),
+                "downloaded": len(downloaded_files),
+                "no_data": len(downloaded_files) == 0,
+                "saw_not_downloaded": _scraper_saw_not_downloaded(status, task_id),
             }
 
         iterations.append(
@@ -276,7 +346,7 @@ def compute_parser_quality(
     iterations: List[Dict[str, Any]] = []
     for cluster in _cluster_runs_by_time(parser_runs):
         started_at = min(run[0] for run in cluster)
-        parsers_metrics: Dict[str, Dict[str, int]] = {}
+        parsers_metrics: Dict[str, Dict[str, List[str]]] = {}
 
         for parser_key, (scraper, file_type) in parser_key_parts.items():
             task_id = _pick_task_for_cluster(cluster, parser_key)
@@ -284,12 +354,9 @@ def compute_parser_quality(
                 continue
 
             status = parser_status[parser_key]
-            zero_record_files = _parser_zero_record_files(status, task_id)
-            downloaded_not_parsed = 0
-
             scraper_status = scraper_status_by_chain.get(scraper)
+            scraper_task_id = None
             if scraper_status is not None:
-                scraper_task_id = None
                 best_delta = None
                 for candidate_task_id in _task_ids_from_scraper(scraper_status):
                     scraper_started = _task_started_at_scraper(
@@ -302,17 +369,15 @@ def compute_parser_quality(
                         scraper_task_id = candidate_task_id
                         best_delta = delta
 
-                if scraper_task_id is not None:
-                    downloaded = _scraper_downloaded_files(
-                        scraper_status, scraper_task_id
-                    )
-                    downloaded_for_type = _filter_files_by_type(downloaded, file_type)
-                    resolved = _parser_resolved_files(status, task_id)
-                    downloaded_not_parsed = len(downloaded_for_type - resolved)
-
             parsers_metrics[parser_key] = {
-                "zero_record_files": zero_record_files,
-                "downloaded_not_parsed": downloaded_not_parsed,
+                "zero_record_files": _parser_zero_record_file_names(status, task_id),
+                "downloaded_not_parsed": _parser_downloaded_not_parsed_file_names(
+                    status,
+                    task_id,
+                    scraper_status,
+                    scraper_task_id,
+                    file_type,
+                ),
             }
 
         if parsers_metrics:
