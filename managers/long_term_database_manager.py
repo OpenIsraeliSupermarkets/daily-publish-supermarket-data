@@ -4,6 +4,10 @@ from utils import Logger
 import shutil
 from remotes import LongTermDatabaseUploader
 from utils import now
+from managers.quality_indicators import (
+    PARSER_QUALITY_FILENAME,
+    SCRAPER_QUALITY_FILENAME,
+)
 
 
 class LongTermDatasetManager:
@@ -29,6 +33,7 @@ class LongTermDatasetManager:
         long_term_db_target: LongTermDatabaseUploader,
         scraping_status_folder,
         converting_status_folder,
+        quality_folder=None,
         enabled_scrapers=None,
         enabled_file_types=None,
     ):
@@ -53,6 +58,7 @@ class LongTermDatasetManager:
         self.outputs_folder = outputs_folder
         self.scraping_status_folder = scraping_status_folder
         self.converting_status_folder = converting_status_folder
+        self.quality_folder = quality_folder
 
     def _read_parser_status(self):
         """
@@ -103,6 +109,8 @@ class LongTermDatasetManager:
         self.remote_database_manager.stage(self.outputs_folder)
         self.remote_database_manager.stage(self.scraping_status_folder)
         self.remote_database_manager.stage(self.converting_status_folder)
+        if self.quality_folder and os.path.isdir(self.quality_folder):
+            self.remote_database_manager.stage(self.quality_folder)
         self.remote_database_manager.increase_index()
         self.remote_database_manager.pack_staged_files()
 
@@ -127,6 +135,14 @@ class LongTermDatasetManager:
                     "path": "parser-status.json",
                     "description": "Parser status file",
                 },
+                {
+                    "path": SCRAPER_QUALITY_FILENAME,
+                    "description": "Scraper quality indicators across DAG iterations",
+                },
+                {
+                    "path": PARSER_QUALITY_FILENAME,
+                    "description": "Parser quality indicators across DAG iterations",
+                },
             ]
             + self._read_parser_status()
             + self._read_scraper_status_files(),
@@ -147,6 +163,8 @@ class LongTermDatasetManager:
         shutil.rmtree(self.outputs_folder, ignore_errors=True)
         shutil.rmtree(self.scraping_status_folder, ignore_errors=True)
         shutil.rmtree(self.converting_status_folder, ignore_errors=True)
+        if self.quality_folder:
+            shutil.rmtree(self.quality_folder, ignore_errors=True)
         self.remote_database_manager.clean()
 
     def reverse(self, dataset_path):

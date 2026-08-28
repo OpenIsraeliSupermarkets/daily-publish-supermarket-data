@@ -12,6 +12,7 @@ from il_supermarket_parsers import ConvertingTask, FileTypesFilters
 from managers.long_term_database_manager import LongTermDatasetManager
 from managers.short_term_database_manager import ShortTermDBDatasetManager
 from managers.cache_manager import CacheManager
+from managers.quality_indicators import write_quality_indicators
 from remotes import KaggleUploader, MongoDbUploader
 from utils import now
 
@@ -79,6 +80,7 @@ class BaseSupermarketDataPublisher:
         self.status_configuration = status_configuration or {"database_type": "json"}
         self.scraping_status_folder = os.path.join(app_folder, "scraping_status")
         self.converting_status_folder = os.path.join(app_folder, "converting_status")
+        self.quality_folder = os.path.join(app_folder, "quality")
 
         Logger.info("app_folder=%s", app_folder)
 
@@ -153,6 +155,13 @@ class BaseSupermarketDataPublisher:
         task.start()
         task.join()
         Logger.info("Converting task is done")
+        write_quality_indicators(
+            quality_folder=self.quality_folder,
+            scraping_status_folder=self.scraping_status_folder,
+            converting_status_folder=self.converting_status_folder,
+            enabled_scrapers=self.enabled_scrapers,
+            enabled_file_types=self.enabled_file_types,
+        )
 
     def _download_from_long_term_database(self):
         """
@@ -200,6 +209,7 @@ class BaseSupermarketDataPublisher:
             outputs_folder=self.outputs_folder,
             scraping_status_folder=self.scraping_status_folder,
             converting_status_folder=self.converting_status_folder,
+            quality_folder=self.quality_folder,
         )
         database.compose()
         database.upload()
@@ -253,6 +263,7 @@ class BaseSupermarketDataPublisher:
             self.outputs_folder,
             self.converting_status_folder,
             self.scraping_status_folder,
+            self.quality_folder,
         ]:
             if os.path.exists(folder):
                 shutil.rmtree(folder)

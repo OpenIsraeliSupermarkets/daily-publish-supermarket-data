@@ -92,6 +92,13 @@ def test_compose(sample_manager):
     sample_manager.remote_database_manager.pack_staged_files.assert_called_once()
 
 
+def test_compose_stages_quality_folder(sample_manager):
+    sample_manager.quality_folder = "/test/quality"
+    with patch("os.path.isdir", return_value=True):
+        sample_manager.compose()
+    sample_manager.remote_database_manager.stage.assert_any_call("/test/quality")
+
+
 @patch("utils.logging_config.Logger.critical")
 def test_upload_failure(mock_critical, sample_manager):
     sample_manager.remote_database_manager.upload_to_dataset.side_effect = Exception(
@@ -129,11 +136,17 @@ def test_clean(sample_manager):
 def test_integration():
     with tempfile.TemporaryDirectory() as temp_dir:
         expected_app_folder_stracture(temp_dir)
+        quality_dir = os.path.join(temp_dir, "quality")
+        os.makedirs(quality_dir, exist_ok=True)
+        with open(os.path.join(quality_dir, "scraper_quality.json"), "w") as f:
+            json.dump({"iterations": []}, f)
+        with open(os.path.join(quality_dir, "parser_quality.json"), "w") as f:
+            json.dump({"iterations": []}, f)
+
         remote_name = os.path.join(temp_dir, "test_dataset")
 
         manager = LongTermDatasetManager(
             outputs_folder=os.path.join(temp_dir, "outputs"),
-            # status_folder=os.path.join(temp_dir, "status"),
             long_term_db_target=DummyFileStorage(
                 dataset_remote_path=remote_name,
                 dataset_path=os.path.join(temp_dir, "dataset"),
@@ -143,6 +156,7 @@ def test_integration():
             enabled_file_types=["type1", "type2"],
             scraping_status_folder=os.path.join(temp_dir, "scraping_status"),
             converting_status_folder=os.path.join(temp_dir, "converting_status"),
+            quality_folder=quality_dir,
         )
 
         manager.compose()
@@ -151,4 +165,11 @@ def test_integration():
 
         assert len(os.listdir(temp_dir)) == 1
         remote_files = sorted(os.listdir(remote_name))
-        assert remote_files == ["index.json", "misc.zip"]
+        assert remote_files == sorted(
+            [
+                "index.json",
+                "parser_quality.json",
+                "scraper_quality.json",
+                "misc.zip",
+            ]
+        )

@@ -17,6 +17,10 @@ from il_supermarket_scarper import (
 )
 from il_supermarket_parsers import ParserStatusOutput
 from data_models.raw_schema import ScraperStatus, ParserStatus, file_name_to_table
+from managers.quality_indicators import (
+    PARSER_QUALITY_FILENAME,
+    SCRAPER_QUALITY_FILENAME,
+)
 from managers.cache_manager import CacheManager
 from access.access_layer import AccessLayer
 
@@ -262,6 +266,18 @@ def _assert_long_term_content_files(files, enabled_scrapers):
         ), f"No CSV files for chain {scraper} found in {csv_files}"
 
 
+def _validate_quality_files_if_present(long_term_db_target, files):
+    """Validate quality indicator JSON when published next to index.json."""
+    basenames = {os.path.basename(name) for name in files}
+    for quality_file in (SCRAPER_QUALITY_FILENAME, PARSER_QUALITY_FILENAME):
+        if quality_file not in basenames:
+            continue
+        payload = long_term_db_target.get_file_content(quality_file)
+        assert "computed_at" in payload, f"{quality_file} missing computed_at"
+        assert "iterations" in payload, f"{quality_file} missing iterations"
+        assert isinstance(payload["iterations"], list)
+
+
 def validate_long_term_structure(
     long_term_db_target, stage_folder, enabled_scrapers, in_app=True
 ):
@@ -306,6 +322,8 @@ def validate_long_term_structure(
         _assert_long_term_content_files(files, enabled_scrapers)
         csv_files = long_term_db_target.list_files(extension="csv")
         assert len(csv_files) > 0, f"No CSV files found in long-term database"
+
+    _validate_quality_files_if_present(long_term_db_target, files)
 
     if in_app:
         assert not os.path.exists(

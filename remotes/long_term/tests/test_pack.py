@@ -121,6 +121,22 @@ def test_pack_staged_files_creates_one_zip_per_scraper(long_term_uploader):
         assert zipf.namelist() == ["parser-status.json"]
 
 
+def test_pack_staged_files_keeps_quality_files_next_to_index(long_term_uploader):
+    dataset = long_term_uploader.dataset_path
+
+    _write(os.path.join(dataset, "index.json"), '{"0":"2026-01-01"}')
+    _write(os.path.join(dataset, "scraper_quality.json"), '{"iterations":[]}')
+    _write(os.path.join(dataset, "parser_quality.json"), '{"iterations":[]}')
+    _write(os.path.join(dataset, "bareket.json"))
+
+    long_term_uploader.pack_staged_files()
+
+    remaining = sorted(os.listdir(dataset))
+    assert remaining == sorted(
+        ["index.json", "scraper_quality.json", "parser_quality.json", "bareket.zip"]
+    )
+
+
 def test_pack_staged_files_noop_when_only_index(long_term_uploader):
     _write(os.path.join(long_term_uploader.dataset_path, "index.json"), "{}")
     long_term_uploader.pack_staged_files()
