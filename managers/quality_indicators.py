@@ -33,6 +33,7 @@ from utils import Logger, now
 
 SCRAPER_QUALITY_FILENAME = "scraper_quality.json"
 PARSER_QUALITY_FILENAME = "parser_quality.json"
+PIPELINE_HEALTH_FILENAME = "pipeline_health.json"
 ITERATION_CLUSTER_WINDOW = timedelta(hours=2)
 _TZ = pytz.timezone("Asia/Jerusalem")
 
@@ -494,6 +495,127 @@ def compute_parser_quality(
     }
 
 
+def _load_health_thresholds() -> Dict[str, float]:
+    return {
+        "scraper_download_success_rate_min": float(
+            os.environ.get("QUALITY_SCRAPER_MIN_DOWNLOAD_SUCCESS_RATE", "0.95")
+        ),
+        "parser_parse_success_rate_min": float(
+            os.environ.get("QUALITY_PARSER_MIN_PARSE_SUCCESS_RATE", "0.98")
+        ),
+        "scraper_no_data_scrapers_max": float(
+            os.environ.get("QUALITY_SCRAPER_MAX_NO_DATA_SCRAPERS", "0")
+        ),
+    }
+
+
+def _aggregate_scraper_health_metrics(scraper_quality: Dict[str, Any]) -> Dict[str, Any]:
+    total_saw = 0
+    total_downloaded = 0
+    download_failed = 0
+    skipped_by_limit = 0
+    skipped_by_filter = 0
+    max_no_data_scrapers = 0
+
+    for iteration in scraper_quality.get("iterations", []):
+        max_no_data_scrapers = max(
+            max_no_data_scrapers, iteration.get("scrapers_with_no_data", 0)
+        )
+        for scraper_metrics in iteration.get("scrapers", {}).values():
+            total_saw += scraper_metrics.get("saw", 0)
+            total_downloaded += scraper_metrics.get("downloaded", 0)
+            for entry in scraper_metrics.get("saw_not_downloaded", []):
+                reason = entry.get("reason", "")
+                if reason == "download_failed":
+                    download_failed += 1
+                elif reason == "skipped_by_limit":
+                    skipped_by_limit += 1
+                elif reason == "skipped_by_filter":
+                    skipped_by_filter += 1
+
+    download_success_rate = (
+        total_downloaded / total_saw if total_saw > 0 else 1.0
+    )
+
+    return {
+        "total_saw": total_saw,
+        "total_downloaded": total_downloaded,
+        "total_download_failed": download_failed,
+        "total_skipped_by_limit": skipped_by_limit,
+        "total_skipped_by_filter": skipped_by_filter,
+        "scrapers_with_no_data": max_no_data_scrapers,
+        "download_success_rate": round(download_success_rate, 4),
+    }
+
+
+def _aggregate_parser_health_metrics(
+    parser_quality: Dict[str, Any], downloaded_baseline: int
+) -> Dict[str, Any]:
+    zero_record: Set[str] = set()
+    unparsed: Set[str] = set()
+
+    for iteration in parser_quality.get("iterations", []):
+        for parser_metrics in iteration.get("parsers", {}).values():
+            zero_record.update(parser_metrics.get("zero_record_files", []))
+            unparsed.update(parser_metrics.get("downloaded_not_parsed", []))
+
+    problem_files = zero_record | unparsed
+    baseline = downloaded_baseline if downloaded_baseline > 0 else len(problem_files)
+    if baseline > 0:
+        parse_success_rate = 1.0 - (len(problem_files) / baseline)
+    else:
+        parse_success_rate = 1.0
+
+    return {
+        "total_zero_record_files": len(zero_record),
+        "total_downloaded_not_parsed": len(unparsed),
+        "total_problem_files": len(problem_files),
+        "downloaded_baseline": downloaded_baseline,
+        "parse_success_rate": round(parse_success_rate, 4),
+        "zero_record_files": sorted(zero_record),
+        "downloaded_not_parsed": sorted(unparsed),
+    }
+
+
+def compute_pipeline_health(
+    scraper_quality: Dict[str, Any],
+    parser_quality: Dict[str, Any],
+    thresholds: Optional[Dict[str, float]] = None,
+) -> Dict[str, Any]:
+    """Derive overall scrape/parse health indicators and threshold checks."""
+    thresholds = thresholds or _load_health_thresholds()
+    scraper = _aggregate_scraper_health_metrics(scraper_quality)
+    parser = _aggregate_parser_health_metrics(
+        parser_quality, scraper["total_downloaded"]
+    )
+
+    scraper_failures: List[str] = []
+    if (
+        scraper["download_success_rate"]
+        < thresholds["scraper_download_success_rate_min"]
+    ):
+        scraper_failures.append("download_success_rate")
+    if scraper["scrapers_with_no_data"] > thresholds["scraper_no_data_scrapers_max"]:
+        scraper_failures.append("scrapers_with_no_data")
+
+    parser_failures: List[str] = []
+    if parser["parse_success_rate"] < thresholds["parser_parse_success_rate_min"]:
+        parser_failures.append("parse_success_rate")
+
+    scraper["healthy"] = not scraper_failures
+    scraper["below_threshold"] = scraper_failures
+    parser["healthy"] = not parser_failures
+    parser["below_threshold"] = parser_failures
+
+    return {
+        "computed_at": now().isoformat(),
+        "thresholds": thresholds,
+        "scraper": scraper,
+        "parser": parser,
+        "overall_healthy": scraper["healthy"] and parser["healthy"],
+    }
+
+
 def write_quality_indicators(
     quality_folder: str,
     scraping_status_folder: str,
@@ -524,13 +646,20 @@ def write_quality_indicators(
     scraper_path = os.path.join(quality_folder, SCRAPER_QUALITY_FILENAME)
     parser_path = os.path.join(quality_folder, PARSER_QUALITY_FILENAME)
 
+    pipeline_health = compute_pipeline_health(scraper_quality, parser_quality)
+    health_path = os.path.join(quality_folder, PIPELINE_HEALTH_FILENAME)
+
     with open(scraper_path, "w", encoding="utf-8") as handle:
         json.dump(scraper_quality, handle, indent=2, default=str)
     with open(parser_path, "w", encoding="utf-8") as handle:
         json.dump(parser_quality, handle, indent=2, default=str)
+    with open(health_path, "w", encoding="utf-8") as handle:
+        json.dump(pipeline_health, handle, indent=2, default=str)
 
     Logger.info(
-        "Quality indicators written: %s scraper iterations, %s parser iterations",
+        "Quality indicators written: %s scraper iterations, %s parser iterations, "
+        "overall_healthy=%s",
         len(scraper_quality["iterations"]),
         len(parser_quality["iterations"]),
+        pipeline_health["overall_healthy"],
     )

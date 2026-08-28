@@ -142,6 +142,8 @@ def test_integration():
             json.dump({"iterations": []}, f)
         with open(os.path.join(quality_dir, "parser_quality.json"), "w") as f:
             json.dump({"iterations": []}, f)
+        with open(os.path.join(quality_dir, "pipeline_health.json"), "w") as f:
+            json.dump({"overall_healthy": True, "scraper": {}, "parser": {}}, f)
 
         remote_name = os.path.join(temp_dir, "test_dataset")
 
@@ -169,6 +171,7 @@ def test_integration():
             [
                 "index.json",
                 "parser_quality.json",
+                "pipeline_health.json",
                 "scraper_quality.json",
                 "misc.zip",
             ]

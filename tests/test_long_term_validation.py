@@ -8,6 +8,7 @@ from il_supermarket_scarper import DumpFolderNames, FileTypesFilters
 
 from managers.quality_indicators import (
     PARSER_QUALITY_FILENAME,
+    PIPELINE_HEALTH_FILENAME,
     SCRAPER_QUALITY_FILENAME,
 )
 from remotes.long_term.file_storage import DummyFileStorage
@@ -89,9 +90,22 @@ def test_validate_long_term_structure_with_quality_files():
 
         with open(os.path.join(remote_dir, "index.json"), "w", encoding="utf-8") as handle:
             handle.write('{"0":"2026-01-01"}')
-        for quality_file in (SCRAPER_QUALITY_FILENAME, PARSER_QUALITY_FILENAME):
+        for quality_file in (
+            SCRAPER_QUALITY_FILENAME,
+            PARSER_QUALITY_FILENAME,
+            PIPELINE_HEALTH_FILENAME,
+        ):
+            if quality_file == PIPELINE_HEALTH_FILENAME:
+                payload = {
+                    "computed_at": "2026-01-01",
+                    "overall_healthy": True,
+                    "scraper": {"healthy": True},
+                    "parser": {"healthy": True},
+                }
+            else:
+                payload = {"computed_at": "2026-01-01", "iterations": []}
             with open(os.path.join(remote_dir, quality_file), "w", encoding="utf-8") as handle:
-                json.dump({"computed_at": "2026-01-01", "iterations": []}, handle)
+                json.dump(payload, handle)
 
         stem = DumpFolderNames["BAREKET"].value.lower()
         with open(os.path.join(remote_dir, f"{stem}.json"), "w", encoding="utf-8") as handle:

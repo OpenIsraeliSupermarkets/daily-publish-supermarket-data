@@ -9,8 +9,10 @@ from il_supermarket_scarper import DumpFolderNames, FileTypesFilters
 
 from managers.quality_indicators import (
     PARSER_QUALITY_FILENAME,
+    PIPELINE_HEALTH_FILENAME,
     SCRAPER_QUALITY_FILENAME,
     compute_parser_quality,
+    compute_pipeline_health,
     compute_scraper_quality,
     write_quality_indicators,
 )
@@ -343,6 +345,87 @@ def test_compute_parser_quality_zero_records_and_not_parsed(status_dirs):
     assert parser_metrics["downloaded_not_parsed"] == ["Price456"]
 
 
+def test_compute_pipeline_health_flags_unhealthy_parser():
+    scraper_quality = {
+        "iterations": [
+            {
+                "scrapers_with_no_data": 0,
+                "scrapers": {
+                    "BAREKET": {
+                        "saw": 2,
+                        "downloaded": 2,
+                        "saw_not_downloaded": [],
+                    }
+                },
+            }
+        ]
+    }
+    parser_quality = {
+        "iterations": [
+            {
+                "parsers": {
+                    "bareket_price_file": {
+                        "zero_record_files": ["Price123"],
+                        "downloaded_not_parsed": ["Price456"],
+                    }
+                }
+            }
+        ]
+    }
+
+    health = compute_pipeline_health(
+        scraper_quality,
+        parser_quality,
+        thresholds={
+            "scraper_download_success_rate_min": 0.95,
+            "parser_parse_success_rate_min": 0.98,
+            "scraper_no_data_scrapers_max": 0,
+        },
+    )
+
+    assert health["scraper"]["healthy"] is True
+    assert health["parser"]["healthy"] is False
+    assert health["parser"]["parse_success_rate"] == 0.0
+    assert health["parser"]["below_threshold"] == ["parse_success_rate"]
+    assert health["overall_healthy"] is False
+
+
+def test_compute_pipeline_health_flags_unhealthy_scraper():
+    scraper_quality = {
+        "iterations": [
+            {
+                "scrapers_with_no_data": 1,
+                "scrapers": {
+                    "BAREKET": {
+                        "saw": 10,
+                        "downloaded": 8,
+                        "saw_not_downloaded": [
+                            {"reason": "download_failed"},
+                            {"reason": "download_failed"},
+                        ],
+                    }
+                },
+            }
+        ]
+    }
+    parser_quality = {"iterations": []}
+
+    health = compute_pipeline_health(
+        scraper_quality,
+        parser_quality,
+        thresholds={
+            "scraper_download_success_rate_min": 0.95,
+            "parser_parse_success_rate_min": 0.98,
+            "scraper_no_data_scrapers_max": 0,
+        },
+    )
+
+    assert health["scraper"]["download_success_rate"] == 0.8
+    assert health["scraper"]["healthy"] is False
+    assert "download_success_rate" in health["scraper"]["below_threshold"]
+    assert health["overall_healthy"] is False
+
+
 def test_write_quality_indicators_creates_files(status_dirs):
     bareket_file = DumpFolderNames["BAREKET"].value.lower()
     started = datetime(2026, 1, 1, 10, 0, 0)
@@ -365,17 +448,24 @@ def test_write_quality_indicators_creates_files(status_dirs):
 
     scraper_path = os.path.join(status_dirs["quality"], SCRAPER_QUALITY_FILENAME)
     parser_path = os.path.join(status_dirs["quality"], PARSER_QUALITY_FILENAME)
+    health_path = os.path.join(status_dirs["quality"], PIPELINE_HEALTH_FILENAME)
     assert os.path.isfile(scraper_path)
     assert os.path.isfile(parser_path)
+    assert os.path.isfile(health_path)
 
     with open(scraper_path, encoding="utf-8") as handle:
         scraper_payload = json.load(handle)
     with open(parser_path, encoding="utf-8") as handle:
         parser_payload = json.load(handle)
+    with open(health_path, encoding="utf-8") as handle:
+        health_payload = json.load(handle)
 
     assert "computed_at" in scraper_payload
     assert "iterations" in parser_payload
     assert len(scraper_payload["iterations"]) >= 1
+    assert "overall_healthy" in health_payload
+    assert "scraper" in health_payload
+    assert "parser" in health_payload
 
 
 def test_write_quality_indicators_skips_missing_scraping_folder(tmp_path):

@@ -6,6 +6,7 @@ from remotes import LongTermDatabaseUploader
 from utils import now
 from managers.quality_indicators import (
     PARSER_QUALITY_FILENAME,
+    PIPELINE_HEALTH_FILENAME,
     SCRAPER_QUALITY_FILENAME,
 )
 
@@ -142,6 +143,10 @@ class LongTermDatasetManager:
                 {
                     "path": PARSER_QUALITY_FILENAME,
                     "description": "Parser quality indicators across DAG iterations",
+                },
+                {
+                    "path": PIPELINE_HEALTH_FILENAME,
+                    "description": "Overall scrape/parse pipeline health indicators",
                 },
             ]
             + self._read_parser_status()

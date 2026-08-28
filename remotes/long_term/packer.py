@@ -13,7 +13,12 @@ class StagedDatasetPacker:
     """Group and zip staged long-term files by supermarket scraper."""
 
     KEEP_AS_IS = frozenset(
-        {"index.json", "scraper_quality.json", "parser_quality.json"}
+        {
+            "index.json",
+            "scraper_quality.json",
+            "parser_quality.json",
+            "pipeline_health.json",
+        }
     )
 
     @staticmethod

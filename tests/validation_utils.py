@@ -19,6 +19,7 @@ from il_supermarket_parsers import ParserStatusOutput
 from data_models.raw_schema import ScraperStatus, ParserStatus, file_name_to_table
 from managers.quality_indicators import (
     PARSER_QUALITY_FILENAME,
+    PIPELINE_HEALTH_FILENAME,
     SCRAPER_QUALITY_FILENAME,
 )
 from managers.cache_manager import CacheManager
@@ -269,11 +270,20 @@ def _assert_long_term_content_files(files, enabled_scrapers):
 def _validate_quality_files_if_present(long_term_db_target, files):
     """Validate quality indicator JSON when published next to index.json."""
     basenames = {os.path.basename(name) for name in files}
-    for quality_file in (SCRAPER_QUALITY_FILENAME, PARSER_QUALITY_FILENAME):
+    for quality_file in (
+        SCRAPER_QUALITY_FILENAME,
+        PARSER_QUALITY_FILENAME,
+        PIPELINE_HEALTH_FILENAME,
+    ):
         if quality_file not in basenames:
             continue
         payload = long_term_db_target.get_file_content(quality_file)
         assert "computed_at" in payload, f"{quality_file} missing computed_at"
+        if quality_file == PIPELINE_HEALTH_FILENAME:
+            assert "overall_healthy" in payload, f"{quality_file} missing overall_healthy"
+            assert "scraper" in payload, f"{quality_file} missing scraper"
+            assert "parser" in payload, f"{quality_file} missing parser"
+            continue
         assert "iterations" in payload, f"{quality_file} missing iterations"
         assert isinstance(payload["iterations"], list)
 
