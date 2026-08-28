@@ -28,14 +28,17 @@ def _scraper_status(
     saw_files: list[str],
     downloaded_files: list[str],
     failed_downloads: list[tuple[str, str]] | None = None,
+    limit: int | None = None,
+    saw_links: dict[str, str] | None = None,
 ) -> dict:
+    saw_links = saw_links or {}
     events = [
         {
             "task_id": task_id,
             "status": "saw",
             "system_timestamp": started_at.isoformat(),
             "file_name": name,
-            "link": None,
+            "link": saw_links.get(name),
             "size": None,
         }
         for name in saw_files
@@ -80,6 +83,7 @@ def _scraper_status(
                 "task_id": task_id,
                 "status": "started",
                 "system_timestamp": started_at.isoformat(),
+                "limit": limit,
             }
         ],
         "events": events,
@@ -193,12 +197,50 @@ def test_compute_scraper_quality_counts_saw_and_downloaded(status_dirs):
     assert bareket["downloaded"] == 1
     assert bareket["no_data"] is False
     assert bareket["saw_not_downloaded"] == [
-        {"file_name": "Price456", "error": "timeout"},
-        {"file_name": "Promo789", "error": "not downloaded"},
+        {
+            "file_name": "Price456",
+            "reason": "download_failed",
+            "error": "timeout",
+        },
+        {
+            "file_name": "Promo789",
+            "reason": "skipped_by_filter",
+            "error": "not selected for download (filtered before collection)",
+        },
     ]
     assert iteration["scrapers"]["WOLT"]["no_data"] is True
     assert iteration["scrapers"]["WOLT"]["saw_not_downloaded"] == []
     assert iteration["scrapers_with_no_data"] == 1
+
+
+def test_compute_scraper_quality_skipped_by_limit(status_dirs):
+    started = datetime(2026, 1, 1, 10, 0, 0)
+    bareket_file = DumpFolderNames["BAREKET"].value.lower()
+    _write_json(
+        os.path.join(status_dirs["scraping"], f"{bareket_file}.json"),
+        _scraper_status(
+            "task-1",
+            started,
+            saw_files=["Price1.xml", "Price2.xml"],
+            downloaded_files=["Price1.xml"],
+            limit=1,
+            saw_links={
+                "Price2.xml": "http://example.com/Price2.xml.gz",
+            },
+        ),
+    )
+
+    result = compute_scraper_quality(status_dirs["scraping"], ["BAREKET"])
+
+    skipped = result["iterations"][0]["scrapers"]["BAREKET"]["saw_not_downloaded"]
+    assert skipped == [
+        {
+            "file_name": "Price2",
+            "link": "http://example.com/Price2.xml.gz",
+            "reason": "skipped_by_limit",
+            "error": "not selected for download (limit=1, 1/2 files downloaded)",
+        }
+    ]
 
 
 def test_compute_scraper_quality_two_iterations(status_dirs):
@@ -251,8 +293,16 @@ def test_compute_scraper_quality_two_iterations(status_dirs):
     assert result["iterations"][0]["scrapers"]["BAREKET"]["downloaded"] == 1
     assert result["iterations"][1]["scrapers"]["BAREKET"]["downloaded"] == 0
     assert result["iterations"][1]["scrapers"]["BAREKET"]["saw_not_downloaded"] == [
-        {"file_name": "Price2", "error": "not downloaded"},
-        {"file_name": "Price3", "error": "not downloaded"},
+        {
+            "file_name": "Price2",
+            "reason": "skipped_by_filter",
+            "error": "not selected for download (filtered before collection)",
+        },
+        {
+            "file_name": "Price3",
+            "reason": "skipped_by_filter",
+            "error": "not selected for download (filtered before collection)",
+        },
     ]
     assert result["iterations"][1]["scrapers_with_no_data"] == 1
 

@@ -22,9 +22,11 @@ from il_supermarket_scarper import (
     ScraperStatusOutput,
 )
 from il_supermarket_scarper.utils.scraper_status_contract import (
+    CollectedStatus,
     DownloadedStatus,
     FailedStatus,
     SawStatus,
+    StartedStatus,
 )
 
 from utils import Logger, now
@@ -120,6 +122,52 @@ def _scraper_downloaded_files(status: ScraperStatusOutput, task_id: str) -> Set[
     return downloaded
 
 
+def _task_started_limit_scraper(
+    status: ScraperStatusOutput, task_id: str
+) -> Optional[int]:
+    for event in status.global_status:
+        if event.task_id == task_id and isinstance(event, StartedStatus):
+            return event.limit
+    return None
+
+
+def _scraper_file_lifecycle(
+    status: ScraperStatusOutput, task_id: str
+) -> Dict[str, Dict[str, Any]]:
+    """Per-file flags and saw metadata for one scraper task."""
+    lifecycle: Dict[str, Dict[str, Any]] = defaultdict(
+        lambda: {
+            "saw": False,
+            "collected": False,
+            "downloaded_ok": False,
+            "link": None,
+        }
+    )
+
+    for event in status.events:
+        if event.task_id != task_id:
+            continue
+        if isinstance(event, SawStatus):
+            file_name = normalize_filename(event.file_name)
+            lifecycle[file_name]["saw"] = True
+            if event.link is not None:
+                lifecycle[file_name]["link"] = str(event.link)
+        elif isinstance(event, CollectedStatus):
+            file_name = normalize_filename(event.file_name)
+            lifecycle[file_name]["collected"] = True
+        elif isinstance(event, DownloadedStatus):
+            file_name = normalize_filename(event.file_name)
+            if event.downloaded_successfully and event.extracted_successfully:
+                lifecycle[file_name]["downloaded_ok"] = True
+
+    for verified in status.verified_downloads:
+        if verified.task_id != task_id:
+            continue
+        lifecycle[normalize_filename(verified.file_name)]["downloaded_ok"] = True
+
+    return lifecycle
+
+
 def _scraper_download_errors(
     status: ScraperStatusOutput, task_id: str
 ) -> Dict[str, str]:
@@ -141,19 +189,71 @@ def _scraper_download_errors(
     return errors
 
 
+def _explain_saw_not_downloaded_entry(
+    file_name: str,
+    lifecycle: Dict[str, Dict[str, Any]],
+    download_errors: Dict[str, str],
+    limit: Optional[int],
+    saw_count: int,
+    downloaded_count: int,
+) -> Dict[str, Any]:
+    file_state = lifecycle.get(
+        file_name,
+        {"saw": False, "collected": False, "downloaded_ok": False, "link": None},
+    )
+    entry: Dict[str, Any] = {"file_name": file_name}
+
+    if file_state.get("link"):
+        entry["link"] = file_state["link"]
+
+    if file_name in download_errors:
+        entry["reason"] = "download_failed"
+        entry["error"] = download_errors[file_name]
+        return entry
+
+    if file_state.get("collected") and not file_state.get("downloaded_ok"):
+        entry["reason"] = "download_failed"
+        entry["error"] = "collected but not downloaded"
+        return entry
+
+    if (
+        not file_state.get("collected")
+        and limit is not None
+        and limit > 0
+        and downloaded_count >= limit
+        and saw_count > downloaded_count
+    ):
+        entry["reason"] = "skipped_by_limit"
+        entry["error"] = (
+            f"not selected for download (limit={limit}, "
+            f"{downloaded_count}/{saw_count} files downloaded)"
+        )
+        return entry
+
+    entry["reason"] = "skipped_by_filter"
+    entry["error"] = "not selected for download (filtered before collection)"
+    return entry
+
+
 def _scraper_saw_not_downloaded(
     status: ScraperStatusOutput, task_id: str
-) -> List[Dict[str, str]]:
+) -> List[Dict[str, Any]]:
     saw_files = _scraper_saw_files(status, task_id)
     downloaded_files = _scraper_downloaded_files(status, task_id)
     download_errors = _scraper_download_errors(status, task_id)
+    lifecycle = _scraper_file_lifecycle(status, task_id)
+    limit = _task_started_limit_scraper(status, task_id)
 
     not_downloaded = sorted(saw_files - downloaded_files)
     return [
-        {
-            "file_name": file_name,
-            "error": download_errors.get(file_name, "not downloaded"),
-        }
+        _explain_saw_not_downloaded_entry(
+            file_name,
+            lifecycle,
+            download_errors,
+            limit,
+            len(saw_files),
+            len(downloaded_files),
+        )
         for file_name in not_downloaded
     ]
 
