@@ -7,7 +7,7 @@
 #   - parsers release: published (covers scraper-sync releases)
 #   - parsers sync issue closed (covers "no new version needed" sync outcomes)
 #
-# Env: GH_TOKEN with repo access to scrapers, parsers, and this repo.
+# Env: GH_TOKEN (App installation token or PAT) with access to scrapers, parsers, and this repo.
 set -euo pipefail
 
 SCRAPERS_REPO="${SCRAPERS_REPO:-OpenIsraeliSupermarkets/israeli-supermarket-scarpers}"
