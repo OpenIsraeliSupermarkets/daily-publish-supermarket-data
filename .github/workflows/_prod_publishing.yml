@@ -5,7 +5,7 @@ name: Production | Publishing
 
 on: 
   schedule:
-    - cron: '00 21 * * *'
+    - cron: '17 21 * * *'
   workflow_dispatch:
     
 jobs:

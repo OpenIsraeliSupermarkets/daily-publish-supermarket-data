@@ -3,7 +3,7 @@ name: Production | Clean Docker
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 0 * * 0'  # Run weekly at midnight on Sunday
+    - cron: '17 0 * * 0'  # Run weekly at midnight on Sunday
 
 jobs:
   clean:
