@@ -31,6 +31,7 @@ from managers.quality_indicators import (  # noqa: E402
     PIPELINE_HEALTH_FILENAME,
     SCRAPER_QUALITY_FILENAME,
     compute_improvement_priorities,
+    enrich_issue_candidates_with_filename_patterns,
     select_quality_issue_candidates,
 )
 
@@ -99,6 +100,9 @@ def build_issue_plan(
     candidates = select_quality_issue_candidates(
         improvements, parse_min_files=parse_min_files
     )
+    enrich_issue_candidates_with_filename_patterns(
+        candidates, scraper_quality, parser_quality
+    )
     return {
         "dataset": KAGGLE_DATASET_HANDLE,
         "kaggle_page": KAGGLE_DATASET_PAGE,
@@ -114,50 +118,212 @@ def _fingerprint_marker(fingerprint: str) -> str:
     return f"<!-- quality-fingerprint: {fingerprint} | {digest} -->"
 
 
+def _format_started_events(item: Dict[str, Any]) -> List[str]:
+    events = item.get("run_parameters") or []
+    lines: List[str] = []
+    if not events:
+        lines.append("_No `global_status` started event was present in the status JSON._")
+        lines.append("")
+        return lines
+    for index, group in enumerate(events, start=1):
+        started = group.get("started") or group.get("parameters") or {}
+        header = (
+            "### Started event"
+            if len(events) == 1
+            else f"### Started event {index}"
+        )
+        if group.get("parser_key"):
+            header += f" (`{group['parser_key']}`)"
+        lines.append(header)
+        lines.append("")
+        if started:
+            lines.append("```json")
+            lines.append(json.dumps(started, indent=2, ensure_ascii=False, default=str))
+            lines.append("```")
+        else:
+            lines.append("_Started event was empty._")
+        lines.append("")
+    return lines
+
+
+def _format_filename_patterns(
+    patterns: Optional[List[Dict[str, Any]]],
+    heading: str,
+    intro: str,
+) -> List[str]:
+    lines = [heading, "", intro, ""]
+    if not patterns:
+        lines.append("_No filenames were recorded for this._")
+        lines.append("")
+        return lines
+    for row in patterns:
+        lines.append(f"- `{row.get('pattern')}` ({row.get('count', 0)} files)")
+        for example in row.get("examples") or []:
+            lines.append(f"  - `{example}`")
+        lines.append("")
+    return lines
+
+
+def _issue_title(item: Dict[str, Any]) -> str:
+    chain = item.get("chain") or "unknown"
+    patterns = item.get("filename_patterns") or []
+    top = patterns[0]["pattern"] if patterns else None
+    extra = f" and {len(patterns) - 1} more" if len(patterns) > 1 else ""
+    issue = item.get("issue")
+    if issue == "download_failures":
+        name = top or "requested dumps"
+        return f"[scrape] {chain}: {name}{extra} failed to download"[:240]
+    if issue == "saw_but_not_downloaded":
+        name = top or "listed dumps"
+        return f"[scrape] {chain}: saw {name}{extra} but did not download"[:240]
+    if issue == "no_data":
+        return f"[scrape] {chain}: scrape returned no files"[:240]
+    not_parsed = item.get("not_parsed_count") or 0
+    zero_rows = item.get("zero_record_count") or 0
+    name = top or "downloaded dumps"
+    if not_parsed >= zero_rows:
+        return f"[parse] {chain}: {name}{extra} not picked up for parsing"[:240]
+    return f"[parse] {chain}: {name}{extra} parsed with zero rows"[:240]
+
+
+def _scrape_result_sentence(item: Dict[str, Any]) -> str:
+    issue = item.get("issue")
+    count = item.get("problem_file_count") or item.get("download_failed") or 0
+    if issue == "download_failures":
+        return (
+            f"download or extraction failed for {count} files. "
+            "The scraper saw them, but they did not land on disk."
+        )
+    if issue == "saw_but_not_downloaded":
+        return (
+            f"the latest run saw {item.get('latest_saw')} files and downloaded "
+            f"{item.get('latest_downloaded')}. The files below never came down."
+        )
+    if issue == "no_data":
+        return "no files were downloaded in any run."
+    return item.get("why") or "the scrape result was incomplete."
+
+
+def _scrape_not_ok_sentence(item: Dict[str, Any]) -> str:
+    started = ((item.get("run_parameters") or [{}])[0].get("started") or {})
+    requested = [value for value in (started.get("files_requested") or []) if value]
+    if requested:
+        types = ", ".join(f"`{value}`" for value in requested)
+        return (
+            f"This scrape requested {types}. Files matching the patterns below "
+            "are in that request and should have been downloaded and extracted."
+        )
+    return (
+        "A scrape of this site with those parameters should download the dumps it "
+        "saw for the requested file types. Leaving them failed or uncollected is a "
+        "scraper bug."
+    )
+
+
+def _parse_not_ok_sentence() -> str:
+    return (
+        "Those files were already downloaded for this site. The parser should pick "
+        "them up and emit rows. Skipping them or writing zero rows is a parser bug."
+    )
+
+
 def _scrape_issue_body(plan: Dict[str, Any], item: Dict[str, Any]) -> str:
     marker = _fingerprint_marker(item["fingerprint"])
-    return f"""{marker}
-
-Quality gap from published Kaggle JSON (not the full dataset).
-
-- Dataset: [{KAGGLE_DATASET_HANDLE}]({KAGGLE_DATASET_PAGE}?select={SCRAPER_QUALITY_FILENAME})
-- Computed at: `{plan.get("computed_at")}`
-- Chain folder: `{item.get("chain")}` (enum `{item.get("enum")}`)
-- Issue: `{item.get("issue")}`
-- Why: {item.get("why")}
-- Latest saw/downloaded: {item.get("latest_saw")}/{item.get("latest_downloaded")}
-- Download failures: {item.get("download_failed")}
-- No-data iterations: {item.get("no_data_iterations")}/{item.get("iterations")}
-
-Do not download chain zips or CSVs to triage this. Use `scraper_quality.json` / `pipeline_health.json` only.
-"""
+    chain = item.get("chain")
+    enum = item.get("enum")
+    result = _scrape_result_sentence(item)
+    lines = [
+        marker,
+        "",
+        f"When I scrape `{chain}` (`{enum}`) with the parameters below, {result}",
+        "",
+        _scrape_not_ok_sentence(item),
+        "",
+        "## Parameters I scraped with",
+        "",
+        "Full `global_status` `started` event from the scraper status JSON.",
+        "",
+    ]
+    lines.extend(_format_started_events(item))
+    lines.extend(
+        _format_filename_patterns(
+            item.get("filename_patterns"),
+            "## Files I saw that did not come down correctly",
+            "Treat files matching these patterns as in-scope.",
+        )
+    )
+    errors = item.get("sample_errors") or []
+    if errors:
+        lines.extend(["## Errors I got", ""])
+        for error in errors:
+            lines.append(f"- `{error}`")
+        lines.append("")
+    lines.extend(
+        [
+            "## Evidence",
+            "",
+            f"- Dataset: [{KAGGLE_DATASET_HANDLE}]({KAGGLE_DATASET_PAGE}?select={SCRAPER_QUALITY_FILENAME})",
+            f"- Computed at: `{plan.get('computed_at')}`",
+            f"- Latest saw/downloaded: {item.get('latest_saw')}/{item.get('latest_downloaded')}",
+            "",
+            "Do not download chain zips or CSVs to triage this. Use `scraper_quality.json` only.",
+        ]
+    )
+    return "\n".join(lines)
 
 
 def _parse_issue_body(plan: Dict[str, Any], item: Dict[str, Any]) -> str:
     marker = _fingerprint_marker(item["fingerprint"])
+    chain = item.get("chain")
+    enum = item.get("enum")
+    not_parsed = item.get("not_parsed_count") or 0
+    zero_rows = item.get("zero_record_count") or 0
+    result_bits = []
+    if not_parsed:
+        result_bits.append(
+            f"{not_parsed} downloaded files were never picked up for parsing"
+        )
+    if zero_rows:
+        result_bits.append(f"{zero_rows} files parsed with zero rows")
+    result = "; ".join(result_bits) or "parsing did not produce usable records"
     lines = [
         marker,
         "",
-        "Quality gap from published Kaggle JSON (not the full dataset).",
+        f"When I parse `{chain}` (`{enum}`) with the parameters below, {result}.",
         "",
-        f"- Dataset: [{KAGGLE_DATASET_HANDLE}]({KAGGLE_DATASET_PAGE}?select={PARSER_QUALITY_FILENAME})",
-        f"- Computed at: `{plan.get('computed_at')}`",
-        f"- Chain folder: `{item.get('chain')}` (enum `{item.get('enum')}`)",
-        f"- Total problem files: {item.get('total_files')}",
+        _parse_not_ok_sentence(),
         "",
-        "### By file type",
+        "## Parameters I parsed with",
+        "",
+        "Full `global_status` `started` event from the parser status JSON.",
         "",
     ]
-    for row in item.get("by_file_type") or []:
-        lines.append(
-            f"- `{row.get('file_type')}`: {row.get('downloaded_not_parsed', 0)} "
-            f"downloaded-not-parsed, {row.get('zero_records', 0)} zero-record "
-            f"({row.get('why')})"
+    lines.extend(_format_started_events(item))
+    if item.get("not_parsed_patterns"):
+        lines.extend(
+            _format_filename_patterns(
+                item.get("not_parsed_patterns"),
+                "## Files not picked up for parsing",
+                "These dumps were downloaded for this site but never parsed.",
+            )
+        )
+    if item.get("zero_record_patterns"):
+        lines.extend(
+            _format_filename_patterns(
+                item.get("zero_record_patterns"),
+                "## Files that parsed with zero rows",
+                "These dumps were parsed but produced no records.",
+            )
         )
     lines.extend(
         [
+            "## Evidence",
             "",
-            "Do not download chain zips or CSVs to triage this. Use `parser_quality.json` / `pipeline_health.json` only.",
+            f"- Dataset: [{KAGGLE_DATASET_HANDLE}]({KAGGLE_DATASET_PAGE}?select={PARSER_QUALITY_FILENAME})",
+            f"- Computed at: `{plan.get('computed_at')}`",
+            f"- Total files: {item.get('total_files')}",
+            "",
+            "Do not download chain zips or CSVs to triage this. Use `parser_quality.json` only.",
         ]
     )
     return "\n".join(lines)
@@ -175,6 +341,8 @@ def _find_open_issue(repo: str, marker: str) -> Optional[int]:
             "open",
             "--label",
             "automation",
+            "--limit",
+            "100",
             "--json",
             "number,body",
         ],
@@ -213,7 +381,7 @@ def _ensure_labels(repo: str) -> None:
         )
 
 
-def _create_or_comment(
+def _create_or_update(
     repo: str,
     title: str,
     body: str,
@@ -222,22 +390,33 @@ def _create_or_comment(
 ) -> str:
     existing = _find_open_issue(repo, marker)
     if existing is not None:
-        comment = f"Recurrence from latest Kaggle quality JSON.\n\n{body}"
         if dry_run:
-            return f"dry-run comment #{existing} on {repo}"
-        subprocess.run(
-            [
-                "gh",
-                "issue",
-                "comment",
-                str(existing),
-                "--repo",
-                repo,
-                "--body",
-                comment,
-            ],
-            check=True,
-        )
+            return f"dry-run update #{existing} on {repo}: {title}"
+        with tempfile.NamedTemporaryFile(
+            "w", encoding="utf-8", suffix=".md", delete=False
+        ) as handle:
+            handle.write(body)
+            body_path = handle.name
+        try:
+            subprocess.run(
+                [
+                    "gh",
+                    "issue",
+                    "edit",
+                    str(existing),
+                    "--repo",
+                    repo,
+                    "--title",
+                    title,
+                    "--body-file",
+                    body_path,
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        finally:
+            os.unlink(body_path)
         return f"https://github.com/{repo}/issues/{existing}"
 
     if dry_run:
@@ -262,8 +441,6 @@ def _create_or_comment(
                 "--label",
                 "automation",
                 "--label",
-                "quality",
-                "--label",
                 "bug",
             ],
             check=True,
@@ -278,30 +455,24 @@ def _create_or_comment(
 def apply_issue_plan(plan: Dict[str, Any], dry_run: bool = False) -> List[str]:
     urls: List[str] = []
     for item in plan["candidates"]["scraping"]:
-        title = (
-            f"[quality] {item['chain']}: {item['issue']} "
-            f"({item.get('why', 'scrape gap')})"
-        )
+        title = _issue_title(item)
         body = _scrape_issue_body(plan, item)
         urls.append(
-            _create_or_comment(
+            _create_or_update(
                 item["repo"],
-                title[:240],
+                title,
                 body,
                 _fingerprint_marker(item["fingerprint"]),
                 dry_run,
             )
         )
     for item in plan["candidates"]["parsing"]:
-        title = (
-            f"[quality] {item['chain']}: {item['total_files']} files "
-            "failed parse quality"
-        )
+        title = _issue_title(item)
         body = _parse_issue_body(plan, item)
         urls.append(
-            _create_or_comment(
+            _create_or_update(
                 item["repo"],
-                title[:240],
+                title,
                 body,
                 _fingerprint_marker(item["fingerprint"]),
                 dry_run,

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
@@ -64,6 +65,88 @@ def normalize_filename(file_name: str) -> str:
         .replace(".gz", "")
         .replace("NULL", "")
     )
+
+
+_DUMP_FILENAME_RE = re.compile(
+    r"^(?P<kind>PriceFull|PromoFull|Price|Promo|Stores)"
+    r"(?P<chain>\d+)"
+    r"(?:-(?P<rest>.*))?$",
+    re.IGNORECASE,
+)
+
+
+def generalize_filename_patterns(
+    filenames: Iterable[str],
+    example_limit: int = 5,
+) -> List[Dict[str, Any]]:
+    """Collapse dump filenames into joined patterns plus example names.
+
+    Israeli dump names look like ``Price7290027600007-006-611-20260831-220000``.
+    Constant hyphen fields stay literal; varying fields become ``*``.
+    """
+    grouped: Dict[Tuple[str, str, int], List[Tuple[str, str, List[str]]]] = defaultdict(
+        list
+    )
+    leftovers: List[str] = []
+    seen: Set[str] = set()
+    ordered: List[str] = []
+    for raw in filenames:
+        if not raw:
+            continue
+        name = normalize_filename(str(raw))
+        if name in seen:
+            continue
+        seen.add(name)
+        ordered.append(name)
+
+    for name in ordered:
+        match = _DUMP_FILENAME_RE.match(name)
+        if not match:
+            leftovers.append(name)
+            continue
+        kind = match.group("kind")
+        chain = match.group("chain")
+        rest = match.group("rest") or ""
+        parts = rest.split("-") if rest else []
+        grouped[(kind.lower(), chain, len(parts))].append((name, kind, parts))
+
+    patterns: List[Dict[str, Any]] = []
+    for (_kind_key, chain, n_parts), rows in grouped.items():
+        kind = rows[0][1]
+        if n_parts == 0:
+            pattern = f"{kind}{chain}"
+        else:
+            columns = list(zip(*(row[2] for row in rows)))
+            tokens = [
+                column[0] if len(set(column)) == 1 else "*" for column in columns
+            ]
+            pattern = f"{kind}{chain}-" + "-".join(tokens)
+        patterns.append(
+            {
+                "pattern": pattern,
+                "count": len(rows),
+                "examples": [row[0] for row in rows[:example_limit]],
+            }
+        )
+
+    if leftovers:
+        prefix = os.path.commonprefix(leftovers)
+        if len(leftovers) == 1:
+            leftover_pattern = leftovers[0]
+        elif len(prefix) >= 8:
+            leftover_pattern = f"{prefix}*"
+        else:
+            leftover_pattern = "*"
+        patterns.append(
+            {
+                "pattern": leftover_pattern,
+                "count": len(leftovers),
+                "examples": leftovers[:example_limit],
+            }
+        )
+
+    patterns.sort(key=lambda item: (-item["count"], item["pattern"]))
+    return patterns
 
 
 def _load_status_json(path: str) -> Optional[dict]:
@@ -131,6 +214,25 @@ def _scraper_downloaded_files(status: ScraperStatusOutput, task_id: str) -> Set[
         if event.downloaded_successfully and event.extracted_successfully:
             downloaded.add(normalize_filename(event.file_name))
     return downloaded
+
+
+def _started_global_status_from_raw(
+    raw: Optional[Dict[str, Any]],
+    task_id: str,
+) -> List[Dict[str, Any]]:
+    """Copy `status: started` objects from a status JSON `global_status` array."""
+    if not raw:
+        return []
+    started: List[Dict[str, Any]] = []
+    for event in raw.get("global_status") or []:
+        if not isinstance(event, dict):
+            continue
+        if event.get("task_id") != task_id:
+            continue
+        if event.get("status") != "started":
+            continue
+        started.append(dict(event))
+    return started
 
 
 def _task_started_limit_scraper(
@@ -351,6 +453,7 @@ def compute_scraper_quality(
 ) -> Dict[str, Any]:
     """Build scraper quality snapshots grouped by DAG iteration (time cluster)."""
     scraper_status: Dict[str, ScraperStatusOutput] = {}
+    scraper_raw: Dict[str, Dict[str, Any]] = {}
     scraper_runs: List[Tuple[datetime, str, str]] = []
 
     for scraper in enabled_scrapers:
@@ -364,6 +467,7 @@ def compute_scraper_quality(
 
         status = ScraperStatusOutput(**raw)
         scraper_status[scraper] = status
+        scraper_raw[scraper] = raw
         for task_id in _task_ids_from_scraper(status):
             started_at = _task_started_at_scraper(status, task_id)
             if started_at is not None:
@@ -383,6 +487,7 @@ def compute_scraper_quality(
                     "downloaded": 0,
                     "no_data": True,
                     "saw_not_downloaded": [],
+                    "global_status": [],
                 }
                 continue
 
@@ -395,6 +500,9 @@ def compute_scraper_quality(
                 "downloaded": len(downloaded_files),
                 "no_data": len(downloaded_files) == 0,
                 "saw_not_downloaded": _scraper_saw_not_downloaded(status, task_id),
+                "global_status": _started_global_status_from_raw(
+                    scraper_raw.get(scraper), task_id
+                ),
             }
 
         iterations.append(
@@ -433,6 +541,7 @@ def compute_parser_quality(
             scraper_status_by_chain[scraper] = ScraperStatusOutput(**raw)
 
     parser_status: Dict[str, ParserStatusOutput] = {}
+    parser_raw: Dict[str, Dict[str, Any]] = {}
     parser_runs: List[Tuple[datetime, str, str]] = []
     parser_key_parts: Dict[str, Tuple[str, str]] = {}
 
@@ -449,6 +558,7 @@ def compute_parser_quality(
 
             status = ParserStatusOutput(**raw)
             parser_status[parser_key] = status
+            parser_raw[parser_key] = raw
             for task_id in _task_ids_from_parser(status):
                 started_at = _task_started_at_parser(status, task_id)
                 if started_at is not None:
@@ -457,7 +567,7 @@ def compute_parser_quality(
     iterations: List[Dict[str, Any]] = []
     for cluster in _cluster_runs_by_time(parser_runs):
         started_at = min(run[0] for run in cluster)
-        parsers_metrics: Dict[str, Dict[str, List[str]]] = {}
+        parsers_metrics: Dict[str, Dict[str, Any]] = {}
 
         for parser_key, (scraper, file_type) in parser_key_parts.items():
             task_id = _pick_task_for_cluster(cluster, parser_key)
@@ -481,6 +591,7 @@ def compute_parser_quality(
                         best_delta = delta
 
             parsers_metrics[parser_key] = {
+                "task_id": task_id,
                 "zero_record_files": _parser_zero_record_file_names(status, task_id),
                 "downloaded_not_parsed": _parser_downloaded_not_parsed_file_names(
                     status,
@@ -488,6 +599,9 @@ def compute_parser_quality(
                     scraper_status,
                     scraper_task_id,
                     file_type,
+                ),
+                "global_status": _started_global_status_from_raw(
+                    parser_raw.get(parser_key), task_id
                 ),
             }
 
@@ -712,6 +826,279 @@ def select_quality_issue_candidates(
         scraping_out.append(row)
 
     return {"scraping": scraping_out, "parsing": parsing}
+
+
+def collect_scrape_problem_filenames(
+    scraper_quality: Dict[str, Any],
+    scraper_enum: str,
+    issue: str,
+) -> List[str]:
+    """Filenames that belong on a scrape ticket for one chain."""
+    names: List[str] = []
+    iterations = scraper_quality.get("iterations") or []
+    if issue == "download_failures":
+        for iteration in iterations:
+            metrics = (iteration.get("scrapers") or {}).get(scraper_enum) or {}
+            for entry in metrics.get("saw_not_downloaded") or []:
+                if not isinstance(entry, dict):
+                    continue
+                if entry.get("reason") != "download_failed":
+                    continue
+                file_name = entry.get("file_name")
+                if file_name:
+                    names.append(normalize_filename(file_name))
+    elif issue in {"saw_but_not_downloaded", "no_data"} and iterations:
+        metrics = (iterations[-1].get("scrapers") or {}).get(scraper_enum) or {}
+        for entry in metrics.get("saw_not_downloaded") or []:
+            if not isinstance(entry, dict):
+                continue
+            if entry.get("reason") == "skipped_by_limit":
+                continue
+            file_name = entry.get("file_name")
+            if file_name:
+                names.append(normalize_filename(file_name))
+    return list(dict.fromkeys(names))
+
+
+def collect_scrape_sample_errors(
+    scraper_quality: Dict[str, Any],
+    scraper_enum: str,
+    issue: str,
+    limit: int = 5,
+) -> List[str]:
+    """Distinct download/error messages for the scrape ticket."""
+    errors: List[str] = []
+    seen: Set[str] = set()
+    iterations = scraper_quality.get("iterations") or []
+    scan = iterations if issue == "download_failures" else iterations[-1:]
+    for iteration in scan:
+        metrics = (iteration.get("scrapers") or {}).get(scraper_enum) or {}
+        for entry in metrics.get("saw_not_downloaded") or []:
+            if not isinstance(entry, dict):
+                continue
+            if issue == "download_failures" and entry.get("reason") != "download_failed":
+                continue
+            if entry.get("reason") == "skipped_by_limit":
+                continue
+            message = entry.get("error")
+            if not message or message in seen:
+                continue
+            seen.add(message)
+            errors.append(message)
+            if len(errors) >= limit:
+                return errors
+    return errors
+
+
+def collect_parse_problem_filenames(
+    parser_quality: Dict[str, Any],
+    chain: str,
+    file_type: Optional[str] = None,
+    kind: Optional[str] = None,
+) -> List[str]:
+    """Unparsed and/or zero-record filenames for one dump-folder chain.
+
+    kind: ``downloaded_not_parsed``, ``zero_records``, or None for both.
+    """
+    names: List[str] = []
+    for iteration in parser_quality.get("iterations") or []:
+        for parser_key, metrics in (iteration.get("parsers") or {}).items():
+            scraper, parsed_type = _split_parser_key(parser_key)
+            if _dump_stem(scraper) != chain:
+                continue
+            if file_type and parsed_type != file_type:
+                continue
+            if kind in (None, "downloaded_not_parsed"):
+                names.extend(metrics.get("downloaded_not_parsed") or [])
+            if kind in (None, "zero_records"):
+                names.extend(metrics.get("zero_record_files") or [])
+    return list(dict.fromkeys(normalize_filename(name) for name in names if name))
+
+
+SCRAPER_STARTED_FIELD_ORDER = (
+    "status",
+    "system_timestamp",
+    "task_id",
+    "limit",
+    "files_requested",
+    "store_id",
+    "files_names_to_scrape",
+    "when_date",
+    "filter_null",
+    "filter_zero",
+)
+PARSER_STARTED_FIELD_ORDER = (
+    "status",
+    "system_timestamp",
+    "limit",
+    "scraper",
+    "files_types",
+    "task_id",
+)
+
+
+def _started_events_from_metrics(metrics: Dict[str, Any]) -> List[Dict[str, Any]]:
+    raw = metrics.get("global_status")
+    events: List[Dict[str, Any]] = []
+    if isinstance(raw, list):
+        events = [event for event in raw if isinstance(event, dict)]
+    elif isinstance(raw, dict):
+        events = [raw]
+    elif isinstance(metrics.get("parameters"), dict):
+        events = [{"status": "started", **metrics["parameters"]}]
+    started = [
+        event
+        for event in events
+        if event.get("status") in (None, "started")
+    ]
+    return started or events
+
+
+def _ordered_started_event(
+    event: Dict[str, Any],
+    field_order: Tuple[str, ...],
+) -> Dict[str, Any]:
+    """Keep every started-event field, in the status-JSON key order."""
+    ordered: Dict[str, Any] = {}
+    payload = dict(event)
+    if payload.get("status") is None:
+        payload["status"] = "started"
+    for key in field_order:
+        ordered[key] = payload.get(key)
+    for key, value in payload.items():
+        if key not in ordered:
+            ordered[key] = value
+    return ordered
+
+
+def collect_scrape_run_parameters(
+    scraper_quality: Dict[str, Any],
+    scraper_enum: str,
+) -> List[Dict[str, Any]]:
+    """Every `global_status` started event for one scraper."""
+    started_events: List[Dict[str, Any]] = []
+    for iteration in scraper_quality.get("iterations") or []:
+        metrics = (iteration.get("scrapers") or {}).get(scraper_enum) or {}
+        events = _started_events_from_metrics(metrics)
+        if events:
+            for event in events:
+                started_events.append(
+                    {
+                        "started": _ordered_started_event(
+                            event, SCRAPER_STARTED_FIELD_ORDER
+                        )
+                    }
+                )
+            continue
+        if metrics.get("task_id"):
+            started_events.append(
+                {
+                    "started": _ordered_started_event(
+                        {
+                            "status": "started",
+                            "system_timestamp": iteration.get("started_at"),
+                            "task_id": metrics.get("task_id"),
+                        },
+                        SCRAPER_STARTED_FIELD_ORDER,
+                    )
+                }
+            )
+    return started_events
+
+
+def collect_parse_run_parameters(
+    parser_quality: Dict[str, Any],
+    chain: str,
+) -> List[Dict[str, Any]]:
+    """Every `global_status` started event for one chain's parsers."""
+    started_events: List[Dict[str, Any]] = []
+    for iteration in parser_quality.get("iterations") or []:
+        for parser_key, metrics in (iteration.get("parsers") or {}).items():
+            scraper, file_type = _split_parser_key(parser_key)
+            if _dump_stem(scraper) != chain:
+                continue
+            events = _started_events_from_metrics(metrics)
+            if events:
+                for event in events:
+                    started_events.append(
+                        {
+                            "started": _ordered_started_event(
+                                event, PARSER_STARTED_FIELD_ORDER
+                            ),
+                            "parser_key": parser_key,
+                        }
+                    )
+                continue
+            started_events.append(
+                {
+                    "started": _ordered_started_event(
+                        {
+                            "status": "started",
+                            "system_timestamp": iteration.get("started_at"),
+                            "task_id": metrics.get("task_id"),
+                            "scraper": scraper,
+                            "files_types": file_type,
+                        },
+                        PARSER_STARTED_FIELD_ORDER,
+                    ),
+                    "parser_key": parser_key,
+                }
+            )
+    return started_events
+
+
+def enrich_issue_candidates_with_filename_patterns(
+    candidates: Dict[str, List[Dict[str, Any]]],
+    scraper_quality: Dict[str, Any],
+    parser_quality: Dict[str, Any],
+    example_limit: int = 5,
+) -> Dict[str, List[Dict[str, Any]]]:
+    """Attach generalized filename patterns to scrape/parse issue candidates."""
+    for item in candidates.get("scraping") or []:
+        names = collect_scrape_problem_filenames(
+            scraper_quality, item.get("enum", ""), item.get("issue", "")
+        )
+        item["filename_patterns"] = generalize_filename_patterns(
+            names, example_limit=example_limit
+        )
+        item["problem_file_count"] = len(names)
+        item["sample_errors"] = collect_scrape_sample_errors(
+            scraper_quality, item.get("enum", ""), item.get("issue", "")
+        )
+        item["run_parameters"] = collect_scrape_run_parameters(
+            scraper_quality, item.get("enum", "")
+        )
+    for item in candidates.get("parsing") or []:
+        names = collect_parse_problem_filenames(parser_quality, item.get("chain", ""))
+        not_parsed = collect_parse_problem_filenames(
+            parser_quality, item.get("chain", ""), kind="downloaded_not_parsed"
+        )
+        zero_rows = collect_parse_problem_filenames(
+            parser_quality, item.get("chain", ""), kind="zero_records"
+        )
+        item["filename_patterns"] = generalize_filename_patterns(
+            names, example_limit=example_limit
+        )
+        item["not_parsed_patterns"] = generalize_filename_patterns(
+            not_parsed, example_limit=example_limit
+        )
+        item["zero_record_patterns"] = generalize_filename_patterns(
+            zero_rows, example_limit=example_limit
+        )
+        item["problem_file_count"] = len(names)
+        item["not_parsed_count"] = len(not_parsed)
+        item["zero_record_count"] = len(zero_rows)
+        for row in item.get("by_file_type") or []:
+            typed = collect_parse_problem_filenames(
+                parser_quality, item.get("chain", ""), row.get("file_type")
+            )
+            row["filename_patterns"] = generalize_filename_patterns(
+                typed, example_limit=example_limit
+            )
+        item["run_parameters"] = collect_parse_run_parameters(
+            parser_quality, item.get("chain", "")
+        )
+    return candidates
 
 
 def _load_health_thresholds() -> Dict[str, float]:

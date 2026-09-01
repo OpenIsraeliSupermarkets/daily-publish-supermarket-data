@@ -11,10 +11,15 @@ from managers.quality_indicators import (
     PARSER_QUALITY_FILENAME,
     PIPELINE_HEALTH_FILENAME,
     SCRAPER_QUALITY_FILENAME,
+    collect_parse_problem_filenames,
+    collect_parse_run_parameters,
+    collect_scrape_problem_filenames,
+    collect_scrape_run_parameters,
     compute_improvement_priorities,
     compute_parser_quality,
     compute_pipeline_health,
     compute_scraper_quality,
+    generalize_filename_patterns,
     select_quality_issue_candidates,
     write_quality_indicators,
 )
@@ -34,6 +39,8 @@ def _scraper_status(
     failed_downloads: list[tuple[str, str]] | None = None,
     limit: int | None = None,
     saw_links: dict[str, str] | None = None,
+    files_requested: list[str] | None = None,
+    when_date: datetime | None = None,
 ) -> dict:
     saw_links = saw_links or {}
     events = [
@@ -88,6 +95,10 @@ def _scraper_status(
                 "status": "started",
                 "system_timestamp": started_at.isoformat(),
                 "limit": limit,
+                "files_requested": files_requested,
+                "when_date": when_date.isoformat() if when_date else None,
+                "filter_null": False,
+                "filter_zero": False,
             }
         ],
         "events": events,
@@ -189,6 +200,13 @@ def test_compute_scraper_quality_counts_saw_and_downloaded(status_dirs):
             saw_files=["Price123.xml", "Price456.xml", "Promo789.xml"],
             downloaded_files=["Price123.xml"],
             failed_downloads=[("Price456.xml", "timeout")],
+            files_requested=[
+                "PROMO_FILE",
+                "STORE_FILE",
+                "PRICE_FILE",
+                "PROMO_FULL_FILE",
+                "PRICE_FULL_FILE",
+            ],
         ),
     )
 
@@ -215,6 +233,17 @@ def test_compute_scraper_quality_counts_saw_and_downloaded(status_dirs):
     assert iteration["scrapers"]["WOLT"]["no_data"] is True
     assert iteration["scrapers"]["WOLT"]["saw_not_downloaded"] == []
     assert iteration["scrapers_with_no_data"] == 1
+    started = bareket["global_status"][0]
+    assert started["status"] == "started"
+    assert started["limit"] is None
+    assert started["files_requested"] == [
+        "PROMO_FILE",
+        "STORE_FILE",
+        "PRICE_FILE",
+        "PROMO_FULL_FILE",
+        "PRICE_FULL_FILE",
+    ]
+    assert started["filter_null"] is False
 
 
 def test_compute_scraper_quality_skipped_by_limit(status_dirs):
@@ -245,6 +274,7 @@ def test_compute_scraper_quality_skipped_by_limit(status_dirs):
             "error": "not selected for download (limit=1, 1/2 files downloaded)",
         }
     ]
+    assert result["iterations"][0]["scrapers"]["BAREKET"]["global_status"][0]["limit"] == 1
 
 
 def test_compute_scraper_quality_two_iterations(status_dirs):
@@ -345,6 +375,10 @@ def test_compute_parser_quality_zero_records_and_not_parsed(status_dirs):
     parser_metrics = result["iterations"][0]["parsers"]["bareket_price_file"]
     assert parser_metrics["zero_record_files"] == ["Price123"]
     assert parser_metrics["downloaded_not_parsed"] == ["Price456"]
+    assert parser_metrics["task_id"] == "parse-task-1"
+    assert parser_metrics["global_status"][0]["status"] == "started"
+    assert parser_metrics["global_status"][0]["scraper"] == "BAREKET"
+    assert parser_metrics["global_status"][0]["files_types"] == "PRICE_FILE"
 
 
 def test_compute_pipeline_health_flags_unhealthy_parser():
@@ -578,6 +612,197 @@ def test_select_quality_issue_candidates_groups_parsers_and_skips_small_gaps():
     assert [row["chain"] for row in candidates["parsing"]] == ["supersapir"]
     assert candidates["parsing"][0]["total_files"] == 885
     assert candidates["parsing"][0]["fingerprint"] == "parsers|supersapir|parse_gaps"
+
+
+def test_generalize_filename_patterns_joins_varying_hyphen_fields():
+    names = [
+        "Promo7290027600007-006-611-20260831-220000",
+        "Promo7290027600007-007-029-20260831-220000",
+        "Promo7290027600007-015-201-20260831-220000",
+        "Price7290696200003-001-089-20260829-060445",
+        "Price7290696200003-001-089-20260829-181034",
+    ]
+    patterns = generalize_filename_patterns(names)
+    by_pattern = {row["pattern"]: row for row in patterns}
+    assert by_pattern["Promo7290027600007-*-*-20260831-220000"]["count"] == 3
+    assert by_pattern["Price7290696200003-001-089-20260829-*"]["count"] == 2
+    assert "Promo7290027600007-006-611-20260831-220000" in by_pattern[
+        "Promo7290027600007-*-*-20260831-220000"
+    ]["examples"]
+
+
+def test_collect_scrape_and_parse_problem_filenames():
+    scraper_quality = {
+        "iterations": [
+            {
+                "scrapers": {
+                    "SHUFERSAL": {
+                        "saw_not_downloaded": [
+                            {
+                                "reason": "download_failed",
+                                "file_name": "Promo7290027600007-006-611-20260831-220000",
+                            },
+                            {
+                                "reason": "skipped_by_filter",
+                                "file_name": "Price7290027600007-001-001-20260831-000000",
+                            },
+                        ]
+                    }
+                }
+            },
+            {
+                "scrapers": {
+                    "VICTORY_NEW_SOURCE": {
+                        "saw_not_downloaded": [
+                            {
+                                "reason": "skipped_by_filter",
+                                "file_name": "Price7290696200003-001-089-20260829-060445",
+                            },
+                            {
+                                "reason": "skipped_by_limit",
+                                "file_name": "Price7290696200003-001-089-20260829-999999",
+                            },
+                        ]
+                    }
+                }
+            },
+        ]
+    }
+    failed = collect_scrape_problem_filenames(
+        scraper_quality, "SHUFERSAL", "download_failures"
+    )
+    assert failed == ["Promo7290027600007-006-611-20260831-220000"]
+    saw = collect_scrape_problem_filenames(
+        scraper_quality, "VICTORY_NEW_SOURCE", "saw_but_not_downloaded"
+    )
+    assert saw == ["Price7290696200003-001-089-20260829-060445"]
+
+    parser_quality = {
+        "iterations": [
+            {
+                "parsers": {
+                    "super_sapir_price_file": {
+                        "downloaded_not_parsed": [
+                            "Price7290058156016-001-013-20260831-003647"
+                        ],
+                        "zero_record_files": [],
+                    },
+                    "super_sapir_promo_file": {
+                        "downloaded_not_parsed": [],
+                        "zero_record_files": [
+                            "Promo7290058156016-001-013-20260831-003647"
+                        ],
+                    },
+                }
+            }
+        ]
+    }
+    parsed = collect_parse_problem_filenames(parser_quality, "supersapir")
+    assert parsed == [
+        "Price7290058156016-001-013-20260831-003647",
+        "Promo7290058156016-001-013-20260831-003647",
+    ]
+    prices_only = collect_parse_problem_filenames(
+        parser_quality, "supersapir", "PRICE_FILE"
+    )
+    assert prices_only == ["Price7290058156016-001-013-20260831-003647"]
+
+
+def test_collect_scrape_and_parse_run_parameters():
+    scraper_quality = {
+        "iterations": [
+            {
+                "started_at": "2026-08-31T07:00:00+03:00",
+                "scrapers": {
+                    "SHUFERSAL": {
+                        "task_id": "task-a",
+                        "global_status": [
+                            {
+                                "status": "started",
+                                "system_timestamp": "2026-08-31 07:45:05.843123+03:00",
+                                "task_id": "task-a",
+                                "limit": None,
+                                "files_requested": ["PRICE_FILE", "PROMO_FILE"],
+                                "store_id": None,
+                                "files_names_to_scrape": None,
+                                "when_date": "2026-08-31 06:44:59.238626+03:00",
+                                "filter_null": False,
+                                "filter_zero": False,
+                            }
+                        ],
+                    }
+                },
+            },
+            {
+                "started_at": "2026-08-31T19:00:00+03:00",
+                "scrapers": {
+                    "SHUFERSAL": {
+                        "task_id": "task-b",
+                        "global_status": [
+                            {
+                                "status": "started",
+                                "system_timestamp": "2026-08-31 19:00:00+03:00",
+                                "task_id": "task-b",
+                                "limit": None,
+                                "files_requested": ["PRICE_FILE", "PROMO_FILE"],
+                                "store_id": None,
+                                "files_names_to_scrape": None,
+                                "when_date": "2026-08-31 18:00:00+03:00",
+                                "filter_null": False,
+                                "filter_zero": False,
+                            }
+                        ],
+                    }
+                },
+            },
+        ]
+    }
+    scrape_groups = collect_scrape_run_parameters(scraper_quality, "SHUFERSAL")
+    assert len(scrape_groups) == 2
+    first = scrape_groups[0]["started"]
+    assert first == {
+        "status": "started",
+        "system_timestamp": "2026-08-31 07:45:05.843123+03:00",
+        "task_id": "task-a",
+        "limit": None,
+        "files_requested": ["PRICE_FILE", "PROMO_FILE"],
+        "store_id": None,
+        "files_names_to_scrape": None,
+        "when_date": "2026-08-31 06:44:59.238626+03:00",
+        "filter_null": False,
+        "filter_zero": False,
+    }
+    assert scrape_groups[1]["started"]["task_id"] == "task-b"
+    assert scrape_groups[1]["started"]["when_date"] == "2026-08-31 18:00:00+03:00"
+
+    parser_quality = {
+        "iterations": [
+            {
+                "started_at": "2026-08-31T08:00:00+03:00",
+                "parsers": {
+                    "super_sapir_price_file": {
+                        "task_id": "parse-a",
+                        "global_status": [
+                            {
+                                "status": "started",
+                                "system_timestamp": "2026-08-31 08:00:00+03:00",
+                                "task_id": "parse-a",
+                                "limit": None,
+                                "scraper": "SUPER_SAPIR",
+                                "files_types": "PRICE_FILE",
+                            }
+                        ],
+                    }
+                },
+            }
+        ]
+    }
+    parse_groups = collect_parse_run_parameters(parser_quality, "supersapir")
+    assert len(parse_groups) == 1
+    assert parse_groups[0]["started"]["files_types"] == "PRICE_FILE"
+    assert parse_groups[0]["started"]["task_id"] == "parse-a"
+    assert parse_groups[0]["started"]["limit"] is None
+    assert parse_groups[0]["parser_key"] == "super_sapir_price_file"
 
 
 def test_write_quality_indicators_creates_files(status_dirs):
