@@ -11,9 +11,11 @@ from managers.quality_indicators import (
     PARSER_QUALITY_FILENAME,
     PIPELINE_HEALTH_FILENAME,
     SCRAPER_QUALITY_FILENAME,
+    compute_improvement_priorities,
     compute_parser_quality,
     compute_pipeline_health,
     compute_scraper_quality,
+    select_quality_issue_candidates,
     write_quality_indicators,
 )
 
@@ -421,9 +423,161 @@ def test_compute_pipeline_health_flags_unhealthy_scraper():
     )
 
     assert health["scraper"]["download_success_rate"] == 0.8
+    assert health["scraper"]["attempted_download_success_rate"] == 0.8
     assert health["scraper"]["healthy"] is False
     assert "download_success_rate" in health["scraper"]["below_threshold"]
     assert health["overall_healthy"] is False
+    assert health["improvements"]["scraping"][0]["enum"] == "BAREKET"
+    assert health["improvements"]["scraping"][0]["chain"] == "bareket"
+    assert health["improvements"]["scraping"][0]["issue"] == "download_failures"
+
+
+def test_compute_pipeline_health_ignores_filter_skips():
+    scraper_quality = {
+        "iterations": [
+            {
+                "scrapers_with_no_data": 0,
+                "scrapers": {
+                    "BAREKET": {
+                        "saw": 100,
+                        "downloaded": 10,
+                        "no_data": False,
+                        "saw_not_downloaded": [
+                            {"reason": "skipped_by_filter"} for _ in range(90)
+                        ],
+                    }
+                },
+            }
+        ]
+    }
+
+    health = compute_pipeline_health(
+        scraper_quality,
+        {"iterations": []},
+        thresholds={
+            "scraper_download_success_rate_min": 0.95,
+            "parser_parse_success_rate_min": 0.98,
+            "scraper_no_data_scrapers_max": 0,
+        },
+    )
+
+    assert health["scraper"]["download_success_rate"] == 0.1
+    assert health["scraper"]["attempted_download_success_rate"] == 1.0
+    assert health["scraper"]["healthy"] is True
+    assert health["improvements"]["scraping"] == []
+
+
+def test_compute_improvement_priorities_ranks_scrape_and_parse_gaps():
+    scraper_quality = {
+        "iterations": [
+            {
+                "scrapers": {
+                    "TIV_TAAM": {
+                        "saw": 10,
+                        "downloaded": 10,
+                        "no_data": False,
+                        "saw_not_downloaded": [],
+                    },
+                    "WOLT": {
+                        "saw": 20,
+                        "downloaded": 5,
+                        "no_data": False,
+                        "saw_not_downloaded": [
+                            {"reason": "download_failed"} for _ in range(3)
+                        ]
+                        + [{"reason": "skipped_by_filter"} for _ in range(12)],
+                    },
+                    "BAREKET": {
+                        "saw": 0,
+                        "downloaded": 0,
+                        "no_data": True,
+                        "saw_not_downloaded": [],
+                    },
+                }
+            }
+        ]
+    }
+    parser_quality = {
+        "iterations": [
+            {
+                "parsers": {
+                    "tiv_taam_price_file": {
+                        "zero_record_files": [],
+                        "downloaded_not_parsed": ["Price1", "Price2"],
+                    },
+                    "wolt_price_file": {
+                        "zero_record_files": ["PriceZero"],
+                        "downloaded_not_parsed": [],
+                    },
+                    "bareket_price_file": {
+                        "zero_record_files": [],
+                        "downloaded_not_parsed": [],
+                    },
+                }
+            }
+        ]
+    }
+
+    priorities = compute_improvement_priorities(scraper_quality, parser_quality)
+
+    assert [item["chain"] for item in priorities["scraping"]] == ["wolt", "bareket"]
+    assert priorities["scraping"][0]["issue"] == "download_failures"
+    assert priorities["scraping"][0]["download_failed"] == 3
+    assert priorities["scraping"][1]["issue"] == "no_data"
+    assert "tivtaam" not in [item["chain"] for item in priorities["scraping"]]
+
+    assert priorities["parsing"][0]["chain"] == "tivtaam"
+    assert priorities["parsing"][0]["enum"] == "TIV_TAAM"
+    assert priorities["parsing"][0]["file_type"] == "PRICE_FILE"
+    assert priorities["parsing"][0]["issue"] == "downloaded_not_parsed"
+    assert priorities["parsing"][0]["downloaded_not_parsed"] == 2
+    assert priorities["parsing"][1]["chain"] == "wolt"
+    assert priorities["parsing"][1]["issue"] == "zero_records"
+
+
+def test_select_quality_issue_candidates_groups_parsers_and_skips_small_gaps():
+
+    improvements = {
+        "scraping": [
+            {
+                "chain": "shufersal",
+                "enum": "SHUFERSAL",
+                "issue": "download_failures",
+                "download_failed": 49,
+            }
+        ],
+        "parsing": [
+            {
+                "chain": "supersapir",
+                "enum": "SUPER_SAPIR",
+                "file_type": "PRICE_FILE",
+                "downloaded_not_parsed": 532,
+                "zero_records": 0,
+            },
+            {
+                "chain": "supersapir",
+                "enum": "SUPER_SAPIR",
+                "file_type": "PROMO_FILE",
+                "downloaded_not_parsed": 353,
+                "zero_records": 0,
+            },
+            {
+                "chain": "wolt",
+                "enum": "WOLT",
+                "file_type": "PRICE_FILE",
+                "downloaded_not_parsed": 3,
+                "zero_records": 1,
+            },
+        ],
+    }
+
+    candidates = select_quality_issue_candidates(improvements, parse_min_files=50)
+    assert len(candidates["scraping"]) == 1
+    assert candidates["scraping"][0]["fingerprint"] == "scrapers|shufersal|download_failures"
+    assert candidates["scraping"][0]["repo"].endswith("israeli-supermarket-scarpers")
+    assert [row["chain"] for row in candidates["parsing"]] == ["supersapir"]
+    assert candidates["parsing"][0]["total_files"] == 885
+    assert candidates["parsing"][0]["fingerprint"] == "parsers|supersapir|parse_gaps"
 
 
 def test_write_quality_indicators_creates_files(status_dirs):
@@ -466,6 +620,9 @@ def test_write_quality_indicators_creates_files(status_dirs):
     assert "overall_healthy" in health_payload
     assert "scraper" in health_payload
     assert "parser" in health_payload
+    assert "improvements" in health_payload
+    assert "scraping" in health_payload["improvements"]
+    assert "parsing" in health_payload["improvements"]
 
 
 def test_write_quality_indicators_skips_missing_scraping_folder(tmp_path):

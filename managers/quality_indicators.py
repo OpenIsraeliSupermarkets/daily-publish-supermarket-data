@@ -34,6 +34,16 @@ from utils import Logger, now
 SCRAPER_QUALITY_FILENAME = "scraper_quality.json"
 PARSER_QUALITY_FILENAME = "parser_quality.json"
 PIPELINE_HEALTH_FILENAME = "pipeline_health.json"
+KAGGLE_QUALITY_JSON_FILES = frozenset(
+    {
+        SCRAPER_QUALITY_FILENAME,
+        PARSER_QUALITY_FILENAME,
+        PIPELINE_HEALTH_FILENAME,
+    }
+)
+SCRAPERS_GITHUB_REPO = "OpenIsraeliSupermarkets/israeli-supermarket-scarpers"
+PARSERS_GITHUB_REPO = "OpenIsraeliSupermarkets/israeli-supermarket-parsers"
+KAGGLE_DATASET_HANDLE = "erlichsefi/israeli-supermarkets-2024"
 ITERATION_CLUSTER_WINDOW = timedelta(hours=2)
 _TZ = pytz.timezone("Asia/Jerusalem")
 
@@ -495,6 +505,215 @@ def compute_parser_quality(
     }
 
 
+def _dump_stem(scraper: str) -> str:
+    try:
+        return DumpFolderNames[scraper].value.lower()
+    except (KeyError, ValueError):
+        return scraper.lower().replace("_", "")
+
+
+def _split_parser_key(parser_key: str) -> Tuple[str, str]:
+    """Split `tiv_taam_price_full_file` into (`TIV_TAAM`, `PRICE_FULL_FILE`)."""
+    lower = parser_key.lower()
+    file_types = sorted(FileTypesFilters.all_types(), key=len, reverse=True)
+    for file_type in file_types:
+        suffix = f"_{file_type.lower()}"
+        if lower.endswith(suffix):
+            return lower[: -len(suffix)].upper(), file_type
+    return parser_key.upper(), ""
+
+
+def compute_improvement_priorities(
+    scraper_quality: Dict[str, Any],
+    parser_quality: Dict[str, Any],
+) -> Dict[str, List[Dict[str, Any]]]:
+    """Rank scrape/parse gaps that should be fixed next.
+
+    Filter/limit skips are ignored: those are expected, not processing bugs.
+    """
+    scrape_stats: Dict[str, Dict[str, Any]] = {}
+    for iteration in scraper_quality.get("iterations", []):
+        for scraper, metrics in (iteration.get("scrapers") or {}).items():
+            stats = scrape_stats.setdefault(
+                scraper,
+                {
+                    "iterations": 0,
+                    "no_data_iterations": 0,
+                    "saw": 0,
+                    "downloaded": 0,
+                    "download_failed": 0,
+                    "skipped_by_filter": 0,
+                    "skipped_by_limit": 0,
+                    "latest_saw": 0,
+                    "latest_downloaded": 0,
+                    "latest_no_data": True,
+                },
+            )
+            stats["iterations"] += 1
+            stats["saw"] += metrics.get("saw", 0)
+            stats["downloaded"] += metrics.get("downloaded", 0)
+            if metrics.get("no_data"):
+                stats["no_data_iterations"] += 1
+            for entry in metrics.get("saw_not_downloaded") or []:
+                reason = entry.get("reason") if isinstance(entry, dict) else None
+                if reason == "download_failed":
+                    stats["download_failed"] += 1
+                elif reason == "skipped_by_filter":
+                    stats["skipped_by_filter"] += 1
+                elif reason == "skipped_by_limit":
+                    stats["skipped_by_limit"] += 1
+            stats["latest_saw"] = metrics.get("saw", 0)
+            stats["latest_downloaded"] = metrics.get("downloaded", 0)
+            stats["latest_no_data"] = bool(metrics.get("no_data"))
+
+    scraping: List[Dict[str, Any]] = []
+    for scraper, stats in scrape_stats.items():
+        if stats["download_failed"] > 0:
+            issue = "download_failures"
+            why = (
+                f"{stats['download_failed']} files failed download or extraction"
+            )
+        elif (
+            stats["iterations"] > 0
+            and stats["no_data_iterations"] == stats["iterations"]
+        ):
+            issue = "no_data"
+            why = "no files downloaded in any iteration"
+        elif stats["latest_no_data"] and stats["latest_saw"] > 0:
+            issue = "saw_but_not_downloaded"
+            why = (
+                f"saw {stats['latest_saw']} files in the latest iteration "
+                "but downloaded none"
+            )
+        else:
+            continue
+        scraping.append(
+            {
+                "chain": _dump_stem(scraper),
+                "enum": scraper,
+                "stage": "scraping",
+                "issue": issue,
+                "why": why,
+                "download_failed": stats["download_failed"],
+                "no_data_iterations": stats["no_data_iterations"],
+                "iterations": stats["iterations"],
+                "latest_saw": stats["latest_saw"],
+                "latest_downloaded": stats["latest_downloaded"],
+            }
+        )
+    scraping.sort(
+        key=lambda item: (
+            item["download_failed"],
+            item["no_data_iterations"],
+            item["latest_saw"] - item["latest_downloaded"],
+        ),
+        reverse=True,
+    )
+
+    parse_stats: Dict[str, Dict[str, Set[str]]] = {}
+    for iteration in parser_quality.get("iterations", []):
+        for parser_key, metrics in (iteration.get("parsers") or {}).items():
+            stats = parse_stats.setdefault(
+                parser_key,
+                {"zero_records": set(), "downloaded_not_parsed": set()},
+            )
+            stats["zero_records"].update(metrics.get("zero_record_files") or [])
+            stats["downloaded_not_parsed"].update(
+                metrics.get("downloaded_not_parsed") or []
+            )
+
+    parsing: List[Dict[str, Any]] = []
+    for parser_key, stats in parse_stats.items():
+        zero = len(stats["zero_records"])
+        unparsed = len(stats["downloaded_not_parsed"])
+        if zero == 0 and unparsed == 0:
+            continue
+        scraper, file_type = _split_parser_key(parser_key)
+        if unparsed >= zero:
+            issue = "downloaded_not_parsed"
+            why = f"{unparsed} downloaded files were never parsed"
+        else:
+            issue = "zero_records"
+            why = f"{zero} parsed files contained zero records"
+        examples = sorted(stats["downloaded_not_parsed"] | stats["zero_records"])[:5]
+        parsing.append(
+            {
+                "chain": _dump_stem(scraper),
+                "enum": scraper,
+                "file_type": file_type,
+                "parser_key": parser_key,
+                "stage": "parsing",
+                "issue": issue,
+                "why": why,
+                "downloaded_not_parsed": unparsed,
+                "zero_records": zero,
+                "examples": examples,
+            }
+        )
+    parsing.sort(
+        key=lambda item: (
+            item["downloaded_not_parsed"] + item["zero_records"],
+            item["downloaded_not_parsed"],
+        ),
+        reverse=True,
+    )
+
+    return {"scraping": scraping, "parsing": parsing}
+
+
+def select_quality_issue_candidates(
+    improvements: Dict[str, List[Dict[str, Any]]],
+    parse_min_files: int = 50,
+) -> Dict[str, List[Dict[str, Any]]]:
+    """Turn ranked improvements into GitHub issue candidates.
+
+    Scraping: one candidate per chain (already filtered of limit/filter skips).
+    Parsing: one candidate per chain, only if total problem files >= parse_min_files.
+    """
+    scraping = list(improvements.get("scraping") or [])
+
+    by_chain: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    for item in improvements.get("parsing") or []:
+        by_chain[item["chain"]].append(item)
+
+    parsing: List[Dict[str, Any]] = []
+    for chain, items in by_chain.items():
+        total = sum(
+            item.get("downloaded_not_parsed", 0) + item.get("zero_records", 0)
+            for item in items
+        )
+        if total < parse_min_files:
+            continue
+        items_sorted = sorted(
+            items,
+            key=lambda item: item.get("downloaded_not_parsed", 0)
+            + item.get("zero_records", 0),
+            reverse=True,
+        )
+        parsing.append(
+            {
+                "chain": chain,
+                "enum": items_sorted[0].get("enum"),
+                "stage": "parsing",
+                "issue": "parse_gaps",
+                "total_files": total,
+                "by_file_type": items_sorted,
+                "fingerprint": f"parsers|{chain}|parse_gaps",
+                "repo": PARSERS_GITHUB_REPO,
+            }
+        )
+    parsing.sort(key=lambda item: item["total_files"], reverse=True)
+
+    scraping_out = []
+    for item in scraping:
+        row = dict(item)
+        row["fingerprint"] = f"scrapers|{item['chain']}|{item['issue']}"
+        row["repo"] = SCRAPERS_GITHUB_REPO
+        scraping_out.append(row)
+
+    return {"scraping": scraping_out, "parsing": parsing}
+
+
 def _load_health_thresholds() -> Dict[str, float]:
     return {
         "scraper_download_success_rate_min": float(
@@ -536,6 +755,10 @@ def _aggregate_scraper_health_metrics(scraper_quality: Dict[str, Any]) -> Dict[s
     download_success_rate = (
         total_downloaded / total_saw if total_saw > 0 else 1.0
     )
+    attempted = total_downloaded + download_failed
+    attempted_download_success_rate = (
+        total_downloaded / attempted if attempted > 0 else 1.0
+    )
 
     return {
         "total_saw": total_saw,
@@ -545,6 +768,9 @@ def _aggregate_scraper_health_metrics(scraper_quality: Dict[str, Any]) -> Dict[s
         "total_skipped_by_filter": skipped_by_filter,
         "scrapers_with_no_data": max_no_data_scrapers,
         "download_success_rate": round(download_success_rate, 4),
+        "attempted_download_success_rate": round(
+            attempted_download_success_rate, 4
+        ),
     }
 
 
@@ -572,8 +798,6 @@ def _aggregate_parser_health_metrics(
         "total_problem_files": len(problem_files),
         "downloaded_baseline": downloaded_baseline,
         "parse_success_rate": round(parse_success_rate, 4),
-        "zero_record_files": sorted(zero_record),
-        "downloaded_not_parsed": sorted(unparsed),
     }
 
 
@@ -591,7 +815,7 @@ def compute_pipeline_health(
 
     scraper_failures: List[str] = []
     if (
-        scraper["download_success_rate"]
+        scraper["attempted_download_success_rate"]
         < thresholds["scraper_download_success_rate_min"]
     ):
         scraper_failures.append("download_success_rate")
@@ -607,9 +831,12 @@ def compute_pipeline_health(
     parser["healthy"] = not parser_failures
     parser["below_threshold"] = parser_failures
 
+    improvements = compute_improvement_priorities(scraper_quality, parser_quality)
+
     return {
         "computed_at": now().isoformat(),
         "thresholds": thresholds,
+        "improvements": improvements,
         "scraper": scraper,
         "parser": parser,
         "overall_healthy": scraper["healthy"] and parser["healthy"],
