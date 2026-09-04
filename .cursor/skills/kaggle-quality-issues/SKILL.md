@@ -77,6 +77,8 @@ Body:
 
 Do not title or lead with `[quality]`, KPIs, or pipeline-health scores.
 
+To inspect production scrape (or other workflow) logs for the files in a ticket, use `actions-log-search` (`scripts/actions_log_search.py`). Do not dump full Actions logs into chat.
+
 ## Naming
 
 Quality JSON keys are enums (`TIV_TAAM`). Issue titles use dump-folder stems (`tivtaam`).
