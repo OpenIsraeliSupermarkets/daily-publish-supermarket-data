@@ -49,7 +49,8 @@ Voice: **when I scrape/parse this site with these parameters, I saw these files,
 Collect not-downloaded filenames for that chain from `scraper_quality.json`:
 
 - `download_failures` → every `download_failed` name
-- `saw_but_not_downloaded` / `no_data` → latest-iteration names that were not downloaded (`skipped_by_limit` excluded)
+- `saw_but_not_downloaded` / `no_data` → latest-iteration names that were not downloaded (`skipped_by_limit` and `source_corrupt` excluded)
+- Never file `source_corrupt` (`source corrupt after N downloads`). The scraper already retried; the publisher payload is bad. Same skip the scraper uses in `validate_downloads`.
 
 Title: `[scrape] {chain}: {pattern} failed to download`
 

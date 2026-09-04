@@ -53,6 +53,7 @@ python scripts/kaggle_quality_issues.py apply
 - Labels: `automation`, `bug` (keep existing `quality` labels on already-open issues)
 - Titles: `[scrape] {chain}: {pattern} failed to download` or `[parse] {chain}: {pattern} not picked up for parsing`
 - One scrape issue per chain (`download_failures`, `no_data`, `saw_but_not_downloaded`)
+- Skip `source_corrupt` / `source corrupt after N downloads` — publisher payload is bad, not a scraper bug
 - One parse issue per chain if total problem files ≥ 50
 - Body: what I ran (full started JSON) → files/events I saw → what went wrong → why that is not OK
 - Body cites the Kaggle JSON URLs, not zip members

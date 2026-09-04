@@ -58,7 +58,7 @@ When a hit includes a signed Azure URL, extra fields appear:
 |---|---|
 | 404 blob does not exist **and** `sas_expired_at_first_seen=false` | Listing advertised a blob Azure no longer has. SAS was still live. Local re-scrape often cannot reproduce (new listing, new `se=`). |
 | 403 / `AuthenticationFailed` / HTML `link expired` / `sas_expired_at_first_seen=true` | The signed URL died before download. |
-| `source corrupt after 3 downloads: extract failed` | Publisher payload is bad; not a link-staleness bug. Close those. |
+| `source corrupt after 3 downloads: extract failed` | Publisher payload is bad; not a link-staleness bug and not a `ScarpingTask` utilization bug. Quality JSON should mark these `source_corrupt` and not open scraper tickets. Close leftover tickets. |
 
 ## After find
 

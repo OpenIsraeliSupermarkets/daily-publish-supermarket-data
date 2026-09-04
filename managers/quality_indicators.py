@@ -47,6 +47,8 @@ PARSERS_GITHUB_REPO = "OpenIsraeliSupermarkets/israeli-supermarket-parsers"
 KAGGLE_DATASET_HANDLE = "erlichsefi/israeli-supermarkets-2024"
 ITERATION_CLUSTER_WINDOW = timedelta(hours=2)
 _TZ = pytz.timezone("Asia/Jerusalem")
+SOURCE_CORRUPT_REASON = "source_corrupt"
+SOURCE_CORRUPT_ERROR_MARKER = "source corrupt after"
 
 
 def _normalize_timestamp(value: Optional[datetime]) -> Optional[datetime]:
@@ -281,6 +283,18 @@ def _scraper_file_lifecycle(
     return lifecycle
 
 
+def is_source_corrupt_error(message: Optional[str]) -> bool:
+    """True when the scraper already classified the remote payload as corrupt.
+
+    The scraper retries extract a few times, then reports
+    ``source corrupt after N downloads: ...``. That is a publisher skip, not a
+    fetch bug in this repo's ``ScarpingTask`` call.
+    """
+    if not message:
+        return False
+    return SOURCE_CORRUPT_ERROR_MARKER in message.lower()
+
+
 def _scraper_download_errors(
     status: ScraperStatusOutput, task_id: str
 ) -> Dict[str, str]:
@@ -320,8 +334,13 @@ def _explain_saw_not_downloaded_entry(
         entry["link"] = file_state["link"]
 
     if file_name in download_errors:
-        entry["reason"] = "download_failed"
-        entry["error"] = download_errors[file_name]
+        message = download_errors[file_name]
+        entry["reason"] = (
+            SOURCE_CORRUPT_REASON
+            if is_source_corrupt_error(message)
+            else "download_failed"
+        )
+        entry["error"] = message
         return entry
 
     if file_state.get("collected") and not file_state.get("downloaded_ok"):
@@ -643,7 +662,8 @@ def compute_improvement_priorities(
 ) -> Dict[str, List[Dict[str, Any]]]:
     """Rank scrape/parse gaps that should be fixed next.
 
-    Filter/limit skips are ignored: those are expected, not processing bugs.
+    Filter/limit skips and publisher-side ``source_corrupt`` are ignored:
+    those are expected, not processing bugs.
     """
     scrape_stats: Dict[str, Dict[str, Any]] = {}
     for iteration in scraper_quality.get("iterations", []):
@@ -656,6 +676,7 @@ def compute_improvement_priorities(
                     "saw": 0,
                     "downloaded": 0,
                     "download_failed": 0,
+                    "source_corrupt": 0,
                     "skipped_by_filter": 0,
                     "skipped_by_limit": 0,
                     "latest_saw": 0,
@@ -672,6 +693,8 @@ def compute_improvement_priorities(
                 reason = entry.get("reason") if isinstance(entry, dict) else None
                 if reason == "download_failed":
                     stats["download_failed"] += 1
+                elif reason == SOURCE_CORRUPT_REASON:
+                    stats["source_corrupt"] += 1
                 elif reason == "skipped_by_filter":
                     stats["skipped_by_filter"] += 1
                 elif reason == "skipped_by_limit":
@@ -852,7 +875,7 @@ def collect_scrape_problem_filenames(
         for entry in metrics.get("saw_not_downloaded") or []:
             if not isinstance(entry, dict):
                 continue
-            if entry.get("reason") == "skipped_by_limit":
+            if entry.get("reason") in {"skipped_by_limit", SOURCE_CORRUPT_REASON}:
                 continue
             file_name = entry.get("file_name")
             if file_name:
@@ -878,7 +901,7 @@ def collect_scrape_sample_errors(
                 continue
             if issue == "download_failures" and entry.get("reason") != "download_failed":
                 continue
-            if entry.get("reason") == "skipped_by_limit":
+            if entry.get("reason") in {"skipped_by_limit", SOURCE_CORRUPT_REASON}:
                 continue
             message = entry.get("error")
             if not message or message in seen:
@@ -1119,6 +1142,7 @@ def _aggregate_scraper_health_metrics(scraper_quality: Dict[str, Any]) -> Dict[s
     total_saw = 0
     total_downloaded = 0
     download_failed = 0
+    source_corrupt = 0
     skipped_by_limit = 0
     skipped_by_filter = 0
     max_no_data_scrapers = 0
@@ -1134,6 +1158,8 @@ def _aggregate_scraper_health_metrics(scraper_quality: Dict[str, Any]) -> Dict[s
                 reason = entry.get("reason", "")
                 if reason == "download_failed":
                     download_failed += 1
+                elif reason == SOURCE_CORRUPT_REASON:
+                    source_corrupt += 1
                 elif reason == "skipped_by_limit":
                     skipped_by_limit += 1
                 elif reason == "skipped_by_filter":
@@ -1151,6 +1177,7 @@ def _aggregate_scraper_health_metrics(scraper_quality: Dict[str, Any]) -> Dict[s
         "total_saw": total_saw,
         "total_downloaded": total_downloaded,
         "total_download_failed": download_failed,
+        "total_source_corrupt": source_corrupt,
         "total_skipped_by_limit": skipped_by_limit,
         "total_skipped_by_filter": skipped_by_filter,
         "scrapers_with_no_data": max_no_data_scrapers,

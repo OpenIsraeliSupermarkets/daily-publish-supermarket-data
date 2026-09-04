@@ -20,6 +20,7 @@ from managers.quality_indicators import (
     compute_pipeline_health,
     compute_scraper_quality,
     generalize_filename_patterns,
+    is_source_corrupt_error,
     select_quality_issue_candidates,
     write_quality_indicators,
 )
@@ -275,6 +276,91 @@ def test_compute_scraper_quality_skipped_by_limit(status_dirs):
         }
     ]
     assert result["iterations"][0]["scrapers"]["BAREKET"]["global_status"][0]["limit"] == 1
+
+
+def test_is_source_corrupt_error_matches_scraper_prefix():
+    assert is_source_corrupt_error(
+        "source corrupt after 3 downloads: extract failed"
+    )
+    assert is_source_corrupt_error(
+        "source corrupt after 3 downloads: gzip truncated: PriceFull.gz"
+    )
+    assert not is_source_corrupt_error("timeout")
+    assert not is_source_corrupt_error(None)
+
+
+def test_compute_scraper_quality_source_corrupt_is_not_download_failed(status_dirs):
+    started = datetime(2026, 1, 1, 10, 0, 0)
+    doralon_file = DumpFolderNames["DOR_ALON"].value.lower()
+    _write_json(
+        os.path.join(status_dirs["scraping"], f"{doralon_file}.json"),
+        _scraper_status(
+            "task-1",
+            started,
+            saw_files=[
+                "PriceFull7290492000005-004-715-20260903-003304.xml",
+                "PriceFull7290492000005-004-716-20260903-003304.xml",
+            ],
+            downloaded_files=["PriceFull7290492000005-004-716-20260903-003304.xml"],
+            failed_downloads=[
+                (
+                    "PriceFull7290492000005-004-715-20260903-003304.xml",
+                    "source corrupt after 3 downloads: extract failed",
+                )
+            ],
+        ),
+    )
+
+    result = compute_scraper_quality(status_dirs["scraping"], ["DOR_ALON"])
+    doralon = result["iterations"][0]["scrapers"]["DOR_ALON"]
+    assert doralon["downloaded"] == 1
+    assert doralon["saw_not_downloaded"] == [
+        {
+            "file_name": "PriceFull7290492000005-004-715-20260903-003304",
+            "reason": "source_corrupt",
+            "error": "source corrupt after 3 downloads: extract failed",
+        }
+    ]
+
+
+def test_compute_pipeline_health_ignores_source_corrupt():
+    scraper_quality = {
+        "iterations": [
+            {
+                "scrapers_with_no_data": 0,
+                "scrapers": {
+                    "DOR_ALON": {
+                        "saw": 311,
+                        "downloaded": 310,
+                        "no_data": False,
+                        "saw_not_downloaded": [
+                            {
+                                "reason": "source_corrupt",
+                                "file_name": "PriceFull7290492000005-004-715-20260903-003304",
+                                "error": "source corrupt after 3 downloads: extract failed",
+                            }
+                        ],
+                    }
+                },
+            }
+        ]
+    }
+
+    health = compute_pipeline_health(
+        scraper_quality,
+        {"iterations": []},
+        thresholds={
+            "scraper_download_success_rate_min": 0.95,
+            "parser_parse_success_rate_min": 0.98,
+            "scraper_no_data_scrapers_max": 0,
+        },
+    )
+
+    assert health["scraper"]["total_source_corrupt"] == 1
+    assert health["scraper"]["total_download_failed"] == 0
+    assert health["scraper"]["attempted_download_success_rate"] == 1.0
+    assert health["scraper"]["healthy"] is True
+    assert health["improvements"]["scraping"] == []
 
 
 def test_compute_scraper_quality_two_iterations(status_dirs):
@@ -645,6 +731,10 @@ def test_collect_scrape_and_parse_problem_filenames():
                             {
                                 "reason": "skipped_by_filter",
                                 "file_name": "Price7290027600007-001-001-20260831-000000",
+                            },
+                            {
+                                "reason": "source_corrupt",
+                                "file_name": "PriceFull7290492000005-004-715-20260903-003304",
                             },
                         ]
                     }
