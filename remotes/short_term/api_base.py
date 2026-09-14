@@ -99,6 +99,9 @@ class ShortTermDatabaseUploader:
             self._create_destinations(
                 ScraperStatus.get_index(), "VerifiedScraperDownloads"
             )
+            self._create_destinations(
+                ParserStatus.get_index(), "VerifiedParserDownloads"
+            )
             for table in list_all_dynamic_tables(enabled_scrapers, enabled_file_types):
                 self._create_destinations(table.get_index(), table.get_table_name())
         except Exception as e:

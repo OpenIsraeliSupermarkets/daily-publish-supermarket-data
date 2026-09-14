@@ -13,6 +13,7 @@ from typing import Union
 from utils.mongo_bson import sanitize_for_mongo
 
 VERIFIED_SCRAPER_DOWNLOADS_TABLE = "VerifiedScraperDownloads"
+VERIFIED_PARSER_DOWNLOADS_TABLE = "VerifiedParserDownloads"
 
 
 class ShortTermDBDatasetManager:
@@ -65,6 +66,8 @@ class ShortTermDBDatasetManager:
             processed.append(sanitize_for_mongo({"index": row_index, **row_json}))
             pushed_set.add(row_index)
             added_ids.append(row_index)
+        if not processed:
+            return
         self.uploader._insert_to_destinations(target_table, processed)
 
     def _push_a_status_files(
@@ -115,7 +118,7 @@ class ShortTermDBDatasetManager:
             ParserStatusOutput,
             "ParserStatus",
             "GlobalParserStatus",
-            "VerifiedParserDownloads",
+            VERIFIED_PARSER_DOWNLOADS_TABLE,
             local_cahce,
         )
         Logger.info("Parser status stored in DynamoDB successfully.")
