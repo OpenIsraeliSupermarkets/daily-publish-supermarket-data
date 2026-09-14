@@ -85,6 +85,9 @@ def _scraper_status(
             "task_id": task_id,
             "file_name": name,
             "system_timestamp": started_at.isoformat(),
+            "listing_hash": f"hash-{name}",
+            "content_sha256": f"sha-{name}",
+            "save_decision": "save",
         }
         for name in downloaded_files
     ]
