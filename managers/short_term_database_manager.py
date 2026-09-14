@@ -99,7 +99,7 @@ class ShortTermDBDatasetManager:
                         added_ids,
                     )
                     self._push_status_rows(
-                        model.verified_downloads,
+                        getattr(model, "verified_downloads", []),
                         file_name,
                         verified_target_table,
                         pushed_set,
@@ -115,6 +115,7 @@ class ShortTermDBDatasetManager:
             ParserStatusOutput,
             "ParserStatus",
             "GlobalParserStatus",
+            "VerifiedParserDownloads",
             local_cahce,
         )
         Logger.info("Parser status stored in DynamoDB successfully.")
