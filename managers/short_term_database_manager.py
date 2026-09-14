@@ -12,6 +12,9 @@ from typing import Union
 
 from utils.mongo_bson import sanitize_for_mongo
 
+VERIFIED_SCRAPER_DOWNLOADS_TABLE = "VerifiedScraperDownloads"
+VERIFIED_PARSER_DOWNLOADS_TABLE = "VerifiedParserDownloads"
+
 
 class ShortTermDBDatasetManager:
     def __init__(
@@ -41,12 +44,39 @@ class ShortTermDBDatasetManager:
         digest = hashlib.sha256(f"{source_file}\0{canonical}".encode()).hexdigest()
         return digest
 
+    def _push_status_rows(
+        self,
+        rows,
+        file_name: str,
+        target_table: str,
+        pushed_set: set,
+        added_ids: list,
+    ):
+        """Insert not-yet-pushed status rows into ``target_table``."""
+        processed = []
+        for row in rows:
+            try:
+                row_json = json.loads(row.model_dump_json())
+                row_index = self._status_event_index(row_json, file_name)
+            except Exception as e:
+                Logger.error(f"Error processing event: {e}")
+                continue
+            if row_index in pushed_set:
+                continue
+            processed.append(sanitize_for_mongo({"index": row_index, **row_json}))
+            pushed_set.add(row_index)
+            added_ids.append(row_index)
+        if not processed:
+            return
+        self.uploader._insert_to_destinations(target_table, processed)
+
     def _push_a_status_files(
         self,
         status_folder,
         model_type: Union[ParserStatusOutput, ScraperStatusOutput],
         target_table: str,
         global_target_table: str,
+        verified_target_table: str,
         local_cahce: CacheState,
     ):
         for file_name in os.listdir(status_folder):
@@ -61,39 +91,22 @@ class ShortTermDBDatasetManager:
 
                     model = model_type(**records)
 
-                    processed_events = []
-                    for event in model.events:
-                        try:
-                            event_json = json.loads(event.model_dump_json())
-                            row_index = self._status_event_index(event_json, file_name)
-                        except Exception as e:
-                            Logger.error(f"Error processing event: {e}")
-                            continue
-                        if row_index in pushed_set:
-                            continue
-                        pushed_set.add(row_index)
-                        added_ids.append(row_index)
-                        processed_events.append(sanitize_for_mongo({"index": row_index, **event_json}))
-                    self.uploader._insert_to_destinations(
-                        target_table, processed_events
+                    self._push_status_rows(
+                        model.events, file_name, target_table, pushed_set, added_ids
                     )
-
-                    processed_events = []
-                    for event in model.global_status:
-                        try:
-                            event_json = json.loads(event.model_dump_json())
-                            row_index = self._status_event_index(event_json, file_name)
-                        except Exception as e:
-                            Logger.error(f"Error processing event: {e}")
-                            continue
-                        if row_index in pushed_set:
-                            continue
-                        processed_events.append(sanitize_for_mongo({"index": row_index, **event_json}))
-                        pushed_set.add(row_index)
-                        added_ids.append(row_index)
-
-                    self.uploader._insert_to_destinations(
-                        global_target_table, processed_events
+                    self._push_status_rows(
+                        model.global_status,
+                        file_name,
+                        global_target_table,
+                        pushed_set,
+                        added_ids,
+                    )
+                    self._push_status_rows(
+                        getattr(model, "verified_downloads", []),
+                        file_name,
+                        verified_target_table,
+                        pushed_set,
+                        added_ids,
                     )
 
                 merged = pushed_ids + [i for i in added_ids if i not in pushed_ids]
@@ -105,6 +118,7 @@ class ShortTermDBDatasetManager:
             ParserStatusOutput,
             "ParserStatus",
             "GlobalParserStatus",
+            VERIFIED_PARSER_DOWNLOADS_TABLE,
             local_cahce,
         )
         Logger.info("Parser status stored in DynamoDB successfully.")
@@ -115,6 +129,7 @@ class ShortTermDBDatasetManager:
             ScraperStatusOutput,
             "ScraperStatus",
             "GlobalScraperStatus",
+            VERIFIED_SCRAPER_DOWNLOADS_TABLE,
             local_cahce,
         )
         Logger.info("Scraper status stored in DynamoDB successfully.")

@@ -22,6 +22,7 @@ from managers.quality_indicators import (
     PIPELINE_HEALTH_FILENAME,
     SCRAPER_QUALITY_FILENAME,
 )
+from managers.short_term_database_manager import VERIFIED_SCRAPER_DOWNLOADS_TABLE
 from managers.cache_manager import CacheManager
 from access.access_layer import AccessLayer
 
@@ -166,6 +167,40 @@ def validate_converting_output(
             ), f"Expected output file {output_file} does not exist. {downloaded_file}. {chain_folder}"
 
 
+def _group_scraper_status_by_task(short_term_db_target) -> dict:
+    """Reconstruct per-task scraper status payloads from short-term tables."""
+    scraper_by_task: dict = {}
+    for doc in short_term_db_target.get_destinations_content("GlobalScraperStatus"):
+        tid = doc["task_id"]
+        scraper_by_task.setdefault(
+            tid, {"events": [], "global_status": [], "verified_downloads": []}
+        )
+        payload = {k: v for k, v in doc.items() if k != "index"}
+        scraper_by_task[tid]["global_status"].append(payload)
+
+    for doc in short_term_db_target.get_destinations_content(
+        ScraperStatus.get_table_name()
+    ):
+        tid = doc["task_id"]
+        scraper_by_task.setdefault(
+            tid, {"events": [], "global_status": [], "verified_downloads": []}
+        )
+        payload = {k: v for k, v in doc.items() if k != "index"}
+        scraper_by_task[tid]["events"].append(payload)
+
+    for doc in short_term_db_target.get_destinations_content(
+        VERIFIED_SCRAPER_DOWNLOADS_TABLE
+    ):
+        tid = doc["task_id"]
+        scraper_by_task.setdefault(
+            tid, {"events": [], "global_status": [], "verified_downloads": []}
+        )
+        payload = {k: v for k, v in doc.items() if k != "index"}
+        scraper_by_task[tid]["verified_downloads"].append(payload)
+
+    return scraper_by_task
+
+
 def validate_state_after_api_update(
     app_folder, outputs_folder, enabled_scrapers, short_term_db_target
 ):
@@ -179,16 +214,23 @@ def validate_state_after_api_update(
         enabled_scrapers: List of enabled scrapers
         short_term_db_target: The short-term database target
     """
-    # document_db folder
-    scraper_status_table = ScraperStatus.get_table_name()
-    scraper_status_count = len(
-        short_term_db_target.get_destinations_content(scraper_status_table)
+    # Scraper 1.0.13+ emits one status row per listing saw/collect/download, so
+    # absolute row counts are no longer a fixed multiple of enabled scrapers.
+    # Validate that each task reconstructs a valid ScraperStatusOutput instead.
+    scraper_by_task = _group_scraper_status_by_task(short_term_db_target)
+    assert len(scraper_by_task) >= len(enabled_scrapers), (
+        f"Expected at least {len(enabled_scrapers)} scraper tasks, "
+        f"found {len(scraper_by_task)}"
     )
-    expected_scraper_count = 4 * len(enabled_scrapers)
-    assert scraper_status_count == expected_scraper_count, (
-        f"Expected {expected_scraper_count} documents in {scraper_status_table}, "
-        f"found {scraper_status_count}"
-    )
+    for tid, parts in scraper_by_task.items():
+        model = ScraperStatusOutput(
+            events=parts["events"],
+            global_status=parts["global_status"],
+            verified_downloads=parts["verified_downloads"],
+        )
+        assert (
+            model.validate_file_status()
+        ), f"ScraperStatusOutput invalid for task {tid}"
 
     parser_status_table = ParserStatus.get_table_name()
     parser_status_count = len(
@@ -400,24 +442,16 @@ def validate_short_term_structure(
     scraper_global_docs = short_term_db_target.get_destinations_content(
         "GlobalScraperStatus"
     )
+    scraper_verified_docs = short_term_db_target.get_destinations_content(
+        VERIFIED_SCRAPER_DOWNLOADS_TABLE
+    )
 
     assert len(scraper_events_docs) > 0, "Expected at least one ScraperStatus document."
     assert (
         len(scraper_global_docs) > 0
     ), "Expected at least one GlobalScraperStatus document."
 
-    # group by task_id — one group per chain per occasion
-    scraper_by_task: dict = {}
-    for doc in scraper_global_docs:
-        tid = doc["task_id"]
-        scraper_by_task.setdefault(tid, {"events": [], "global_status": []})
-        payload = {k: v for k, v in doc.items() if k != "index"}
-        scraper_by_task[tid]["global_status"].append(payload)
-
-    for doc in scraper_events_docs:
-        tid = doc["task_id"]
-        payload = {k: v for k, v in doc.items() if k != "index"}
-        scraper_by_task[tid]["events"].append(payload)
+    scraper_by_task = _group_scraper_status_by_task(short_term_db_target)
 
     # all scrapers ran at least once
     assert len(scraper_by_task) >= len(
@@ -429,6 +463,7 @@ def validate_short_term_structure(
         model = ScraperStatusOutput(
             events=parts["events"],
             global_status=parts["global_status"],
+            verified_downloads=parts["verified_downloads"],
         )
         assert (
             model.validate_file_status()
@@ -446,6 +481,10 @@ def validate_short_term_structure(
     assert short_term_db_target._is_collection_updated(
         "GlobalScraperStatus", seconds=60 * 60 * 3
     ), "GlobalScraperStatus should be updated in the last 3 hours"
+    if scraper_verified_docs:
+        assert short_term_db_target._is_collection_updated(
+            VERIFIED_SCRAPER_DOWNLOADS_TABLE, seconds=60 * 60 * 3
+        ), "VerifiedScraperDownloads should be updated in the last 3 hours"
 
     # ------------------------------------------------------------------ #
     # Parser                                                               #
