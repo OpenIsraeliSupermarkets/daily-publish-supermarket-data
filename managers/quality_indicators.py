@@ -18,15 +18,13 @@ from il_supermarket_parsers.utils.status.parser_status_contract import (
     SkippedFileStatus,
 )
 from il_supermarket_scarper import (
-    DumpFolderNames,
-    FileTypesFilters,
-    ScraperStatusOutput,
-)
-from il_supermarket_scarper.utils.scraper_status_contract import (
     CollectedStatus,
     DownloadedStatus,
+    DumpFolderNames,
     FailedStatus,
+    FileTypesFilters,
     SawStatus,
+    ScraperStatusOutput,
     StartedStatus,
 )
 
