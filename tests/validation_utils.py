@@ -22,6 +22,7 @@ from managers.quality_indicators import (
     PIPELINE_HEALTH_FILENAME,
     SCRAPER_QUALITY_FILENAME,
 )
+from managers.short_term_database_manager import VERIFIED_SCRAPER_DOWNLOADS_TABLE
 from managers.cache_manager import CacheManager
 from access.access_layer import AccessLayer
 
@@ -400,6 +401,9 @@ def validate_short_term_structure(
     scraper_global_docs = short_term_db_target.get_destinations_content(
         "GlobalScraperStatus"
     )
+    scraper_verified_docs = short_term_db_target.get_destinations_content(
+        VERIFIED_SCRAPER_DOWNLOADS_TABLE
+    )
 
     assert len(scraper_events_docs) > 0, "Expected at least one ScraperStatus document."
     assert (
@@ -410,14 +414,27 @@ def validate_short_term_structure(
     scraper_by_task: dict = {}
     for doc in scraper_global_docs:
         tid = doc["task_id"]
-        scraper_by_task.setdefault(tid, {"events": [], "global_status": []})
+        scraper_by_task.setdefault(
+            tid, {"events": [], "global_status": [], "verified_downloads": []}
+        )
         payload = {k: v for k, v in doc.items() if k != "index"}
         scraper_by_task[tid]["global_status"].append(payload)
 
     for doc in scraper_events_docs:
         tid = doc["task_id"]
+        scraper_by_task.setdefault(
+            tid, {"events": [], "global_status": [], "verified_downloads": []}
+        )
         payload = {k: v for k, v in doc.items() if k != "index"}
         scraper_by_task[tid]["events"].append(payload)
+
+    for doc in scraper_verified_docs:
+        tid = doc["task_id"]
+        scraper_by_task.setdefault(
+            tid, {"events": [], "global_status": [], "verified_downloads": []}
+        )
+        payload = {k: v for k, v in doc.items() if k != "index"}
+        scraper_by_task[tid]["verified_downloads"].append(payload)
 
     # all scrapers ran at least once
     assert len(scraper_by_task) >= len(
@@ -429,6 +446,7 @@ def validate_short_term_structure(
         model = ScraperStatusOutput(
             events=parts["events"],
             global_status=parts["global_status"],
+            verified_downloads=parts["verified_downloads"],
         )
         assert (
             model.validate_file_status()
@@ -446,6 +464,10 @@ def validate_short_term_structure(
     assert short_term_db_target._is_collection_updated(
         "GlobalScraperStatus", seconds=60 * 60 * 3
     ), "GlobalScraperStatus should be updated in the last 3 hours"
+    if scraper_verified_docs:
+        assert short_term_db_target._is_collection_updated(
+            VERIFIED_SCRAPER_DOWNLOADS_TABLE, seconds=60 * 60 * 3
+        ), "VerifiedScraperDownloads should be updated in the last 3 hours"
 
     # ------------------------------------------------------------------ #
     # Parser                                                               #
