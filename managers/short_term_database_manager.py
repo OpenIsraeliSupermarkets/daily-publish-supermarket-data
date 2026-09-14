@@ -8,7 +8,7 @@ from managers.cache_manager import CacheManager, CacheState
 from managers.large_file_push_manager import LargeFilePushManager
 from il_supermarket_parsers import ParserStatusOutput
 from il_supermarket_scarper import ScraperStatusOutput
-from typing import Optional, Union
+from typing import Union
 
 from utils.mongo_bson import sanitize_for_mongo
 
@@ -73,8 +73,8 @@ class ShortTermDBDatasetManager:
         model_type: Union[ParserStatusOutput, ScraperStatusOutput],
         target_table: str,
         global_target_table: str,
+        verified_target_table: str,
         local_cahce: CacheState,
-        verified_target_table: Optional[str] = None,
     ):
         for file_name in os.listdir(status_folder):
             if file_name.endswith(".json"):
@@ -98,14 +98,13 @@ class ShortTermDBDatasetManager:
                         pushed_set,
                         added_ids,
                     )
-                    if verified_target_table is not None:
-                        self._push_status_rows(
-                            getattr(model, "verified_downloads", []) or [],
-                            file_name,
-                            verified_target_table,
-                            pushed_set,
-                            added_ids,
-                        )
+                    self._push_status_rows(
+                        model.verified_downloads,
+                        file_name,
+                        verified_target_table,
+                        pushed_set,
+                        added_ids,
+                    )
 
                 merged = pushed_ids + [i for i in added_ids if i not in pushed_ids]
                 local_cahce.update_pushed_timestamps(file_name, merged)
@@ -126,8 +125,8 @@ class ShortTermDBDatasetManager:
             ScraperStatusOutput,
             "ScraperStatus",
             "GlobalScraperStatus",
+            VERIFIED_SCRAPER_DOWNLOADS_TABLE,
             local_cahce,
-            verified_target_table=VERIFIED_SCRAPER_DOWNLOADS_TABLE,
         )
         Logger.info("Scraper status stored in DynamoDB successfully.")
 
