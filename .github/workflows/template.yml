@@ -59,9 +59,8 @@ jobs:
         
     - name: Resolve latest release version
       run: |
-        tag=$(curl -fsS -H "Authorization: Bearer ${{ github.token }}" \
-          "https://api.github.com/repos/${{ github.repository }}/releases/latest" \
-          | python3 -c "import sys,json;print(json.load(sys.stdin)['tag_name'])")
+        git fetch --tags --force -q
+        tag=$(git tag -l 'v*' --sort=-v:refname | head -n 1)
         echo "Using release $tag"
         echo "IMAGE_TAG=$tag" >> $GITHUB_ENV
 
