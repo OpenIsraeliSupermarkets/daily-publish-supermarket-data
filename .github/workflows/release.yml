@@ -1,11 +1,13 @@
 name: Release
 
-# One click: computes the next version from the latest v* tag, tags main, creates the
+# Runs on every merge to main (patch bump) or by hand with a chosen bump. Computes the next version from the latest v* tag, writes it to VERSION (commit to main), tags, creates the
 # GitHub release (with generated notes) and publishes the Docker image by reusing
 # publish_docker.yml. Skips if nothing changed since the last release.
 # If main is protected, set RELEASE_GITHUB_TOKEN (a token allowed to push tags).
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       bump:
@@ -59,7 +61,7 @@ jobs:
           latest="${{ steps.gate.outputs.latest }}"
           IFS=. read -r major minor patch <<< "${latest:-v0.0.0}"
           major=${major#v}
-          case "${{ inputs.bump }}" in
+          case "${{ inputs.bump || 'patch' }}" in
             major) major=$((major+1)); minor=0; patch=0 ;;
             minor) minor=$((minor+1)); patch=0 ;;
             *) patch=$((patch+1)) ;;
@@ -74,6 +76,10 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          echo "${TAG#v}" > VERSION
+          git add VERSION
+          git commit -m "chore: release $TAG [skip ci]"
+          git push origin HEAD:main
           git tag -a "$TAG" -m "Release $TAG"
           git push origin "$TAG"
           args=(--title "$TAG" --generate-notes)

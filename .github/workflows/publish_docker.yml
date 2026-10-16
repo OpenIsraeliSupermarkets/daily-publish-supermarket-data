@@ -1,9 +1,6 @@
 name: Publish Docker image
 
 on:
-  push:
-    branches:
-      - main
   release:
     types: [published]
   # Called by release.yml (releases created with GITHUB_TOKEN don't fire the `release` event)
@@ -34,7 +31,7 @@ jobs:
       - name: Get version tag
         id: version
         run: |
-          if [ "${{ github.event_name }}" = "workflow_call" ]; then
+          if [ -n "${{ inputs.tag }}" ]; then
             echo "tag=${{ inputs.tag }}" >> $GITHUB_OUTPUT
             echo "is_release=true" >> $GITHUB_OUTPUT
           elif [ "${{ github.event_name }}" = "release" ]; then

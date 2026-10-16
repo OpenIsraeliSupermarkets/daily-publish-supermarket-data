@@ -49,6 +49,7 @@ services:
       start_period: 30s
 
   data_processor:
+    image: erlichsefi/data-fetcher:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: Dockerfile
