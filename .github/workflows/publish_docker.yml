@@ -1,9 +1,6 @@
 name: Publish Docker image
 
 on:
-  push:
-    branches:
-      - main
   release:
     types: [published]
   # Called by release.yml (releases created with GITHUB_TOKEN don't fire the `release` event)
