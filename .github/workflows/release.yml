@@ -1,0 +1,89 @@
+name: Release
+
+# One click: computes the next version from the latest v* tag, tags main, creates the
+# GitHub release (with generated notes) and publishes the Docker image by reusing
+# publish_docker.yml. Skips if nothing changed since the last release.
+# If main is protected, set RELEASE_GITHUB_TOKEN (a token allowed to push tags).
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version part to bump (patch for fixes, minor for features)"
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: release
+      cancel-in-progress: false
+    outputs:
+      released: ${{ steps.gate.outputs.release }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - name: Only release from main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Run this workflow from main (got ${{ github.ref }})"
+          exit 1
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
+      - name: Anything new since the last release?
+        id: gate
+        run: |
+          git fetch --tags --force origin
+          latest=$(git tag -l 'v*' --sort=-v:refname | head -n 1)
+          count=$(git rev-list --count "${latest:+$latest..}HEAD")
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+          echo "Latest tag: ${latest:-<none>}; commits since: $count"
+          if [ "$count" -eq 0 ]; then
+            echo "Nothing to release."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Bump version
+        if: steps.gate.outputs.release == 'true'
+        id: version
+        run: |
+          latest="${{ steps.gate.outputs.latest }}"
+          IFS=. read -r major minor patch <<< "${latest:-v0.0.0}"
+          major=${major#v}
+          case "${{ inputs.bump }}" in
+            major) major=$((major+1)); minor=0; patch=0 ;;
+            minor) minor=$((minor+1)); patch=0 ;;
+            *) patch=$((patch+1)) ;;
+          esac
+          echo "tag=v$major.$minor.$patch" >> "$GITHUB_OUTPUT"
+      - name: Tag and create the release
+        if: steps.gate.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          LATEST: ${{ steps.gate.outputs.latest }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+          args=(--title "$TAG" --generate-notes)
+          if [ -n "$LATEST" ]; then args+=(--notes-start-tag "$LATEST"); fi
+          gh release create "$TAG" "${args[@]}"
+
+  publish:
+    needs: release
+    if: needs.release.outputs.released == 'true'
+    uses: ./.github/workflows/publish_docker.yml
+    with:
+      tag: ${{ needs.release.outputs.tag }}
+    secrets: inherit

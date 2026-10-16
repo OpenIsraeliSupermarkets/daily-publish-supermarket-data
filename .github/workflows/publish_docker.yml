@@ -6,6 +6,13 @@ on:
       - main
   release:
     types: [published]
+  # Called by release.yml (releases created with GITHUB_TOKEN don't fire the `release` event)
+  workflow_call:
+    inputs:
+      tag:
+        description: "Release tag to publish, e.g. v1.2.3"
+        type: string
+        required: true
 
 jobs:
   push_to_registry:
@@ -27,7 +34,10 @@ jobs:
       - name: Get version tag
         id: version
         run: |
-          if [ "${{ github.event_name }}" = "release" ]; then
+          if [ "${{ github.event_name }}" = "workflow_call" ]; then
+            echo "tag=${{ inputs.tag }}" >> $GITHUB_OUTPUT
+            echo "is_release=true" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" = "release" ]; then
             echo "tag=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
             echo "is_release=true" >> $GITHUB_OUTPUT
           else
