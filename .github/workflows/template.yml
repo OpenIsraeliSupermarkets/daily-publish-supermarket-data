@@ -57,10 +57,10 @@ jobs:
         echo "DISCORD_WEBHOOK_URL=${{ secrets.DISCORD_WEBHOOK_URL }}" >> $GITHUB_ENV
        
         
+    # VERSION is committed by release.yml; the runner has the repo (no git needed).
     - name: Resolve latest release version
       run: |
-        git fetch --tags --force -q
-        tag=$(git tag -l 'v*' --sort=-v:refname | head -n 1)
+        tag="v$(tr -d '[:space:]' < VERSION)"
         echo "Using release $tag"
         echo "IMAGE_TAG=$tag" >> $GITHUB_ENV
 
