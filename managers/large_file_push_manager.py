@@ -87,6 +87,7 @@ class LargeFilePushManager:
 
             # Process and upload chunk
             eof_to_send = []
+            last_completed_row = None
             try:
                 chunk = chunk.reset_index(names=["row_index"]).ffill()
                 items = []
@@ -107,6 +108,7 @@ class LargeFilePushManager:
                         )
                         open_file = record["file_name"]
                         total_expected_records = 1
+                        last_completed_row = record["row_index"] - 1
 
                     items.append(
                         DataTable(
@@ -141,6 +143,13 @@ class LargeFilePushManager:
                     target_table_name,
                     [sanitize_for_mongo(e) for e in eof_to_send],
                 )
+                # Track progress at the last completed source file, whose next
+                # row is a full (unmasked) row. CacheManager writes it on exit,
+                # including a SIGTERM exit, so a restart resumes there instead
+                # of from row 0. The rows of the source file that was still
+                # open are sent again, so consumers must tolerate re-sent
+                # records (#108).
+                local_cache.update_last_processed_row(file, last_completed_row)
             # Save last row for next iteration
             last_row_saw = chunk.tail(1).set_index("row_index")
 
