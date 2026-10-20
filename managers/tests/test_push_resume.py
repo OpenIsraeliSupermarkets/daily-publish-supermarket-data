@@ -1,8 +1,9 @@
-"""A push killed mid-file resumes from the last chunk, not from row 0 (#108)."""
+"""A push stopped by SIGTERM resumes at the last completed source file, not row 0 (#108)."""
 
 import asyncio
 import json
 import os
+import signal
 
 import numpy as np
 import pandas as pd
@@ -11,21 +12,30 @@ import pytest
 from managers.cache_manager import CacheManager
 from managers.large_file_push_manager import LargeFilePushManager
 from remotes.short_term.kafka_db import KafkaDbUploader
+from utils import exit_cleanly_on_sigterm
 
 
 class RecordingDb:
-    """Collects pushed items; optionally dies on the n-th insert."""
+    """Collects pushed items; optionally gets SIGTERM on the n-th insert."""
 
-    def __init__(self, die_on_call=None):
+    def __init__(self, sigterm_on_call=None):
         self.items = []
         self.calls = 0
-        self.die_on_call = die_on_call
+        self.sigterm_on_call = sigterm_on_call
 
     def _insert_to_destinations(self, table_name, items):
         self.calls += 1
-        if self.die_on_call is not None and self.calls == self.die_on_call:
-            raise KeyboardInterrupt("killed mid-push")
+        if self.sigterm_on_call is not None and self.calls == self.sigterm_on_call:
+            os.kill(os.getpid(), signal.SIGTERM)  # what `docker stop` sends
         self.items.extend(items)
+
+
+@pytest.fixture(autouse=True)
+def sigterm_handler():
+    previous = signal.getsignal(signal.SIGTERM)
+    exit_cleanly_on_sigterm()
+    yield
+    signal.signal(signal.SIGTERM, previous)
 
 
 def _write_csv(folder):
@@ -48,16 +58,12 @@ def _write_csv(folder):
     return name
 
 
-def _push(folder, file, db, kill=False):
-    manager = CacheManager(folder)
-    cache = manager.__enter__()
+def _push(folder, file, db):
     try:
-        LargeFilePushManager(folder, db, chunk_size=2).process_file(file, cache)
-    except KeyboardInterrupt:
-        # a killed process never runs CacheManager.__exit__
-        manager._lock.release()
-        return
-    manager.__exit__(None, None, None)
+        with CacheManager(folder) as cache:
+            LargeFilePushManager(folder, db, chunk_size=2).process_file(file, cache)
+    except SystemExit:
+        pass
 
 
 def _rows(items):
@@ -81,9 +87,9 @@ def test_killed_push_resumes_at_last_completed_source_file(tmp_path):
     _push(str(clean_dir), _write_csv(str(clean_dir)), clean)
 
     # chunk_size=2: chunk 3 holds a.xml's last row and b.xml's first, so a.xml
-    # completes there (inserts 3 and 4); die on chunk 4 (insert 5)
+    # completes there (inserts 3 and 4); SIGTERM on chunk 4 (insert 5)
     file = _write_csv(str(killed_dir))
-    _push(str(killed_dir), file, RecordingDb(die_on_call=5), kill=True)
+    _push(str(killed_dir), file, RecordingDb(sigterm_on_call=5))
 
     with open(killed_dir / ".push_cache") as cache_file:
         saved = json.load(cache_file)

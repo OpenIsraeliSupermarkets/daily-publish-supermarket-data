@@ -31,7 +31,8 @@ FROM dev as testing
 CMD python system_tests/main.py && python -m pytest .
 
 FROM base as data_processing
-CMD python main.py
+# exec form, so python is PID 1 and receives SIGTERM from docker stop (#108)
+CMD ["python", "main.py"]
 
 # Serving: api.py
 FROM base as serving

@@ -8,7 +8,7 @@ from publishers import SupermarketDataPublisherInterface, SupermarketDataPublish
 import os
 import datetime
 from utils import now
-from utils import Logger
+from utils import Logger, exit_cleanly_on_sigterm
 import datetime
 import pytz
 
@@ -27,6 +27,8 @@ def output_short_term_destination_from_env(output_destination):
 
 
 if __name__ == "__main__":
+    exit_cleanly_on_sigterm()
+
 
     # Allow providing when from environment variable, otherwise use current time
     when_str = os.environ.get("WHEN", None)

@@ -51,6 +51,17 @@ The main workhorse that scrapes supermarket data, processes it, and publishes to
 
 See the [Data Processing Docker Example](#data-processing-example) below for usage.
 
+**Delivery to the short-term database is at-least-once.** Push progress
+(`app_data/.push_cache`) is kept in memory and written when the push exits,
+including on SIGTERM (`docker stop`, redeploys). It is recorded at the end of
+the last fully pushed source file, so after a restart the rows of the source
+file that was open are sent again. That can be up to a whole batch
+(`chunk_size`, 10,000 rows) or more. A hard kill (OOM, `kill -9`, host crash)
+skips the write, and the next run starts that CSV from row 0. Consumers
+(e.g. the data-playground pipeline) must therefore tolerate re-sent records of
+any size: upsert by key, don't append, and don't assume each record arrives
+once.
+
 ### 4. **serving** (API Server)
 FastAPI server that provides REST API access to the scraped raw data.
 

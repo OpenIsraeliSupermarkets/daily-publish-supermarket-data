@@ -11,24 +11,14 @@ class CacheState:
     to manage and query the cache data for individual files.
     """
 
-    def __init__(self, data, persist=None):
+    def __init__(self, data):
         """
         Initialize the CacheState with cache data.
 
         Args:
             data (dict): Dictionary containing the cache data
-            persist (callable, optional): Writes the cache to disk; used by save()
         """
         self._data = data
-        self._persist = persist
-
-    def save(self):
-        """
-        Write the cache to disk now, instead of only when the CacheManager exits,
-        so progress survives a process that is killed mid-upload.
-        """
-        if self._persist is not None:
-            self._persist()
 
     def get_pushed_timestamps(self, file_name):
         """
@@ -138,7 +128,7 @@ class CacheManager:
                 except json.JSONDecodeError:
                     # If the file is corrupted, start with empty data
                     self._data = {}
-            return CacheState(self._data, persist=self._write)
+            return CacheState(self._data)
         except Timeout:
             raise RuntimeError("Could not acquire lock on cache file")
 
@@ -152,16 +142,12 @@ class CacheManager:
             exc_tb: Exception traceback if any occurred
         """
         try:
-            self._write()
+            if self._data is not None:
+                # Write to a temporary file first
+                temp_file = f"{self.cache_file}.tmp"
+                with open(temp_file, "w") as file:
+                    json.dump(self._data, file)
+                # Atomic rename
+                os.replace(temp_file, self.cache_file)
         finally:
             self._lock.release()
-
-    def _write(self):
-        """Atomically write the cache data to the cache file."""
-        if self._data is not None:
-            # Write to a temporary file first
-            temp_file = f"{self.cache_file}.tmp"
-            with open(temp_file, "w") as file:
-                json.dump(self._data, file)
-            # Atomic rename
-            os.replace(temp_file, self.cache_file)

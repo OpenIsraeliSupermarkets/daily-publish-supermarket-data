@@ -143,11 +143,13 @@ class LargeFilePushManager:
                     target_table_name,
                     [sanitize_for_mongo(e) for e in eof_to_send],
                 )
-                # Persist progress at the last completed source file, whose
-                # next row is a full (unmasked) row, so a restart resumes there
-                # instead of from row 0 once the whole upload is done (#108)
+                # Track progress at the last completed source file, whose next
+                # row is a full (unmasked) row. CacheManager writes it on exit,
+                # including a SIGTERM exit, so a restart resumes there instead
+                # of from row 0. The rows of the source file that was still
+                # open are sent again, so consumers must tolerate re-sent
+                # records (#108).
                 local_cache.update_last_processed_row(file, last_completed_row)
-                local_cache.save()
             # Save last row for next iteration
             last_row_saw = chunk.tail(1).set_index("row_index")
 
