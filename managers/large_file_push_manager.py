@@ -90,8 +90,14 @@ class LargeFilePushManager:
             last_completed_row = None
             try:
                 chunk = chunk.reset_index(names=["row_index"]).ffill()
+                records = chunk.to_dict(orient="records")
+                # The first record is the previous chunk's last row, prepended
+                # only as the ffill source. It was already sent and counted
+                # with the previous chunk, so skip it here (#110).
+                if last_row_saw is not None:
+                    records = records[1:]
                 items = []
-                for record in chunk.to_dict(orient="records"):
+                for record in records:
                     if open_file is None:
                         open_file = record["file_name"]
                         total_expected_records = 0
@@ -127,18 +133,10 @@ class LargeFilePushManager:
                 Logger.error(f"Chunk: {chunk}")
                 raise e
 
-            # remove the first item since it was used of ffill
-            if last_row_saw is not None:
-                items = items[1:]
-
             self.database_manager._insert_to_destinations(
                 target_table_name, [sanitize_for_mongo(item) for item in items]
             )
             if eof_to_send:
-                if last_row_saw is not None:
-                    for eof in eof_to_send:
-                        if eof["file_name"] == last_row_saw.iloc[0].file_name:
-                            eof["total_expected_records"] -= 1
                 self.database_manager._insert_to_destinations(
                     target_table_name,
                     [sanitize_for_mongo(e) for e in eof_to_send],
