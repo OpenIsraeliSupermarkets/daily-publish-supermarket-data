@@ -94,34 +94,6 @@ class CacheState:
             self._data["last_pushed"] = {}
         self._data["last_pushed"][self._get_file_name(file_name)] = last_processed_row
 
-    def get_push_resume_state(self, file_name):
-        """
-        Get the state needed to resume pushing a file in the middle of a chunk
-        sequence: the last pushed row (after ffill), the source file it belongs
-        to and how many of that file's records were already counted.
-
-        Args:
-            file_name (str): Name of the file to check
-
-        Returns:
-            dict or None: The saved state, or None if the file has none
-        """
-        return self._data.get("push_resume", {}).get(self._get_file_name(file_name))
-
-    def update_push_resume_state(self, file_name, state):
-        """
-        Store (or with state=None, drop) the resume state for a file.
-
-        Args:
-            file_name (str): Name of the file to update
-            state (dict or None): JSON-serialisable resume state
-        """
-        resume = self._data.setdefault("push_resume", {})
-        if state is None:
-            resume.pop(self._get_file_name(file_name), None)
-        else:
-            resume[self._get_file_name(file_name)] = state
-
     def clear(self):
         """
         Clear the cache data.

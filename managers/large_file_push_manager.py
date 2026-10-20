@@ -1,5 +1,4 @@
 import os
-import json
 from utils import Logger
 import pandas as pd
 from remotes import ShortTermDatabaseUploader
@@ -54,18 +53,6 @@ class LargeFilePushManager:
         last_row_saw = None
         open_file = None
         total_expected_records = 0
-
-        # Rows after the first one of each source file are masked with NaN and
-        # restored by ffill, so resuming mid-file needs the last pushed row as
-        # the ffill source, plus the record count of the file still open.
-        resume_state = local_cache.get_push_resume_state(file)
-        if resume_state is not None:
-            last_row_saw = pd.DataFrame([resume_state["last_row_saw"]]).set_index(
-                "row_index"
-            )
-            open_file = resume_state["open_file"]
-            total_expected_records = resume_state["total_expected_records"]
-            Logger.info(f"Resuming {file} inside {open_file}")
         # Process file in chunks
         for chunk in pd.read_csv(
             file_path,
@@ -100,6 +87,7 @@ class LargeFilePushManager:
 
             # Process and upload chunk
             eof_to_send = []
+            last_completed_row = None
             try:
                 chunk = chunk.reset_index(names=["row_index"]).ffill()
                 items = []
@@ -120,6 +108,7 @@ class LargeFilePushManager:
                         )
                         open_file = record["file_name"]
                         total_expected_records = 1
+                        last_completed_row = record["row_index"] - 1
 
                     items.append(
                         DataTable(
@@ -154,23 +143,13 @@ class LargeFilePushManager:
                     target_table_name,
                     [sanitize_for_mongo(e) for e in eof_to_send],
                 )
+                # Persist progress at the last completed source file, whose
+                # next row is a full (unmasked) row, so a restart resumes there
+                # instead of from row 0 once the whole upload is done (#108)
+                local_cache.update_last_processed_row(file, last_completed_row)
+                local_cache.save()
             # Save last row for next iteration
             last_row_saw = chunk.tail(1).set_index("row_index")
-
-            # Persist progress after every chunk so a restart resumes here,
-            # instead of from row 0 once the whole upload is done (#108)
-            local_cache.update_last_processed_row(file, last_row)
-            local_cache.update_push_resume_state(
-                file,
-                {
-                    "last_row_saw": json.loads(
-                        last_row_saw.reset_index().to_json(orient="records")
-                    )[0],
-                    "open_file": open_file,
-                    "total_expected_records": total_expected_records,
-                },
-            )
-            local_cache.save()
 
         if open_file is not None:
             self.database_manager._insert_to_destinations(
@@ -185,8 +164,6 @@ class LargeFilePushManager:
                     )
                 ],
             )
-        # Update cache with last processed row; the open file was completed
-        # above, so the next run starts on a fresh source file
+        # Update cache with last processed row
         local_cache.update_last_processed_row(file, last_row)
-        local_cache.update_push_resume_state(file, None)
         Logger.info(f"Completed pushing {file}")

@@ -72,7 +72,7 @@ def _rows(items):
     ]
 
 
-def test_killed_push_resumes_with_same_rows(tmp_path):
+def test_killed_push_resumes_at_last_completed_source_file(tmp_path):
     clean_dir, killed_dir = tmp_path / "clean", tmp_path / "killed"
     clean_dir.mkdir()
     killed_dir.mkdir()
@@ -80,18 +80,26 @@ def test_killed_push_resumes_with_same_rows(tmp_path):
     clean = RecordingDb()
     _push(str(clean_dir), _write_csv(str(clean_dir)), clean)
 
+    # chunk_size=2: chunk 3 holds a.xml's last row and b.xml's first, so a.xml
+    # completes there (inserts 3 and 4); die on chunk 4 (insert 5)
     file = _write_csv(str(killed_dir))
-    first = RecordingDb(die_on_call=3)
-    _push(str(killed_dir), file, first, kill=True)
+    _push(str(killed_dir), file, RecordingDb(die_on_call=5), kill=True)
 
     with open(killed_dir / ".push_cache") as cache_file:
         saved = json.load(cache_file)
-    assert saved["last_pushed"][file] >= 1  # progress was written before the kill
+    assert saved["last_pushed"][file] == 4  # a.xml is rows 0-4
 
     second = RecordingDb()
     _push(str(killed_dir), file, second)
 
-    assert _rows(first.items + second.items) == _rows(clean.items)
+    # the restart re-sends b.xml from its first (unmasked) row, as a clean run
+    def data_rows(items):
+        return _rows(
+            i for i in items if i["file_name"] == "b.xml" and "file_complete" not in i
+        )
+
+    assert data_rows(second.items) == data_rows(clean.items)
+    assert [i["file_name"] for i in second.items if "file_complete" in i] == ["b.xml"]
 
 
 def test_finished_push_does_not_resend_file_complete(tmp_path):
