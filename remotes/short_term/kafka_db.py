@@ -173,24 +173,34 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
         topic_name = self._get_topic_name(table_target_name)
 
         try:
-            # Send all messages individually to avoid duplicates on partial failure
+            # Queue every record, then wait for the acks together. Awaiting each
+            # send one by one costs a broker round trip per row (#108).
             successful_records = 0
-            flushs = set()
+            flushs = []
+            pending = []
             for item in items:
                 try:
-                    await self.producer.send_and_wait(
-                        topic=topic_name,
-                        key=item["file_name"].encode("utf-8"),
-                        value=item,
+                    pending.append(
+                        await self.producer.send(
+                            topic=topic_name,
+                            key=item["file_name"].encode("utf-8"),
+                            value=item,
+                        )
                     )
-                    successful_records += 1
                 except KafkaError as inner_e:
                     Logger.error("Failed to send record: %s", str(inner_e))
-
                 if item["file_name"] not in flushs:
-                    flushs.add(item["file_name"])
+                    flushs.append(item["file_name"])
 
-            # send flush message only if we successfully sent some records
+            for result in await asyncio.gather(*pending, return_exceptions=True):
+                if isinstance(result, KafkaError):
+                    Logger.error("Failed to send record: %s", str(result))
+                elif isinstance(result, BaseException):
+                    raise result
+                else:
+                    successful_records += 1
+
+            # flush messages go out only after the file's records are acked
             for file_name in flushs:
                 try:
                     await self.producer.send_and_wait(

@@ -1,4 +1,5 @@
 from unittest.mock import patch, MagicMock
+import asyncio
 import functools
 
 
@@ -20,6 +21,13 @@ def mock_kafka_db(func):
                     topics_data[topic] = []
                 topics_data[topic].append(value)
                 return None
+
+            async def send(self, topic, key, value):
+                # aiokafka's send() enqueues and returns a future for the ack
+                await self.send_and_wait(topic, key, value)
+                future = asyncio.get_running_loop().create_future()
+                future.set_result(None)
+                return future
 
         mock_producer = MockProducer()
 

@@ -11,14 +11,24 @@ class CacheState:
     to manage and query the cache data for individual files.
     """
 
-    def __init__(self, data):
+    def __init__(self, data, persist=None):
         """
         Initialize the CacheState with cache data.
 
         Args:
             data (dict): Dictionary containing the cache data
+            persist (callable, optional): Writes the cache to disk; used by save()
         """
         self._data = data
+        self._persist = persist
+
+    def save(self):
+        """
+        Write the cache to disk now, instead of only when the CacheManager exits,
+        so progress survives a process that is killed mid-upload.
+        """
+        if self._persist is not None:
+            self._persist()
 
     def get_pushed_timestamps(self, file_name):
         """
@@ -84,6 +94,34 @@ class CacheState:
             self._data["last_pushed"] = {}
         self._data["last_pushed"][self._get_file_name(file_name)] = last_processed_row
 
+    def get_push_resume_state(self, file_name):
+        """
+        Get the state needed to resume pushing a file in the middle of a chunk
+        sequence: the last pushed row (after ffill), the source file it belongs
+        to and how many of that file's records were already counted.
+
+        Args:
+            file_name (str): Name of the file to check
+
+        Returns:
+            dict or None: The saved state, or None if the file has none
+        """
+        return self._data.get("push_resume", {}).get(self._get_file_name(file_name))
+
+    def update_push_resume_state(self, file_name, state):
+        """
+        Store (or with state=None, drop) the resume state for a file.
+
+        Args:
+            file_name (str): Name of the file to update
+            state (dict or None): JSON-serialisable resume state
+        """
+        resume = self._data.setdefault("push_resume", {})
+        if state is None:
+            resume.pop(self._get_file_name(file_name), None)
+        else:
+            resume[self._get_file_name(file_name)] = state
+
     def clear(self):
         """
         Clear the cache data.
@@ -128,7 +166,7 @@ class CacheManager:
                 except json.JSONDecodeError:
                     # If the file is corrupted, start with empty data
                     self._data = {}
-            return CacheState(self._data)
+            return CacheState(self._data, persist=self._write)
         except Timeout:
             raise RuntimeError("Could not acquire lock on cache file")
 
@@ -142,12 +180,16 @@ class CacheManager:
             exc_tb: Exception traceback if any occurred
         """
         try:
-            if self._data is not None:
-                # Write to a temporary file first
-                temp_file = f"{self.cache_file}.tmp"
-                with open(temp_file, "w") as file:
-                    json.dump(self._data, file)
-                # Atomic rename
-                os.replace(temp_file, self.cache_file)
+            self._write()
         finally:
             self._lock.release()
+
+    def _write(self):
+        """Atomically write the cache data to the cache file."""
+        if self._data is not None:
+            # Write to a temporary file first
+            temp_file = f"{self.cache_file}.tmp"
+            with open(temp_file, "w") as file:
+                json.dump(self._data, file)
+            # Atomic rename
+            os.replace(temp_file, self.cache_file)
