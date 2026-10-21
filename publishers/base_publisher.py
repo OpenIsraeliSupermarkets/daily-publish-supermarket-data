@@ -5,6 +5,7 @@ Provides the core functionality for scraping, converting, and uploading supermar
 
 from utils import Logger
 import datetime
+import multiprocessing
 import os
 import shutil
 from il_supermarket_scarper import ScarpingTask, ScraperFactory
@@ -12,6 +13,8 @@ from il_supermarket_parsers import ConvertingTask, FileTypesFilters
 from managers.long_term_database_manager import LongTermDatasetManager
 from managers.short_term_database_manager import ShortTermDBDatasetManager
 from managers.cache_manager import CacheManager
+from managers.stream_push_manager import StreamPushManager
+from managers.file_type_router import FileTypeRouter
 from managers.quality_indicators import write_quality_indicators
 from remotes import KaggleUploader, MongoDbUploader
 from utils import now
@@ -155,6 +158,92 @@ class BaseSupermarketDataPublisher:
         task.start()
         task.join()
         Logger.info("Converting task is done")
+        write_quality_indicators(
+            quality_folder=self.quality_folder,
+            scraping_status_folder=self.scraping_status_folder,
+            converting_status_folder=self.converting_status_folder,
+            enabled_scrapers=self.enabled_scrapers,
+            enabled_file_types=self.enabled_file_types,
+        )
+
+    def _execute_streaming(self):
+        """
+        Scrape, convert and push in one pipeline, the way the parser's
+        example.py does: the scraper hands files to the converter through
+        queues, and the converter writes every row both to the CSV outputs
+        (for the long-term upload and api_update) and to a queue that is
+        pushed to the short-term database as rows arrive (#114).
+        """
+        os.makedirs(self.data_folder, exist_ok=True)
+        # The scraper and converters fork their worker pools from background
+        # threads while the router and push threads run. A plain fork copies
+        # locks other threads hold (logging, queues), and the child can hang
+        # on them forever. Fork from a single-threaded server instead.
+        multiprocessing.set_start_method("forkserver", force=True)
+        scraper = ScarpingTask(
+            enabled_scrapers=self.enabled_scrapers,
+            files_types=self.enabled_file_types,
+            multiprocessing=self.number_of_scraping_processes,
+            status_configuration={
+                **self.status_configuration,
+                "base_path": self.scraping_status_folder,
+            },
+            output_configuration={"output_mode": "queue", "queue_type": "memory"},
+        )
+        router = FileTypeRouter(
+            scraper.consume(), self.enabled_file_types, self.scraping_status_folder
+        )
+        # One converter per file type, each reading only its own files. Each
+        # has number_of_parseing_processs workers, so the chains being scraped
+        # at the same time are parsed at the same time.
+        converters = [
+            ConvertingTask(
+                enabled_parsers=self.enabled_scrapers,
+                files_types=[file_type],
+                multiprocessing=self.number_of_parseing_processs,
+                status_configuration={
+                    **self.status_configuration,
+                    "base_path": self.converting_status_folder,
+                },
+                source_configuration={"queue_handlers": router.queues[file_type]},
+                output_configuration=[
+                    {"output_mode": "queue", "queue_type": "memory"},
+                    {"output_mode": "csv", "output_folder": self.outputs_folder},
+                ],
+            )
+            for file_type in router.file_types
+        ]
+        # queues must exist before the converters' workers start
+        parsed_rows = {}
+        for converter in converters:
+            parsed_rows.update(converter.consume())
+
+        with CacheManager(self.app_folder) as local_cache:
+            if local_cache.is_empty():
+                self.short_term_db_target.restart_database(
+                    self.enabled_scrapers, self.enabled_file_types
+                )
+            Logger.info("Starting the streaming task")
+            scraper.start(
+                limit=self.limit,
+                when_date=self.when_date if self.when_date else now(backfill_hours=1),
+            )
+            router.start()
+            for converter in converters:
+                converter.start()
+            try:
+                StreamPushManager(self.short_term_db_target).push(
+                    parsed_rows, local_cache
+                )
+            finally:
+                scraper.join()
+                router.join()
+                for converter in converters:
+                    try:
+                        converter.join()
+                    except RuntimeError:
+                        pass  # already finished: join() raises once the thread is done
+        Logger.info("Streaming task is done")
         write_quality_indicators(
             quality_folder=self.quality_folder,
             scraping_status_folder=self.scraping_status_folder,

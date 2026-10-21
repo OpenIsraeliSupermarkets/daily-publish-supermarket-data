@@ -229,6 +229,14 @@ Testing:
 - `LIMIT` - Limit number of files to process
 - `WAIT_TIME_SECONDS` - Seconds between cycles (default: 1800)
 - `HEALTHCHECK_MAX_AGE_SECONDS` - Health check timeout (default: 300)
+- `CYCLE_OPERATIONS` - Operations of each cycle (default: `streaming,api_update,clean_dump_files`). `streaming` scrapes, converts and pushes each row as soon as it is parsed; `api_update` then pushes only the files streaming did not finish. `scraping,converting,api_update,clean_dump_files` restores the batch cycle.
+- `KAFKA_MAX_BATCH_SIZE` - Producer batch per partition in bytes (default: 1048576, capped at `KAFKA_MAX_REQUEST_SIZE`)
+- `KAFKA_LINGER_MS` - Producer linger (default: 0)
+- `KAFKA_COMPRESSION_TYPE` - `none` (default) or `gzip`; lz4/zstd also need the library on the consumer side
+- `KAFKA_ENABLE_IDEMPOTENCE` - Idempotent producer, so retries add no duplicates (default: true)
+- `KAFKA_MAX_PENDING_ROWS` - Streamed rows waiting for an ack before the push waits (default: 100000)
+
+To measure the scraper-to-Kafka latency of a cycle (per row: broker append time minus the scraper's `saw` time for its file), run `python scripts/kpi_scraper_to_kafka.py --scraping-status-folder <APP_DATA_PATH>/scraping_status` against a broker with `log.message.timestamp.type=LogAppendTime`.
 
 
 ---

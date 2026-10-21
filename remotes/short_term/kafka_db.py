@@ -15,6 +15,11 @@ from aiokafka import AIOKafkaProducer, AIOKafkaConsumer
 from aiokafka.errors import KafkaError
 from kafka import KafkaAdminClient
 from .api_base import ShortTermDatabaseUploader
+from .row_stream import KafkaRowStream
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    return os.getenv(name, str(default)).strip().lower() in ("1", "true", "yes")
 
 
 class KafkaDbUploader(ShortTermDatabaseUploader):
@@ -50,6 +55,24 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
         )
         if self.max_partition_fetch_bytes > self.fetch_max_bytes:
             self.max_partition_fetch_bytes = self.fetch_max_bytes
+        # aiokafka sends one request per broker at a time, holding at most
+        # max_batch_size bytes per partition. The 16 KB default is about 20
+        # rows per round trip (#114).
+        self.max_batch_size = min(
+            int(os.getenv("KAFKA_MAX_BATCH_SIZE", str(1024 * 1024))),
+            self.max_request_size,
+        )
+        # Measured on a local broker (#114): linger only adds a wait at the end
+        # of every chunk, and gzip costs more CPU than it saves on a broker on
+        # the same host, so both are off by default. If retention disk is
+        # tight, set KAFKA_COMPRESSION_TYPE=gzip (lz4/zstd also need the
+        # library on the consumer side).
+        self.linger_ms = int(os.getenv("KAFKA_LINGER_MS", "0"))
+        compression = os.getenv("KAFKA_COMPRESSION_TYPE", "none").strip().lower()
+        self.compression_type = None if compression in ("", "none") else compression
+        self.enable_idempotence = _env_bool("KAFKA_ENABLE_IDEMPOTENCE", True)
+        # rows waiting for an ack in the streaming push before it blocks
+        self.max_pending_rows = int(os.getenv("KAFKA_MAX_PENDING_ROWS", "100000"))
         self.producer: Optional[AIOKafkaProducer] = None
         self.admin_client: Optional[KafkaAdminClient] = None
         self._connection_tested = False
@@ -77,6 +100,10 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
                 client_id="supermarket_data_producer",
                 value_serializer=lambda v: json.dumps(v).encode("utf-8"),
                 max_request_size=self.max_request_size,
+                max_batch_size=self.max_batch_size,
+                linger_ms=self.linger_ms,
+                compression_type=self.compression_type,
+                enable_idempotence=self.enable_idempotence,
             )
             await self.producer.start()
 
@@ -176,6 +203,7 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
             # Queue every record, then wait for the acks together. Awaiting each
             # send one by one costs a broker round trip per row (#108).
             successful_records = 0
+            failed_records = 0
             flushs = []
             pending = []
             for item in items:
@@ -189,27 +217,40 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
                     )
                 except KafkaError as inner_e:
                     Logger.error("Failed to send record: %s", str(inner_e))
+                    failed_records += 1
                 if item["file_name"] not in flushs:
                     flushs.append(item["file_name"])
 
             for result in await asyncio.gather(*pending, return_exceptions=True):
                 if isinstance(result, KafkaError):
                     Logger.error("Failed to send record: %s", str(result))
+                    failed_records += 1
                 elif isinstance(result, BaseException):
                     raise result
                 else:
                     successful_records += 1
 
+            # A lost row must not be followed by a file_complete that claims
+            # it, so fail the push; progress stays at the last boundary (#114).
+            if failed_records:
+                raise KafkaError(
+                    f"{failed_records}/{len(items)} records were not acked by Kafka"
+                )
+
             # flush messages go out only after the file's records are acked
-            for file_name in flushs:
-                try:
-                    await self.producer.send_and_wait(
+            for result in await asyncio.gather(
+                *(
+                    self.producer.send_and_wait(
                         topic=topic_name,
                         key=file_name.encode("utf-8"),
                         value={"flush": "true"},
                     )
-                except KafkaError as flush_e:
-                    Logger.error("Failed to send flush message: %s", str(flush_e))
+                    for file_name in flushs
+                ),
+                return_exceptions=True,
+            ):
+                if isinstance(result, BaseException):
+                    Logger.error("Failed to send flush message: %s", str(result))
 
             Logger.info(
                 "Successfully sent %d/%d records to Kafka",
@@ -219,6 +260,28 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
         except Exception as e:
             Logger.error("Unexpected error during message sending: %s", str(e))
             raise
+
+    def stream_rows(self, push, on_file_stored=None):
+        """Run ``push(stream)`` with a streaming Kafka row stream (see
+        ``ShortTermDatabaseUploader.stream_rows``)."""
+        self._ensure_connection()
+        if self.producer is None:
+            raise KafkaError("Failed to establish Kafka connection")
+
+        async def _run():
+            stream = KafkaRowStream(
+                self.producer,
+                self._get_topic_name,
+                max_pending_rows=self.max_pending_rows,
+                on_file_stored=on_file_stored,
+            )
+            try:
+                await push(stream)
+            finally:
+                await stream.close()
+            return stream
+
+        return self._loop.run_until_complete(_run())
 
     def _create_destinations(self, partition_id, table_name):
         """Create a new topic (Kafka doesn't require explicit topic creation).

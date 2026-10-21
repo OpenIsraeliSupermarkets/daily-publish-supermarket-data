@@ -89,6 +89,27 @@ class CacheState:
         if self._on_progress is not None:
             self._on_progress()
 
+    def get_streamed_files(self):
+        """
+        Get the source files the streaming push already delivered in full.
+
+        Returns:
+            list: Source file names whose file_complete message was acked
+        """
+        return self._data.get("streamed_files", [])
+
+    def mark_file_streamed(self, file_name):
+        """
+        Record that the streaming push delivered every row of a source file,
+        so the CSV push in api_update does not send it again.
+
+        Args:
+            file_name (str): Source file name, as in the rows' file_name field
+        """
+        streamed = self._data.setdefault("streamed_files", [])
+        if file_name not in streamed:
+            streamed.append(file_name)
+
     def clear(self):
         """
         Clear the cache data.
