@@ -136,6 +136,13 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
         """
         return f"{table_target_name}"
 
+    @staticmethod
+    def _message_key(item) -> Optional[bytes]:
+        """Partition key for a row: its file_name, else its index (status rows
+        such as GlobalScraperStatus carry no file_name, #115), else no key."""
+        key = item.get("file_name") or item.get("index")
+        return None if key is None else str(key).encode("utf-8")
+
     def _insert_to_destinations(self, table_target_name, items):
         """Insert items into a Kafka topic with error handling.
 
@@ -183,14 +190,16 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
                     pending.append(
                         await self.producer.send(
                             topic=topic_name,
-                            key=item["file_name"].encode("utf-8"),
+                            key=self._message_key(item),
                             value=item,
                         )
                     )
                 except KafkaError as inner_e:
                     Logger.error("Failed to send record: %s", str(inner_e))
-                if item["file_name"] not in flushs:
-                    flushs.append(item["file_name"])
+                # only per-file rows get a flush marker; status rows have no file
+                file_name = item.get("file_name")
+                if file_name is not None and file_name not in flushs:
+                    flushs.append(file_name)
 
             for result in await asyncio.gather(*pending, return_exceptions=True):
                 if isinstance(result, KafkaError):
