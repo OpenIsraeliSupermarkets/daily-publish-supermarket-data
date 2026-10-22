@@ -160,9 +160,11 @@ class CacheManager:
         """
         if self._data is None:
             return
-        self._data.setdefault("_metadata", {})["last_modified"] = (
-            datetime.now().astimezone().isoformat()
-        )
+        # a cleared cache stays empty ({}), as clean_all_source_data expects
+        if not CacheState(self._data).is_empty():
+            self._data.setdefault("_metadata", {})["last_modified"] = (
+                datetime.now().astimezone().isoformat()
+            )
         # Write to a temporary file first
         temp_file = f"{self.cache_file}.tmp"
         with open(temp_file, "w") as file:

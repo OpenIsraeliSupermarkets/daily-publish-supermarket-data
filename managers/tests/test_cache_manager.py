@@ -188,7 +188,6 @@ class TestCacheManager:
         # Verify cache file is empty
         with open(cache_file, "r") as f:
             data = json.load(f)
-            assert "last_modified" in data.pop("_metadata")
             assert data == {}
 
     def test_saves_after_each_processed_row(self, temp_dir):
