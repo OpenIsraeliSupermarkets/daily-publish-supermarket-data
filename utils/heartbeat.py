@@ -3,11 +3,11 @@ Heartbeat utility for tracking operation execution status.
 Writes and reads a JSON file with operation statuses for health monitoring.
 """
 
+import glob
 import json
 import os
-import threading
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Dict, Iterable, Optional
 from utils import Logger
 
 
@@ -28,10 +28,6 @@ class HeartbeatManager:
         """
         self.heartbeat_path = heartbeat_path
         os.makedirs(os.path.dirname(heartbeat_path), exist_ok=True)
-        # the beating thread and the DAG both read-modify-write the file
-        self._lock = threading.RLock()
-        self._stop_beating = threading.Event()
-        self._beat_thread = None
 
     def _read_heartbeat(self) -> Dict:
         """
@@ -56,12 +52,9 @@ class HeartbeatManager:
         Args:
             data: Dictionary to write to heartbeat file
         """
-        # write then rename, so a health check never reads a half-written file
-        tmp_path = f"{self.heartbeat_path}.tmp"
         try:
-            with open(tmp_path, "w", encoding="utf-8") as f:
+            with open(self.heartbeat_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
-            os.replace(tmp_path, self.heartbeat_path)
         except Exception as e:
             Logger.error(f"Error writing heartbeat file: {e}")
 
@@ -72,22 +65,21 @@ class HeartbeatManager:
         Args:
             operation: Name of the operation being started
         """
-        with self._lock:
-            data = self._read_heartbeat()
-            data["last_update"] = datetime.now().isoformat()
-            data["current_operation"] = operation
+        data = self._read_heartbeat()
+        data["last_update"] = datetime.now().isoformat()
+        data["current_operation"] = operation
 
-            if "operations" not in data:
-                data["operations"] = {}
+        if "operations" not in data:
+            data["operations"] = {}
 
-            data["operations"][operation] = {
-                "status": "running",
-                "started_at": datetime.now().isoformat(),
-                "completed_at": None,
-                "error": None,
-            }
+        data["operations"][operation] = {
+            "status": "running",
+            "started_at": datetime.now().isoformat(),
+            "completed_at": None,
+            "error": None,
+        }
 
-            self._write_heartbeat(data)
+        self._write_heartbeat(data)
         Logger.info(f"Heartbeat: Started operation '{operation}'")
 
     def complete_operation(
@@ -101,33 +93,28 @@ class HeartbeatManager:
             success: Whether the operation succeeded
             error: Error message if operation failed
         """
-        with self._lock:
-            data = self._read_heartbeat()
-            data["last_update"] = datetime.now().isoformat()
-            data["current_operation"] = None
+        data = self._read_heartbeat()
+        data["last_update"] = datetime.now().isoformat()
+        data["current_operation"] = None
 
-            if "operations" not in data:
-                data["operations"] = {}
+        if "operations" not in data:
+            data["operations"] = {}
 
-            if operation in data["operations"]:
-                data["operations"][operation]["status"] = (
-                    "success" if success else "failed"
-                )
-                data["operations"][operation][
-                    "completed_at"
-                ] = datetime.now().isoformat()
-                if error:
-                    data["operations"][operation]["error"] = str(error)
-            else:
-                # Operation wasn't started properly, create entry
-                data["operations"][operation] = {
-                    "status": "success" if success else "failed",
-                    "started_at": datetime.now().isoformat(),
-                    "completed_at": datetime.now().isoformat(),
-                    "error": str(error) if error else None,
-                }
+        if operation in data["operations"]:
+            data["operations"][operation]["status"] = "success" if success else "failed"
+            data["operations"][operation]["completed_at"] = datetime.now().isoformat()
+            if error:
+                data["operations"][operation]["error"] = str(error)
+        else:
+            # Operation wasn't started properly, create entry
+            data["operations"][operation] = {
+                "status": "success" if success else "failed",
+                "started_at": datetime.now().isoformat(),
+                "completed_at": datetime.now().isoformat(),
+                "error": str(error) if error else None,
+            }
 
-            self._write_heartbeat(data)
+        self._write_heartbeat(data)
         Logger.info(
             f"Heartbeat: Completed operation '{operation}' with status '{data['operations'][operation]['status']}'"
         )
@@ -137,53 +124,61 @@ class HeartbeatManager:
         Update the heartbeat timestamp without changing operation status.
         Useful for long-running operations to show the process is still alive.
         """
-        with self._lock:
-            data = self._read_heartbeat()
-            data["last_update"] = datetime.now().isoformat()
-            self._write_heartbeat(data)
+        data = self._read_heartbeat()
+        data["last_update"] = datetime.now().isoformat()
+        self._write_heartbeat(data)
 
-    def start_beating(self, interval_seconds: float = 60):
+    @staticmethod
+    def _as_aware(timestamp: str) -> datetime:
+        """Parse an ISO timestamp; one without a timezone is in local time."""
+        parsed = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+        return parsed if parsed.tzinfo else parsed.astimezone()
+
+    @staticmethod
+    def last_status_update(status_paths: Iterable[str]) -> Optional[datetime]:
         """
-        Refresh last_update every interval_seconds from a daemon thread, so the
-        heartbeat only goes stale when the process is dead or frozen, not busy.
-        Calling it again while the thread is alive does nothing.
+        Latest `_metadata.last_modified` among the given status JSON files and the
+        JSON files directly inside the given folders, or None if there is none.
+
+        The scraper and parser status databases set it on every write, and the push
+        cache sets it on every saved chunk, so it moves only while an operation makes
+        progress. Only the most recently written file of each path is parsed.
         """
-        if self._beat_thread is not None and self._beat_thread.is_alive():
-            return
-        self._stop_beating.clear()
-
-        def _beat():
-            while not self._stop_beating.is_set():
-                self.update_heartbeat()
-                self._stop_beating.wait(interval_seconds)
-
-        self._beat_thread = threading.Thread(
-            target=_beat, name="heartbeat", daemon=True
-        )
-        self._beat_thread.start()
-
-    def stop_beating(self):
-        """Stop the thread started by start_beating."""
-        self._stop_beating.set()
-        if self._beat_thread is not None:
-            self._beat_thread.join(timeout=5)
-            self._beat_thread = None
+        latest = None
+        for path in status_paths:
+            candidates = (
+                glob.glob(os.path.join(path, "*.json"))
+                if os.path.isdir(path)
+                else [path]
+            )
+            candidates = [c for c in candidates if os.path.isfile(c)]
+            if not candidates:
+                continue
+            newest_file = max(candidates, key=os.path.getmtime)
+            try:
+                with open(newest_file, "r", encoding="utf-8") as f:
+                    last_modified = json.load(f)["_metadata"]["last_modified"]
+                changed = HeartbeatManager._as_aware(last_modified)
+            except Exception:  # pylint: disable=broad-exception-caught
+                continue
+            if latest is None or changed > latest:
+                latest = changed
+        return latest
 
     @staticmethod
     def check_health(
         heartbeat_path: str,
         max_age_seconds: int = 300,
-        max_operation_seconds: int = 0,
+        status_paths: Optional[Iterable[str]] = None,
     ) -> tuple[bool, str]:
         """
         Check if the heartbeat indicates a healthy process.
 
         Args:
             heartbeat_path: Path to the heartbeat JSON file
-            max_age_seconds: Maximum age of heartbeat in seconds before considering unhealthy
-            max_operation_seconds: Maximum time one operation may stay running before
-                considering unhealthy (a live process stuck in an operation keeps
-                beating); 0 disables the limit
+            max_age_seconds: Maximum seconds without progress before considering unhealthy
+            status_paths: Status JSON files or folders whose `_metadata.last_modified`
+                counts as progress, along with the heartbeat's own last_update
 
         Returns:
             Tuple of (is_healthy, message)
@@ -201,18 +196,21 @@ class HeartbeatManager:
         if "last_update" not in data:
             return False, "Heartbeat file missing 'last_update' field"
 
-        # Check heartbeat age
+        # Check how long since the process last made progress
         try:
-            last_update = datetime.fromisoformat(data["last_update"])
-            age_seconds = (datetime.now() - last_update).total_seconds()
-
-            if age_seconds > max_age_seconds:
-                return (
-                    False,
-                    f"Heartbeat is stale (last update: {age_seconds:.0f}s ago)",
-                )
+            last_progress = HeartbeatManager._as_aware(data["last_update"])
         except Exception as e:
             return False, f"Error parsing last_update timestamp: {e}"
+        status_update = HeartbeatManager.last_status_update(status_paths or [])
+        if status_update is not None and status_update > last_progress:
+            last_progress = status_update
+        idle_seconds = (datetime.now().astimezone() - last_progress).total_seconds()
+        if idle_seconds > max_age_seconds:
+            return (
+                False,
+                f"No progress for {idle_seconds:.0f}s "
+                f"(current operation: {data.get('current_operation')})",
+            )
 
         # Check for failed operations
         operations = data.get("operations", {})
@@ -235,21 +233,12 @@ class HeartbeatManager:
                 try:
                     started_at = datetime.fromisoformat(op_data["started_at"])
                     running_time = (datetime.now() - started_at).total_seconds()
-                except Exception:
-                    running_time = None
-                if (
-                    running_time is not None
-                    and 0 < max_operation_seconds < running_time
-                ):
-                    return (
-                        False,
-                        f"Operation '{current_op}' has been running for {running_time:.0f}s "
-                        f"(limit {max_operation_seconds}s)",
-                    )
-                if running_time is not None:
+                    # This is just informational, not a failure condition
                     return (
                         True,
                         f"Healthy. Currently running: {current_op} (for {running_time:.0f}s)",
                     )
+                except Exception:
+                    pass
 
         return True, "Healthy"

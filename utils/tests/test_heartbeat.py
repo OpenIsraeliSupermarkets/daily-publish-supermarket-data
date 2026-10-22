@@ -1,9 +1,8 @@
-"""Heartbeat stays fresh while busy and flags an operation stuck for too long (#129)."""
+"""Health is judged by when the status files last changed, not by heartbeat age alone (#129)."""
 
 import json
-import threading
-import time
-from datetime import datetime, timedelta
+import os
+from datetime import datetime, timedelta, timezone
 
 from utils import HeartbeatManager
 
@@ -13,16 +12,16 @@ def _write(path, data):
         json.dump(data, f)
 
 
-def _running_since(path, operation, started_at):
+def _heartbeat(path, last_update, current_operation="scraping"):
     _write(
         path,
         {
-            "last_update": datetime.now().isoformat(),
-            "current_operation": operation,
+            "last_update": last_update.isoformat(),
+            "current_operation": current_operation,
             "operations": {
-                operation: {
+                current_operation: {
                     "status": "running",
-                    "started_at": started_at.isoformat(),
+                    "started_at": last_update.isoformat(),
                     "completed_at": None,
                     "error": None,
                 }
@@ -31,100 +30,102 @@ def _running_since(path, operation, started_at):
     )
 
 
-def test_beating_keeps_a_long_operation_fresh(tmp_path):
-    path = str(tmp_path / "heartbeat.json")
-    heartbeat = HeartbeatManager(path)
-    heartbeat.start_operation("scraping")
-    with open(path, encoding="utf-8") as f:
-        started = json.load(f)["last_update"]
-
-    heartbeat.start_beating(interval_seconds=0.05)
-    try:
-        time.sleep(0.3)
-        with open(path, encoding="utf-8") as f:
-            data = json.load(f)
-    finally:
-        heartbeat.stop_beating()
-
-    assert data["last_update"] > started
-    assert data["current_operation"] == "scraping"
-    assert data["operations"]["scraping"]["status"] == "running"
+def _status(path, last_modified):
+    # the scraper / parser JsonDataBase shape: collections plus _metadata
+    _write(
+        path,
+        {"events": [], "_metadata": {"last_modified": last_modified.isoformat()}},
+    )
 
 
-def test_start_beating_twice_keeps_one_thread(tmp_path):
-    heartbeat = HeartbeatManager(str(tmp_path / "heartbeat.json"))
-    heartbeat.start_beating(interval_seconds=10)
-    try:
-        heartbeat.start_beating(interval_seconds=10)
-        beaters = [t for t in threading.enumerate() if t.name == "heartbeat"]
-    finally:
-        heartbeat.stop_beating()
-    assert len(beaters) == 1
-
-
-def test_beating_does_not_lose_operation_transitions(tmp_path):
-    path = str(tmp_path / "heartbeat.json")
-    heartbeat = HeartbeatManager(path)
-    heartbeat.start_beating(interval_seconds=0)
-    try:
-        for i in range(50):
-            heartbeat.start_operation(f"op{i}")
-            heartbeat.complete_operation(f"op{i}", success=True)
-    finally:
-        heartbeat.stop_beating()
-
-    with open(path, encoding="utf-8") as f:
-        operations = json.load(f)["operations"]
-    assert all(operations[f"op{i}"]["status"] == "success" for i in range(50))
-
-
-def test_operation_over_the_limit_is_unhealthy(tmp_path):
-    path = str(tmp_path / "heartbeat.json")
-    _running_since(path, "scraping", datetime.now() - timedelta(hours=7))
+def test_busy_operation_with_recent_status_is_healthy(tmp_path):
+    heartbeat = str(tmp_path / "heartbeat.json")
+    _heartbeat(heartbeat, datetime.now() - timedelta(hours=2))
+    status_dir = tmp_path / "scraping_status"
+    status_dir.mkdir()
+    # scraper writes Israel-time aware stamps
+    _status(
+        str(status_dir / "shufersal.json"),
+        datetime.now(timezone(timedelta(hours=3))) - timedelta(minutes=5),
+    )
 
     healthy, message = HeartbeatManager.check_health(
-        path, max_age_seconds=300, max_operation_seconds=6 * 3600
+        heartbeat, max_age_seconds=3600, status_paths=[str(status_dir)]
+    )
+
+    assert healthy, message
+
+
+def test_no_status_change_for_too_long_is_unhealthy(tmp_path):
+    # Oct 20: every chain done scraping, then the process hung inside the operation
+    heartbeat = str(tmp_path / "heartbeat.json")
+    _heartbeat(heartbeat, datetime.now() - timedelta(hours=3))
+    status_dir = tmp_path / "scraping_status"
+    status_dir.mkdir()
+    _status(
+        str(status_dir / "shuk_ahir.json"),
+        datetime.now(timezone.utc) - timedelta(hours=2),
+    )
+
+    healthy, message = HeartbeatManager.check_health(
+        heartbeat, max_age_seconds=3600, status_paths=[str(status_dir)]
     )
 
     assert not healthy
     assert "scraping" in message
 
 
-def test_long_operation_within_the_limit_is_healthy(tmp_path):
-    path = str(tmp_path / "heartbeat.json")
-    _running_since(path, "api_update", datetime.now() - timedelta(hours=2))
-
-    healthy, message = HeartbeatManager.check_health(
-        path, max_age_seconds=300, max_operation_seconds=6 * 3600
-    )
-
-    assert healthy
-    assert "api_update" in message
-
-
-def test_operation_limit_zero_disables_the_check(tmp_path):
-    path = str(tmp_path / "heartbeat.json")
-    _running_since(path, "scraping", datetime.now() - timedelta(days=2))
-
-    healthy, _ = HeartbeatManager.check_health(
-        path, max_age_seconds=300, max_operation_seconds=0
-    )
-
-    assert healthy
-
-
-def test_stale_heartbeat_is_unhealthy(tmp_path):
-    path = str(tmp_path / "heartbeat.json")
+def test_push_cache_stamp_counts_as_progress(tmp_path):
+    heartbeat = str(tmp_path / "heartbeat.json")
+    _heartbeat(heartbeat, datetime.now() - timedelta(hours=4), "api_update")
+    push_cache = str(tmp_path / ".push_cache")
     _write(
-        path,
+        push_cache,
         {
-            "last_update": (datetime.now() - timedelta(minutes=10)).isoformat(),
-            "current_operation": None,
-            "operations": {},
+            "last_pushed": {"price_full_file_a.csv": 10},
+            "_metadata": {"last_modified": datetime.now().astimezone().isoformat()},
         },
     )
 
-    healthy, message = HeartbeatManager.check_health(path, max_age_seconds=300)
+    healthy, message = HeartbeatManager.check_health(
+        heartbeat, max_age_seconds=3600, status_paths=[push_cache]
+    )
 
-    assert not healthy
-    assert "stale" in message
+    assert healthy, message
+
+
+def test_reads_the_most_recently_written_status_file(tmp_path):
+    status_dir = tmp_path / "converting_status"
+    status_dir.mkdir()
+    old, new = str(status_dir / "a.json"), str(status_dir / "b.json")
+    recent = datetime.now(timezone.utc) - timedelta(minutes=1)
+    _status(old, datetime.now(timezone.utc) - timedelta(days=1))
+    _status(new, recent)
+    os.utime(old, (1, 1))
+
+    assert HeartbeatManager.last_status_update([str(status_dir)]) == recent
+
+
+def test_missing_or_unstamped_status_is_ignored(tmp_path):
+    status_dir = tmp_path / "scraping_status"
+    status_dir.mkdir()
+    _write(str(status_dir / "a.json"), {"events": []})
+
+    assert (
+        HeartbeatManager.last_status_update(
+            [str(status_dir), str(tmp_path / "missing")]
+        )
+        is None
+    )
+
+
+def test_recent_heartbeat_without_status_files_is_healthy(tmp_path):
+    # between DAG runs only the heartbeat moves
+    heartbeat = str(tmp_path / "heartbeat.json")
+    _heartbeat(heartbeat, datetime.now() - timedelta(minutes=20), "clean_dump_files")
+
+    healthy, message = HeartbeatManager.check_health(
+        heartbeat, max_age_seconds=3600, status_paths=[str(tmp_path / "missing")]
+    )
+
+    assert healthy, message
