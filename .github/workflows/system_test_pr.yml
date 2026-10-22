@@ -5,17 +5,22 @@ on:
     branches:
       - main
 
-# The CI runner is a single shared machine and local_test.sh uses fixed
-# container names, so only one system test may run there at a time.
+# A new push to a PR cancels that PR's older system test, so a stale run
+# never holds the runner.
 concurrency:
-  group: system-test-ci-runner
-  cancel-in-progress: false
+  group: system-test-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   system-test:
     runs-on:
       - self-hosted
       - ci
+    # The CI runner is a shared machine and local_test.sh uses fixed container
+    # names, so only one system test (from any PR) may run there at a time.
+    concurrency:
+      group: system-test-ci-runner
+      cancel-in-progress: false
     # A green run takes ~10 min; a hang (e.g. #116) must not hold the shared
     # runner for the default 6 h. The teardown step still runs on timeout.
     timeout-minutes: 45
