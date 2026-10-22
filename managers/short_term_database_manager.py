@@ -15,6 +15,9 @@ from utils.mongo_bson import sanitize_for_mongo
 VERIFIED_SCRAPER_DOWNLOADS_TABLE = "VerifiedScraperDownloads"
 VERIFIED_PARSER_DOWNLOADS_TABLE = "VerifiedParserDownloads"
 
+STATUS_TOPIC_PREFIX = "status"
+STATUS_METADATA_KEY = "_metadata"
+
 
 class ShortTermDBDatasetManager:
     def __init__(
@@ -134,7 +137,74 @@ class ShortTermDBDatasetManager:
         )
         Logger.info("Scraper status stored in DynamoDB successfully.")
 
+    def _chain_of_status_file(self, file_name: str) -> str:
+        """Chain a status file belongs to, from its name alone: scraper files
+        are ``<chain>.json``, parser files ``<chain>_<file_type>.json``. Chain
+        names contain ``_``, so match the enabled scrapers, longest first."""
+        stem = file_name[: -len(".json")].lower()
+        for chain in sorted(
+            (c.lower() for c in self.enabled_scrapers), key=len, reverse=True
+        ):
+            if stem == chain or stem.startswith(chain + "_"):
+                return chain
+        return stem
+
+    def _forward_status_sections(
+        self, status_folder, stage: str, local_cahce: CacheState
+    ):
+        """Forward every top-level list of each status file, row by row and
+        untouched, to ``status_<stage>_<key>``. The shape of the rows is the
+        consumer's business; only the envelope is ours (#127)."""
+        for file_name in sorted(os.listdir(status_folder)):
+            if not file_name.endswith(".json"):
+                continue
+
+            pushed_ids = list(local_cahce.get_pushed_timestamps(file_name))
+            pushed_set = set(pushed_ids)
+            added_ids: list = []
+
+            with open(os.path.join(status_folder, file_name), "r") as file:
+                records = json.load(file)
+
+            chain = self._chain_of_status_file(file_name)
+            for section, rows in records.items():
+                if section == STATUS_METADATA_KEY or not isinstance(rows, list):
+                    continue
+                envelopes = []
+                for row in rows:
+                    row_index = self._status_event_index(row, file_name)
+                    if row_index in pushed_set:
+                        continue
+                    envelopes.append(
+                        {
+                            "index": row_index,
+                            "chain": chain,
+                            "stage": stage,
+                            "section": section,
+                            "source_status_file": file_name,
+                            "data": row,
+                        }
+                    )
+                    pushed_set.add(row_index)
+                    added_ids.append(row_index)
+                if envelopes:
+                    self.uploader._insert_to_destinations(
+                        f"{STATUS_TOPIC_PREFIX}_{stage}_{section}", envelopes
+                    )
+
+            merged = pushed_ids + [i for i in added_ids if i not in pushed_ids]
+            local_cahce.update_pushed_timestamps(file_name, merged)
+
     def _push_status_files(self, local_cahce: CacheState):
+        if getattr(self.uploader, "forwards_raw_status", False):
+            self._forward_status_sections(
+                self.scraping_status_folder, "scraper", local_cahce
+            )
+            self._forward_status_sections(
+                self.converting_status_folder, "parser", local_cahce
+            )
+            return
+
         self._push_scraper_status(local_cahce)
 
         self._push_parser_status(local_cahce)

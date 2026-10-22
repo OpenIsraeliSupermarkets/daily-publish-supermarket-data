@@ -16,6 +16,10 @@ class ShortTermDatabaseUploader:
     through API interactions.
     """
 
+    # True when status files are forwarded untouched, one destination per
+    # stage and top-level key, instead of being parsed into typed tables (#127)
+    forwards_raw_status = False
+
     def __init__(self, *_):
         """Initialize the API database uploader.
 

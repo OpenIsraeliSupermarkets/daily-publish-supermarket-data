@@ -25,6 +25,8 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
     message serialization and bulk operations.
     """
 
+    forwards_raw_status = True
+
     def __init__(self, kafka_bootstrap_servers: Optional[str] = None):
         """Initialize Kafka connection.
 
@@ -138,9 +140,11 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
 
     @staticmethod
     def _message_key(item) -> Optional[bytes]:
-        """Partition key for a row: its file_name, else its index (status rows
-        such as GlobalScraperStatus carry no file_name, #115), else no key."""
-        key = item.get("file_name") or item.get("index")
+        """Partition key for a row: its file_name; a status envelope's chain,
+        so one chain's status events stay in order (#127); else its index
+        (status rows such as GlobalScraperStatus carry no file_name, #115);
+        else no key."""
+        key = item.get("file_name") or item.get("chain") or item.get("index")
         return None if key is None else str(key).encode("utf-8")
 
     def _insert_to_destinations(self, table_target_name, items):
