@@ -81,7 +81,17 @@ jobs:
     - name: Make sure Mongo UP
       run: docker compose up -d mongodb 
 
+    # --force-recreate: never attach to a data-fetcher left running by a cancelled run.
+    # --no-deps: Mongo is already up; don't recreate it too.
+    # The step timeout stays under the 6 h job limit so the cleanup below gets to run.
     - name: Process Request
-      run: docker compose up --no-build data_processor
+      timeout-minutes: 330
+      run: docker compose up --no-build --no-deps --force-recreate data_processor
+
+    # A cancel or timeout only kills the compose client, not the container.
+    # Stop (not rm) so `docker logs data-fetcher` still works for a post-mortem.
+    - name: Stop data processor
+      if: always()
+      run: docker compose stop --timeout 60 data_processor
 
     # act -W '.github/workflows/template.yml' -P self-hosted=catthehacker/ubuntu:act-latest
