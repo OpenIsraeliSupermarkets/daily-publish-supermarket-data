@@ -24,6 +24,7 @@ def main():
     1. File exists and is recent
     2. No operations have failed
     3. Process is actively updating the heartbeat
+    4. No operation has been running longer than HEALTHCHECK_MAX_OPERATION_SECONDS
     """
     # Get heartbeat path from environment or use default
     app_data_path = os.environ.get("APP_DATA_PATH", "app_data")
@@ -32,8 +33,15 @@ def main():
     # Maximum age for heartbeat (5 minutes by default)
     max_age_seconds = int(os.environ.get("HEALTHCHECK_MAX_AGE_SECONDS", 300))
 
+    # Maximum time one operation may run (6 hours by default, 0 disables)
+    max_operation_seconds = int(
+        os.environ.get("HEALTHCHECK_MAX_OPERATION_SECONDS", 21600)
+    )
+
     # Check health
-    is_healthy, message = HeartbeatManager.check_health(heartbeat_path, max_age_seconds)
+    is_healthy, message = HeartbeatManager.check_health(
+        heartbeat_path, max_age_seconds, max_operation_seconds
+    )
 
     if is_healthy:
         print(f"✓ {message}")

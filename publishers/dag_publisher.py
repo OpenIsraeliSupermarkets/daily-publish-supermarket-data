@@ -62,6 +62,10 @@ class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
         """
         Logger.info("Starting executing DAG = %s", operations)
         self._check_tz()
+        # keeps beating through long operations and the waits between DAG runs
+        self.heartbeat.start_beating(
+            float(os.environ.get("HEARTBEAT_INTERVAL_SECONDS", 60))
+        )
 
         for operation in operations.split(","):
             Logger.info(f"DAG is {operations} starting the operation=%s", operation)

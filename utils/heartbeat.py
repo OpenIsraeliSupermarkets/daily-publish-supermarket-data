@@ -5,6 +5,7 @@ Writes and reads a JSON file with operation statuses for health monitoring.
 
 import json
 import os
+import threading
 from datetime import datetime
 from typing import Dict, Optional
 from utils import Logger
@@ -27,6 +28,10 @@ class HeartbeatManager:
         """
         self.heartbeat_path = heartbeat_path
         os.makedirs(os.path.dirname(heartbeat_path), exist_ok=True)
+        # the beating thread and the DAG both read-modify-write the file
+        self._lock = threading.RLock()
+        self._stop_beating = threading.Event()
+        self._beat_thread = None
 
     def _read_heartbeat(self) -> Dict:
         """
@@ -51,9 +56,12 @@ class HeartbeatManager:
         Args:
             data: Dictionary to write to heartbeat file
         """
+        # write then rename, so a health check never reads a half-written file
+        tmp_path = f"{self.heartbeat_path}.tmp"
         try:
-            with open(self.heartbeat_path, "w", encoding="utf-8") as f:
+            with open(tmp_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
+            os.replace(tmp_path, self.heartbeat_path)
         except Exception as e:
             Logger.error(f"Error writing heartbeat file: {e}")
 
@@ -64,21 +72,22 @@ class HeartbeatManager:
         Args:
             operation: Name of the operation being started
         """
-        data = self._read_heartbeat()
-        data["last_update"] = datetime.now().isoformat()
-        data["current_operation"] = operation
+        with self._lock:
+            data = self._read_heartbeat()
+            data["last_update"] = datetime.now().isoformat()
+            data["current_operation"] = operation
 
-        if "operations" not in data:
-            data["operations"] = {}
+            if "operations" not in data:
+                data["operations"] = {}
 
-        data["operations"][operation] = {
-            "status": "running",
-            "started_at": datetime.now().isoformat(),
-            "completed_at": None,
-            "error": None,
-        }
+            data["operations"][operation] = {
+                "status": "running",
+                "started_at": datetime.now().isoformat(),
+                "completed_at": None,
+                "error": None,
+            }
 
-        self._write_heartbeat(data)
+            self._write_heartbeat(data)
         Logger.info(f"Heartbeat: Started operation '{operation}'")
 
     def complete_operation(
@@ -92,28 +101,33 @@ class HeartbeatManager:
             success: Whether the operation succeeded
             error: Error message if operation failed
         """
-        data = self._read_heartbeat()
-        data["last_update"] = datetime.now().isoformat()
-        data["current_operation"] = None
+        with self._lock:
+            data = self._read_heartbeat()
+            data["last_update"] = datetime.now().isoformat()
+            data["current_operation"] = None
 
-        if "operations" not in data:
-            data["operations"] = {}
+            if "operations" not in data:
+                data["operations"] = {}
 
-        if operation in data["operations"]:
-            data["operations"][operation]["status"] = "success" if success else "failed"
-            data["operations"][operation]["completed_at"] = datetime.now().isoformat()
-            if error:
-                data["operations"][operation]["error"] = str(error)
-        else:
-            # Operation wasn't started properly, create entry
-            data["operations"][operation] = {
-                "status": "success" if success else "failed",
-                "started_at": datetime.now().isoformat(),
-                "completed_at": datetime.now().isoformat(),
-                "error": str(error) if error else None,
-            }
+            if operation in data["operations"]:
+                data["operations"][operation]["status"] = (
+                    "success" if success else "failed"
+                )
+                data["operations"][operation][
+                    "completed_at"
+                ] = datetime.now().isoformat()
+                if error:
+                    data["operations"][operation]["error"] = str(error)
+            else:
+                # Operation wasn't started properly, create entry
+                data["operations"][operation] = {
+                    "status": "success" if success else "failed",
+                    "started_at": datetime.now().isoformat(),
+                    "completed_at": datetime.now().isoformat(),
+                    "error": str(error) if error else None,
+                }
 
-        self._write_heartbeat(data)
+            self._write_heartbeat(data)
         Logger.info(
             f"Heartbeat: Completed operation '{operation}' with status '{data['operations'][operation]['status']}'"
         )
@@ -123,13 +137,43 @@ class HeartbeatManager:
         Update the heartbeat timestamp without changing operation status.
         Useful for long-running operations to show the process is still alive.
         """
-        data = self._read_heartbeat()
-        data["last_update"] = datetime.now().isoformat()
-        self._write_heartbeat(data)
+        with self._lock:
+            data = self._read_heartbeat()
+            data["last_update"] = datetime.now().isoformat()
+            self._write_heartbeat(data)
+
+    def start_beating(self, interval_seconds: float = 60):
+        """
+        Refresh last_update every interval_seconds from a daemon thread, so the
+        heartbeat only goes stale when the process is dead or frozen, not busy.
+        Calling it again while the thread is alive does nothing.
+        """
+        if self._beat_thread is not None and self._beat_thread.is_alive():
+            return
+        self._stop_beating.clear()
+
+        def _beat():
+            while not self._stop_beating.is_set():
+                self.update_heartbeat()
+                self._stop_beating.wait(interval_seconds)
+
+        self._beat_thread = threading.Thread(
+            target=_beat, name="heartbeat", daemon=True
+        )
+        self._beat_thread.start()
+
+    def stop_beating(self):
+        """Stop the thread started by start_beating."""
+        self._stop_beating.set()
+        if self._beat_thread is not None:
+            self._beat_thread.join(timeout=5)
+            self._beat_thread = None
 
     @staticmethod
     def check_health(
-        heartbeat_path: str, max_age_seconds: int = 300
+        heartbeat_path: str,
+        max_age_seconds: int = 300,
+        max_operation_seconds: int = 0,
     ) -> tuple[bool, str]:
         """
         Check if the heartbeat indicates a healthy process.
@@ -137,6 +181,9 @@ class HeartbeatManager:
         Args:
             heartbeat_path: Path to the heartbeat JSON file
             max_age_seconds: Maximum age of heartbeat in seconds before considering unhealthy
+            max_operation_seconds: Maximum time one operation may stay running before
+                considering unhealthy (a live process stuck in an operation keeps
+                beating); 0 disables the limit
 
         Returns:
             Tuple of (is_healthy, message)
@@ -188,12 +235,21 @@ class HeartbeatManager:
                 try:
                     started_at = datetime.fromisoformat(op_data["started_at"])
                     running_time = (datetime.now() - started_at).total_seconds()
-                    # This is just informational, not a failure condition
+                except Exception:
+                    running_time = None
+                if (
+                    running_time is not None
+                    and 0 < max_operation_seconds < running_time
+                ):
+                    return (
+                        False,
+                        f"Operation '{current_op}' has been running for {running_time:.0f}s "
+                        f"(limit {max_operation_seconds}s)",
+                    )
+                if running_time is not None:
                     return (
                         True,
                         f"Healthy. Currently running: {current_op} (for {running_time:.0f}s)",
                     )
-                except Exception:
-                    pass
 
         return True, "Healthy"
