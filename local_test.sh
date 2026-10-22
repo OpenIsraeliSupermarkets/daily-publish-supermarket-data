@@ -114,9 +114,13 @@ fi
 
 mkdir -p "$MONGO_DATA_PATH/mongo_data"
 
-echo "Step 6: Rebuilding Docker containers without cache"
+echo "Step 6: Building Docker images from this checkout"
+# Always build: data_processor also names a published image, and without a
+# local build `docker compose up` pulls it, so the test would skip this code.
 if [[ "$BUILD_NO_CACHE" =~ ^[Yy]$ ]]; then
-    docker compose build --no-cache
+    docker compose build --no-cache api data_processor
+else
+    docker compose build api data_processor
 fi
 
 if [ $? -ne 0 ]; then
