@@ -158,6 +158,21 @@ if [ "$TEST_MODE" == "production" ]; then
     fi
     
     echo "Step 8.2: Scrape operation completed successfully"
+
+    # The image's health check judges progress by the heartbeat and the
+    # _metadata.last_modified of the status files the scrape just wrote (#129)
+    echo "Step 8.2.1: Health check passes on the files the scrape left behind"
+    if ! docker compose run --rm --no-deps data_processor python healthcheck.py; then
+        echo -e "\033[31mHealth check failed right after a successful scrape. Exiting.\033[0m"
+        exit 1
+    fi
+
+    echo "Step 8.2.2: Health check fails once nothing has progressed for longer than the limit"
+    if docker compose run --rm --no-deps -e HEALTHCHECK_MAX_AGE_SECONDS=1 data_processor \
+        sh -c "sleep 3 && python healthcheck.py"; then
+        echo -e "\033[31mHealth check passed although nothing progressed past the limit. Exiting.\033[0m"
+        exit 1
+    fi
     
     echo "Step 8.3: Running PUBLISHING operation (publishing,clean_all_source_data)"
     export OPERATION="publishing,clean_all_source_data"
