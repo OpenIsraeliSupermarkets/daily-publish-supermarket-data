@@ -103,6 +103,48 @@ container_exit_code() {
     docker inspect --format='{{.State.ExitCode}}' "$1" 2>/dev/null
 }
 
+# Run the data processor for one OPERATION and watch Docker's health status of
+# the container while it runs: it must never turn unhealthy, and with
+# require_healthy=true it must report healthy at least once (#129).
+run_data_processor_watching_health() {
+    local require_healthy=$1
+    local container_name="data-fetcher"
+    local seen_healthy=false
+
+    docker compose up -d data_processor || return 1
+    docker logs -f "$container_name" &
+    local logs_pid=$!
+
+    while [ "$(docker inspect -f '{{.State.Running}}' "$container_name" 2>/dev/null)" == "true" ]; do
+        health_status=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_name")
+        if [ "$health_status" == "unhealthy" ]; then
+            kill $logs_pid 2>/dev/null
+            echo -e "\033[31m$container_name turned unhealthy while running:\033[0m"
+            docker inspect -f '{{range .State.Health.Log}}{{.End}} exit={{.ExitCode}} {{.Output}}{{end}}' "$container_name"
+            return 1
+        elif [ "$health_status" == "healthy" ]; then
+            seen_healthy=true
+        elif [ "$health_status" == "none" ]; then
+            kill $logs_pid 2>/dev/null
+            echo -e "\033[31m$container_name has no health check. Exiting.\033[0m"
+            return 1
+        fi
+        sleep 5
+    done
+    kill $logs_pid 2>/dev/null
+
+    exit_code=$(docker inspect -f '{{.State.ExitCode}}' "$container_name")
+    if [ "$exit_code" != "0" ]; then
+        echo -e "\033[31m$container_name exited with code $exit_code\033[0m"
+        return 1
+    fi
+    if [ "$require_healthy" == "true" ] && [ "$seen_healthy" != "true" ]; then
+        echo -e "\033[31m$container_name never reported healthy while running\033[0m"
+        return 1
+    fi
+    echo "$container_name finished; health while running: never unhealthy, seen healthy=$seen_healthy"
+}
+
 echo "Step 3: Stopping and removing existing Docker containers"
 docker compose down -v
 docker compose rm -f
@@ -150,7 +192,7 @@ echo "Step 8: Starting data processor"
 if [ "$TEST_MODE" == "production" ]; then
     echo "Step 8.1: Running SCRAPE operation (scraping,converting,clean_dump_files,api_update)"
     export OPERATION="scraping,converting,clean_dump_files,api_update"
-    docker compose up data_processor
+    run_data_processor_watching_health true
     
     if [ $? -ne 0 ] || [ "$(container_exit_code data-fetcher)" != "0" ]; then
         echo -e "\033[31mScrape operation failed. Exiting.\033[0m"
@@ -158,25 +200,10 @@ if [ "$TEST_MODE" == "production" ]; then
     fi
     
     echo "Step 8.2: Scrape operation completed successfully"
-
-    # The image's health check judges progress by the heartbeat and the
-    # _metadata.last_modified of the status files the scrape just wrote (#129)
-    echo "Step 8.2.1: Health check passes on the files the scrape left behind"
-    if ! docker compose run --rm --no-deps data_processor python healthcheck.py; then
-        echo -e "\033[31mHealth check failed right after a successful scrape. Exiting.\033[0m"
-        exit 1
-    fi
-
-    echo "Step 8.2.2: Health check fails once nothing has progressed for longer than the limit"
-    if docker compose run --rm --no-deps -e HEALTHCHECK_MAX_AGE_SECONDS=1 data_processor \
-        sh -c "sleep 3 && python healthcheck.py"; then
-        echo -e "\033[31mHealth check passed although nothing progressed past the limit. Exiting.\033[0m"
-        exit 1
-    fi
     
     echo "Step 8.3: Running PUBLISHING operation (publishing,clean_all_source_data)"
     export OPERATION="publishing,clean_all_source_data"
-    docker compose up data_processor
+    run_data_processor_watching_health false
     
     if [ $? -ne 0 ] || [ "$(container_exit_code data-fetcher)" != "0" ]; then
         echo -e "\033[31mPublishing operation failed. Exiting.\033[0m"
