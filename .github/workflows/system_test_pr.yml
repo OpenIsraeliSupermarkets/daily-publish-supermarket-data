@@ -5,9 +5,17 @@ on:
     branches:
       - main
 
+# The CI runner is a single shared machine and local_test.sh uses fixed
+# container names, so only one system test may run there at a time.
+concurrency:
+  group: system-test-ci-runner
+  cancel-in-progress: false
+
 jobs:
   system-test:
-    runs-on: ubuntu-24.04
+    runs-on:
+      - self-hosted
+      - ci
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -38,4 +46,8 @@ jobs:
         run: ./local_test.sh --incremental 
 
       - name: Run system test with persistent mode
-        run: ./local_test.sh --persist 
+        run: ./local_test.sh --persist
+
+      - name: Tear down containers
+        if: always()
+        run: docker compose down -v --remove-orphans || true
