@@ -1,6 +1,7 @@
 from pydantic import BaseModel, field_validator
 from typing import Optional, Dict, Any, List, Union, Tuple
-from il_supermarket_scarper import FileTypesFilters, ScraperFactory
+from il_supermarket_scarper import FileTypesFilters, ScraperFactory, ScraperStatusOutput
+from il_supermarket_parsers import ParserStatusOutput
 from datetime import datetime
 import json
 
@@ -403,3 +404,25 @@ def list_all_dynamic_tables(enabled_scrapers: list[str], enabled_file_types: lis
             table_name = get_table_name(file_type.lower(), chain.lower())
             table_models.append(create_dynamic_table_class(table_name))
     return table_models
+
+
+# Status rows: one destination per stage and per field of the stage's status
+# model (ScraperStatusOutput / ParserStatusOutput), e.g. status_scraper_events (#127)
+SCRAPER_STAGE = "scraper"
+PARSER_STAGE = "parser"
+
+
+def status_table_name(stage: str, section: str) -> str:
+    return f"status_{stage}_{section}"
+
+
+def status_table_names() -> List[str]:
+    """Every status destination the current status models produce."""
+    return [
+        status_table_name(stage, section)
+        for stage, model in (
+            (SCRAPER_STAGE, ScraperStatusOutput),
+            (PARSER_STAGE, ParserStatusOutput),
+        )
+        for section in model.model_fields
+    ]

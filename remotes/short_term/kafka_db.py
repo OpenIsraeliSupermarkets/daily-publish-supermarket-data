@@ -9,7 +9,7 @@ import os
 import json
 import asyncio
 from typing import Dict, Any, Optional, List
-from data_models.raw_schema import ParserStatus, ScraperStatus, list_all_dynamic_tables
+from data_models.raw_schema import list_all_dynamic_tables, status_table_names
 
 from aiokafka import AIOKafkaProducer, AIOKafkaConsumer
 from aiokafka.errors import KafkaError
@@ -24,8 +24,6 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
     topic management, and status tracking. It includes special handling for
     message serialization and bulk operations.
     """
-
-    forwards_raw_status = True
 
     def __init__(self, kafka_bootstrap_servers: Optional[str] = None):
         """Initialize Kafka connection.
@@ -140,9 +138,8 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
 
     @staticmethod
     def _message_key(item) -> Optional[bytes]:
-        """Partition key for a row: its file_name; a status envelope's chain,
-        so one chain's status events stay in order (#127); else its index
-        (status rows such as GlobalScraperStatus carry no file_name, #115);
+        """Partition key for a row: its file_name; a status row's chain, so one
+        chain's status events stay in order (#115, #127); else its index;
         else no key."""
         key = item.get("file_name") or item.get("chain") or item.get("index")
         return None if key is None else str(key).encode("utf-8")
@@ -505,12 +502,8 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
         try:
             # self._clean_all_destinations()
             #
-            self._create_destinations(
-                ParserStatus.get_index(), ParserStatus.get_table_name()
-            )
-            self._create_destinations(
-                ScraperStatus.get_index(), ScraperStatus.get_table_name()
-            )
+            for table in status_table_names():
+                self._create_destinations("index", table)
             for table in list_all_dynamic_tables(enabled_scrapers, enabled_file_types):
                 self._create_destinations(table.get_index(), table.get_table_name())
         except Exception as e:

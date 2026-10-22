@@ -4,7 +4,7 @@ This module defines the base class for database uploaders that interact with API
 providing a consistent interface for different implementations.
 """
 
-from data_models.raw_schema import ParserStatus, ScraperStatus, list_all_dynamic_tables
+from data_models.raw_schema import list_all_dynamic_tables, status_table_names
 
 
 # pylint: disable=too-few-public-methods
@@ -15,10 +15,6 @@ class ShortTermDatabaseUploader:
     It provides methods for managing data storage, retrieval, and status tracking
     through API interactions.
     """
-
-    # True when status files are forwarded untouched, one destination per
-    # stage and top-level key, instead of being parsed into typed tables (#127)
-    forwards_raw_status = False
 
     def __init__(self, *_):
         """Initialize the API database uploader.
@@ -92,20 +88,8 @@ class ShortTermDatabaseUploader:
         try:
             self._clean_all_destinations()
             #
-            self._create_destinations(
-                ParserStatus.get_index(), ParserStatus.get_table_name()
-            )
-            self._create_destinations(
-                ScraperStatus.get_index(), ScraperStatus.get_table_name()
-            )
-            self._create_destinations(ParserStatus.get_index(), "GlobalParserStatus")
-            self._create_destinations(ScraperStatus.get_index(), "GlobalScraperStatus")
-            self._create_destinations(
-                ScraperStatus.get_index(), "VerifiedScraperDownloads"
-            )
-            self._create_destinations(
-                ParserStatus.get_index(), "VerifiedParserDownloads"
-            )
+            for table in status_table_names():
+                self._create_destinations("index", table)
             for table in list_all_dynamic_tables(enabled_scrapers, enabled_file_types):
                 self._create_destinations(table.get_index(), table.get_table_name())
         except Exception as e:

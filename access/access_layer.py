@@ -5,7 +5,13 @@ import re
 from typing import Optional
 
 from il_supermarket_scarper import ScraperFactory, FileTypesFilters
-from data_models.raw_schema import ParserStatus, DataTable, get_table_name
+from data_models.raw_schema import (
+    PARSER_STAGE,
+    ParserStatus,
+    DataTable,
+    get_table_name,
+    status_table_name,
+)
 from data_models.response import (
     ScrapedFile,
     ScrapedFiles,
@@ -66,7 +72,7 @@ class AccessLayer:
             ShortTermDatabaseHealth: Object containing update status and timestamp
         """
         is_updated = self.short_term_database_connector._is_collection_updated(
-            ParserStatus.get_table_name(), seconds=60 * 60
+            status_table_name(PARSER_STAGE, "events"), seconds=60 * 60
         )
         return ShortTermDatabaseHealth(
             is_updated=is_updated, last_update=datetime.now().astimezone().isoformat()

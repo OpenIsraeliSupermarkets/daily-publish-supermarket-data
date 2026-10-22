@@ -11,12 +11,7 @@ from il_supermarket_scarper import ScraperStatusOutput
 from typing import Union
 
 from utils.mongo_bson import sanitize_for_mongo
-
-VERIFIED_SCRAPER_DOWNLOADS_TABLE = "VerifiedScraperDownloads"
-VERIFIED_PARSER_DOWNLOADS_TABLE = "VerifiedParserDownloads"
-
-STATUS_TOPIC_PREFIX = "status"
-STATUS_METADATA_KEY = "_metadata"
+from data_models.raw_schema import PARSER_STAGE, SCRAPER_STAGE, status_table_name
 
 
 class ShortTermDBDatasetManager:
@@ -47,96 +42,6 @@ class ShortTermDBDatasetManager:
         digest = hashlib.sha256(f"{source_file}\0{canonical}".encode()).hexdigest()
         return digest
 
-    def _push_status_rows(
-        self,
-        rows,
-        file_name: str,
-        target_table: str,
-        pushed_set: set,
-        added_ids: list,
-    ):
-        """Insert not-yet-pushed status rows into ``target_table``."""
-        processed = []
-        for row in rows:
-            try:
-                row_json = json.loads(row.model_dump_json())
-                row_index = self._status_event_index(row_json, file_name)
-            except Exception as e:
-                Logger.error(f"Error processing event: {e}")
-                continue
-            if row_index in pushed_set:
-                continue
-            processed.append(sanitize_for_mongo({"index": row_index, **row_json}))
-            pushed_set.add(row_index)
-            added_ids.append(row_index)
-        if not processed:
-            return
-        self.uploader._insert_to_destinations(target_table, processed)
-
-    def _push_a_status_files(
-        self,
-        status_folder,
-        model_type: Union[ParserStatusOutput, ScraperStatusOutput],
-        target_table: str,
-        global_target_table: str,
-        verified_target_table: str,
-        local_cahce: CacheState,
-    ):
-        for file_name in os.listdir(status_folder):
-            if file_name.endswith(".json"):
-
-                pushed_ids = list(local_cahce.get_pushed_timestamps(file_name))
-                pushed_set = set(pushed_ids)
-                added_ids: list = []
-
-                with open(os.path.join(status_folder, file_name), "r") as file:
-                    records = json.load(file)
-
-                    model = model_type(**records)
-
-                    self._push_status_rows(
-                        model.events, file_name, target_table, pushed_set, added_ids
-                    )
-                    self._push_status_rows(
-                        model.global_status,
-                        file_name,
-                        global_target_table,
-                        pushed_set,
-                        added_ids,
-                    )
-                    self._push_status_rows(
-                        getattr(model, "verified_downloads", []),
-                        file_name,
-                        verified_target_table,
-                        pushed_set,
-                        added_ids,
-                    )
-
-                merged = pushed_ids + [i for i in added_ids if i not in pushed_ids]
-                local_cahce.update_pushed_timestamps(file_name, merged)
-
-    def _push_parser_status(self, local_cahce: CacheState):
-        self._push_a_status_files(
-            self.converting_status_folder,
-            ParserStatusOutput,
-            "ParserStatus",
-            "GlobalParserStatus",
-            VERIFIED_PARSER_DOWNLOADS_TABLE,
-            local_cahce,
-        )
-        Logger.info("Parser status stored in DynamoDB successfully.")
-
-    def _push_scraper_status(self, local_cahce: CacheState):
-        self._push_a_status_files(
-            self.scraping_status_folder,
-            ScraperStatusOutput,
-            "ScraperStatus",
-            "GlobalScraperStatus",
-            VERIFIED_SCRAPER_DOWNLOADS_TABLE,
-            local_cahce,
-        )
-        Logger.info("Scraper status stored in DynamoDB successfully.")
-
     def _chain_of_status_file(self, file_name: str) -> str:
         """Chain a status file belongs to, from its name alone: scraper files
         are ``<chain>.json``, parser files ``<chain>_<file_type>.json``. Chain
@@ -149,12 +54,48 @@ class ShortTermDBDatasetManager:
                 return chain
         return stem
 
-    def _forward_status_sections(
-        self, status_folder, stage: str, local_cahce: CacheState
+    def _push_status_rows(
+        self,
+        rows,
+        envelope: dict,
+        pushed_set: set,
+        added_ids: list,
     ):
-        """Forward every top-level list of each status file, row by row and
-        untouched, to ``status_<stage>_<key>``. The shape of the rows is the
-        consumer's business; only the envelope is ours (#127)."""
+        """Insert not-yet-pushed status rows of one section, each wrapped in
+        ``envelope``, into ``status_<stage>_<section>``."""
+        processed = []
+        for row in rows:
+            try:
+                row_json = json.loads(row.model_dump_json())
+                row_index = self._status_event_index(
+                    row_json, envelope["source_status_file"]
+                )
+            except Exception as e:
+                Logger.error(f"Error processing event: {e}")
+                continue
+            if row_index in pushed_set:
+                continue
+            processed.append(
+                sanitize_for_mongo({"index": row_index, **envelope, "data": row_json})
+            )
+            pushed_set.add(row_index)
+            added_ids.append(row_index)
+        if not processed:
+            return
+        self.uploader._insert_to_destinations(
+            status_table_name(envelope["stage"], envelope["section"]), processed
+        )
+
+    def _push_a_status_files(
+        self,
+        status_folder,
+        model_type: Union[ParserStatusOutput, ScraperStatusOutput],
+        stage: str,
+        local_cahce: CacheState,
+    ):
+        """Validate each status file with its model, then push every list the
+        model has, one destination per section (#127). A section added to the
+        model upstream is pushed without a change here."""
         for file_name in sorted(os.listdir(status_folder)):
             if not file_name.endswith(".json"):
                 continue
@@ -164,50 +105,38 @@ class ShortTermDBDatasetManager:
             added_ids: list = []
 
             with open(os.path.join(status_folder, file_name), "r") as file:
-                records = json.load(file)
+                model = model_type(**json.load(file))
 
             chain = self._chain_of_status_file(file_name)
-            for section, rows in records.items():
-                if section == STATUS_METADATA_KEY or not isinstance(rows, list):
+            for section in type(model).model_fields:
+                rows = getattr(model, section)
+                if not isinstance(rows, list):
                     continue
-                envelopes = []
-                for row in rows:
-                    row_index = self._status_event_index(row, file_name)
-                    if row_index in pushed_set:
-                        continue
-                    envelopes.append(
-                        {
-                            "index": row_index,
-                            "chain": chain,
-                            "stage": stage,
-                            "section": section,
-                            "source_status_file": file_name,
-                            "data": row,
-                        }
-                    )
-                    pushed_set.add(row_index)
-                    added_ids.append(row_index)
-                if envelopes:
-                    self.uploader._insert_to_destinations(
-                        f"{STATUS_TOPIC_PREFIX}_{stage}_{section}", envelopes
-                    )
+                envelope = {
+                    "chain": chain,
+                    "stage": stage,
+                    "section": section,
+                    "source_status_file": file_name,
+                }
+                self._push_status_rows(rows, envelope, pushed_set, added_ids)
 
             merged = pushed_ids + [i for i in added_ids if i not in pushed_ids]
             local_cahce.update_pushed_timestamps(file_name, merged)
 
     def _push_status_files(self, local_cahce: CacheState):
-        if getattr(self.uploader, "forwards_raw_status", False):
-            self._forward_status_sections(
-                self.scraping_status_folder, "scraper", local_cahce
-            )
-            self._forward_status_sections(
-                self.converting_status_folder, "parser", local_cahce
-            )
-            return
-
-        self._push_scraper_status(local_cahce)
-
-        self._push_parser_status(local_cahce)
+        self._push_a_status_files(
+            self.scraping_status_folder,
+            ScraperStatusOutput,
+            SCRAPER_STAGE,
+            local_cahce,
+        )
+        self._push_a_status_files(
+            self.converting_status_folder,
+            ParserStatusOutput,
+            PARSER_STAGE,
+            local_cahce,
+        )
+        Logger.info("Scraper and parser status stored successfully.")
 
     def _push_files_data(self, local_cahce: CacheState):
         #

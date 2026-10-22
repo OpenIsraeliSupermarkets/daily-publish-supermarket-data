@@ -26,7 +26,7 @@ class RecordingProducer:
 
 
 def _global_status_rows():
-    """GlobalScraperStatus rows exactly as api_update builds them."""
+    """Scraper global_status rows exactly as api_update builds them."""
     output = ScraperStatusOutput(
         global_status=[
             {"task_id": "20261021120000", "status": "started", "limit": 10},
@@ -50,9 +50,13 @@ def _global_status_rows():
 
     manager = ShortTermDBDatasetManager.__new__(ShortTermDBDatasetManager)
     manager.uploader = Collect()
-    manager._push_status_rows(
-        output.global_status, "Shufersal.json", "GlobalScraperStatus", set(), []
-    )
+    envelope = {
+        "chain": "shufersal",
+        "stage": "scraper",
+        "section": "global_status",
+        "source_status_file": "Shufersal.json",
+    }
+    manager._push_status_rows(output.global_status, envelope, set(), [])
     return pushed
 
 
@@ -62,13 +66,14 @@ def test_status_rows_without_file_name_reach_the_topic():
 
     uploader = KafkaDbUploader(kafka_bootstrap_servers="unused:9092")
     uploader.producer = RecordingProducer()
-    asyncio.run(uploader._async_insert_to_destinations("GlobalScraperStatus", rows))
+    topic = "status_scraper_global_status"
+    asyncio.run(uploader._async_insert_to_destinations(topic, rows))
 
     sent = uploader.producer.sent
-    # every row is sent, keyed by its stable index, with no per-file flush marker
+    # every row is sent, keyed by its chain, with no per-file flush marker
     assert [value for _, _, value in sent] == rows
-    assert [key for _, key, _ in sent] == [row["index"].encode() for row in rows]
-    assert {topic for topic, _, _ in sent} == {"GlobalScraperStatus"}
+    assert [key for _, key, _ in sent] == [b"shufersal"] * len(rows)
+    assert {t for t, _, _ in sent} == {topic}
     json.dumps([value for _, _, value in sent])  # serializable as the producer does
 
 
