@@ -58,6 +58,19 @@ class HeartbeatManager:
         except Exception as e:
             Logger.error(f"Error writing heartbeat file: {e}")
 
+    def reset(self):
+        """
+        Start a fresh heartbeat for a new process, so operations a previous
+        container left running or failed don't count against this one.
+        """
+        self._write_heartbeat(
+            {
+                "last_update": datetime.now().isoformat(),
+                "current_operation": None,
+                "operations": {},
+            }
+        )
+
     def start_operation(self, operation: str):
         """
         Mark an operation as started.

@@ -129,3 +129,28 @@ def test_recent_heartbeat_without_status_files_is_healthy(tmp_path):
     )
 
     assert healthy, message
+
+
+def test_reset_drops_a_previous_process_operations(tmp_path):
+    # a failed or still-"running" operation left by an earlier container
+    heartbeat_path = str(tmp_path / "heartbeat.json")
+    _write(
+        heartbeat_path,
+        {
+            "last_update": (datetime.now() - timedelta(days=2)).isoformat(),
+            "current_operation": None,
+            "operations": {
+                "publishing": {
+                    "status": "failed",
+                    "started_at": (datetime.now() - timedelta(days=2)).isoformat(),
+                    "completed_at": (datetime.now() - timedelta(days=2)).isoformat(),
+                    "error": "[Errno 2] No such file or directory: 'app_data/outputs'",
+                }
+            },
+        },
+    )
+
+    HeartbeatManager(heartbeat_path).reset()
+
+    healthy, message = HeartbeatManager.check_health(heartbeat_path, 3600)
+    assert healthy, message
