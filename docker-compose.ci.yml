@@ -1,0 +1,9 @@
+# Overrides for the PR system test on the self-hosted CI runner, which has
+# only 2 CPUs; docker refuses a cpus limit above the host's CPU count.
+# Selected via COMPOSE_FILE in .github/workflows/system_test_pr.yml.
+services:
+  mongodb:
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
