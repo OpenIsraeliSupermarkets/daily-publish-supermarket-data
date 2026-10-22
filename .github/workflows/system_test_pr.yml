@@ -16,6 +16,9 @@ jobs:
     runs-on:
       - self-hosted
       - ci
+    # A green run takes ~10 min; a hang (e.g. #116) must not hold the shared
+    # runner for the default 6 h. The teardown step still runs on timeout.
+    timeout-minutes: 45
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
