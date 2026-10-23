@@ -5,7 +5,6 @@ Provides the core functionality for scraping, converting, and uploading supermar
 
 from utils import Logger
 import datetime
-import multiprocessing
 import os
 import shutil
 from il_supermarket_scarper import ScarpingTask, ScraperFactory
@@ -17,7 +16,7 @@ from managers.stream_push_manager import StreamPushManager
 from managers.file_type_router import FileTypeRouter
 from managers.quality_indicators import write_quality_indicators
 from remotes import KaggleUploader, MongoDbUploader
-from utils import now
+from utils import now, use_forkserver
 
 
 class BaseSupermarketDataPublisher:
@@ -175,11 +174,10 @@ class BaseSupermarketDataPublisher:
         pushed to the short-term database as rows arrive (#114).
         """
         os.makedirs(self.data_folder, exist_ok=True)
-        # The scraper and converters fork their worker pools from background
-        # threads while the router and push threads run. A plain fork copies
-        # locks other threads hold (logging, queues), and the child can hang
-        # on them forever. Fork from a single-threaded server instead.
-        multiprocessing.set_start_method("forkserver", force=True)
+        # The scraper and converters start their pools from background threads
+        # while the router and push threads run; main.py already does this at
+        # startup, repeated here for callers that skip main.py (#116).
+        use_forkserver()
         scraper = ScarpingTask(
             enabled_scrapers=self.enabled_scrapers,
             files_types=self.enabled_file_types,
