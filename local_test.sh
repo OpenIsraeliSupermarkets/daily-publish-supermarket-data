@@ -60,12 +60,9 @@ fi
 echo "Step 2: Setting up test environment variables"
 # Step 10 joins the compose network by name, and compose derives that name from
 # the checkout folder. Pin it so the test works from any folder or worktree.
-export COMPOSE_PROJECT_NAME=daily-publish-supermarket-data
-# Mongo can't run from a bind mount on macOS; see docker-compose.local.yml.
-# CI sets COMPOSE_FILE itself, so this only applies to a local Mac run.
-if [ "$(uname)" == "Darwin" ] && [ -z "$COMPOSE_FILE" ]; then
-    export COMPOSE_FILE=docker-compose.yml:docker-compose.local.yml
-fi
+export COMPOSE_PROJECT_NAME=publisher
+# Same overrides as the CI system test (see docker-compose.ci.yml).
+export COMPOSE_FILE=${COMPOSE_FILE:-docker-compose.yml:docker-compose.ci.yml}
 # limit the run time — keep in sync with tests.validation_utils.scrapers_to_test()
 export ENABLED_SCRAPERS=BAREKET,WOLT
 export LIMIT=10
@@ -109,6 +106,9 @@ container_exit_code() {
 echo "Step 3: Stopping and removing existing Docker containers"
 docker compose down -v
 docker compose rm -f
+# The services have fixed container names, so a leftover from a run under a
+# different compose project name (or a cancelled run) would block this one.
+docker rm -f raw-data-mongodb raw-data-api data-fetcher >/dev/null 2>&1 || true
 
 echo "Step 4: Cleaning app data directory"
 # Clean the app data folder
@@ -242,7 +242,7 @@ echo "Step 10: Running system tests"
 
 docker build --target testing -t supermarket-testing .
 docker run \
-    --network=daily-publish-supermarket-data_mongo-network \
+    --network=${COMPOSE_PROJECT_NAME}_mongo-network \
     -e API_HOST=http://api:8000/ \
     -e MONGODB_URI=mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@mongodb:${MONGO_PORT} \
     -e API_TOKEN=${API_TOKEN} \

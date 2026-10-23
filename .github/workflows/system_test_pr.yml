@@ -50,6 +50,8 @@ jobs:
           echo "TZ=Asia/Jerusalem" >> $GITHUB_ENV
           echo "DISCORD_WEBHOOK_URL=${{ secrets.DISCORD_WEBHOOK_URL }}" >> $GITHUB_ENV
           echo "COMPOSE_FILE=docker-compose.yml:docker-compose.ci.yml" >> $GITHUB_ENV
+          # Same project name local_test.sh uses, so the teardown step finds its containers.
+          echo "COMPOSE_PROJECT_NAME=publisher" >> $GITHUB_ENV
 
       - name: Run system test with incremental mode
         run: ./local_test.sh --incremental 

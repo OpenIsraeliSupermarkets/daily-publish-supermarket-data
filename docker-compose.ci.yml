@@ -1,8 +1,18 @@
-# Overrides for the PR system test on the self-hosted CI runner, which has
-# only 2 CPUs; docker refuses a cpus limit above the host's CPU count.
-# Selected via COMPOSE_FILE in .github/workflows/system_test_pr.yml.
+# Overrides shared by the PR system test (self-hosted CI runner) and a local
+# ./local_test.sh run, so both exercise the same stack.
+# Selected via COMPOSE_FILE: set in .github/workflows/system_test_pr.yml, and
+# defaulted by local_test.sh.
 services:
   mongodb:
+    # Pinned: mongo:latest refuses to start on some host kernels, e.g. Docker
+    # Desktop's (https://jira.mongodb.org/browse/SERVER-121912).
+    image: mongo:7.0
+    # WiredTiger fails with "Operation not permitted" on a macOS bind mount, so
+    # use a throwaway volume instead of MONGO_DATA_PATH (removed by `down -v`).
+    volumes: !override
+      - /data/db
+    # The CI runner has only 2 CPUs; docker refuses a cpus limit above the
+    # host's CPU count.
     deploy:
       resources:
         limits:
