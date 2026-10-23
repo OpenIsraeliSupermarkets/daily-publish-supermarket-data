@@ -26,6 +26,8 @@ class TestCacheState:
         """Test checking if cache is empty."""
         assert CacheState({}).is_empty() is True
         assert CacheState({"file1": {}}).is_empty() is False
+        # the save stamp alone does not make a cache non-empty
+        assert CacheState({"_metadata": {"last_modified": "x"}}).is_empty() is True
 
     def test_update_pushed_timestamps(self):
         """Test updating pushed timestamps for a file."""
@@ -86,6 +88,7 @@ class TestCacheManager:
         # Verify file content
         with open(cache_manager.cache_file, "r") as f:
             data = json.load(f)
+            assert "last_modified" in data.pop("_metadata")
             assert data == {"file1": {"timestamps": [1, 2, 3]}}
 
     def test_context_manager_existing_cache(self, temp_dir):
@@ -107,6 +110,7 @@ class TestCacheManager:
         # Verify file was updated
         with open(cache_file, "r") as f:
             data = json.load(f)
+            assert "last_modified" in data.pop("_metadata")
             assert data == {
                 "file1": {"timestamps": [1, 2, 3]},
                 "file2": {"timestamps": [4, 5, 6]},
@@ -130,6 +134,7 @@ class TestCacheManager:
         # Verify file was fixed
         with open(cache_file, "r") as f:
             data = json.load(f)
+            assert "last_modified" in data.pop("_metadata")
             assert data == {"file1": {"timestamps": [1, 2, 3]}}
 
     @patch("filelock.FileLock.acquire")
@@ -184,3 +189,13 @@ class TestCacheManager:
         with open(cache_file, "r") as f:
             data = json.load(f)
             assert data == {}
+
+    def test_saves_after_each_processed_row(self, temp_dir):
+        """Each recorded row is on disk before exit, stamped with last_modified."""
+        cache_manager = CacheManager(temp_dir)
+        with cache_manager as cache_state:
+            cache_state.update_last_processed_row("outputs/price_full_file_a.csv", 7)
+            with open(cache_manager.cache_file, "r") as f:
+                data = json.load(f)
+            assert data["last_pushed"] == {"price_full_file_a.csv": 7}
+            assert "last_modified" in data["_metadata"]

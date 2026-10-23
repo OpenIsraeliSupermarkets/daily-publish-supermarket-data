@@ -22,6 +22,7 @@ class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
         # Initialize heartbeat manager
         heartbeat_path = os.path.join(self.app_folder, "heartbeat.json")
         self.heartbeat = HeartbeatManager(heartbeat_path)
+        self.heartbeat.reset()
 
     def _execute_single_operation(self, operation):
         """

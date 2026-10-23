@@ -3,10 +3,11 @@ Heartbeat utility for tracking operation execution status.
 Writes and reads a JSON file with operation statuses for health monitoring.
 """
 
+import glob
 import json
 import os
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Dict, Iterable, Optional
 from utils import Logger
 
 
@@ -56,6 +57,19 @@ class HeartbeatManager:
                 json.dump(data, f, indent=2, ensure_ascii=False)
         except Exception as e:
             Logger.error(f"Error writing heartbeat file: {e}")
+
+    def reset(self):
+        """
+        Start a fresh heartbeat for a new process, so operations a previous
+        container left running or failed don't count against this one.
+        """
+        self._write_heartbeat(
+            {
+                "last_update": datetime.now().isoformat(),
+                "current_operation": None,
+                "operations": {},
+            }
+        )
 
     def start_operation(self, operation: str):
         """
@@ -128,15 +142,56 @@ class HeartbeatManager:
         self._write_heartbeat(data)
 
     @staticmethod
+    def _as_aware(timestamp: str) -> datetime:
+        """Parse an ISO timestamp; one without a timezone is in local time."""
+        parsed = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+        return parsed if parsed.tzinfo else parsed.astimezone()
+
+    @staticmethod
+    def last_status_update(status_paths: Iterable[str]) -> Optional[datetime]:
+        """
+        Latest `_metadata.last_modified` among the given status JSON files and the
+        JSON files directly inside the given folders, or None if there is none.
+
+        The scraper and parser status databases set it on every write, and the push
+        cache sets it on every saved chunk, so it moves only while an operation makes
+        progress. Only the most recently written file of each path is parsed.
+        """
+        latest = None
+        for path in status_paths:
+            candidates = (
+                glob.glob(os.path.join(path, "*.json"))
+                if os.path.isdir(path)
+                else [path]
+            )
+            candidates = [c for c in candidates if os.path.isfile(c)]
+            if not candidates:
+                continue
+            newest_file = max(candidates, key=os.path.getmtime)
+            try:
+                with open(newest_file, "r", encoding="utf-8") as f:
+                    last_modified = json.load(f)["_metadata"]["last_modified"]
+                changed = HeartbeatManager._as_aware(last_modified)
+            except Exception:  # pylint: disable=broad-exception-caught
+                continue
+            if latest is None or changed > latest:
+                latest = changed
+        return latest
+
+    @staticmethod
     def check_health(
-        heartbeat_path: str, max_age_seconds: int = 300
+        heartbeat_path: str,
+        max_age_seconds: int = 300,
+        status_paths: Optional[Iterable[str]] = None,
     ) -> tuple[bool, str]:
         """
         Check if the heartbeat indicates a healthy process.
 
         Args:
             heartbeat_path: Path to the heartbeat JSON file
-            max_age_seconds: Maximum age of heartbeat in seconds before considering unhealthy
+            max_age_seconds: Maximum seconds without progress before considering unhealthy
+            status_paths: Status JSON files or folders whose `_metadata.last_modified`
+                counts as progress, along with the heartbeat's own last_update
 
         Returns:
             Tuple of (is_healthy, message)
@@ -154,18 +209,21 @@ class HeartbeatManager:
         if "last_update" not in data:
             return False, "Heartbeat file missing 'last_update' field"
 
-        # Check heartbeat age
+        # Check how long since the process last made progress
         try:
-            last_update = datetime.fromisoformat(data["last_update"])
-            age_seconds = (datetime.now() - last_update).total_seconds()
-
-            if age_seconds > max_age_seconds:
-                return (
-                    False,
-                    f"Heartbeat is stale (last update: {age_seconds:.0f}s ago)",
-                )
+            last_progress = HeartbeatManager._as_aware(data["last_update"])
         except Exception as e:
             return False, f"Error parsing last_update timestamp: {e}"
+        status_update = HeartbeatManager.last_status_update(status_paths or [])
+        if status_update is not None and status_update > last_progress:
+            last_progress = status_update
+        idle_seconds = (datetime.now().astimezone() - last_progress).total_seconds()
+        if idle_seconds > max_age_seconds:
+            return (
+                False,
+                f"No progress for {idle_seconds:.0f}s "
+                f"(current operation: {data.get('current_operation')})",
+            )
 
         # Check for failed operations
         operations = data.get("operations", {})
