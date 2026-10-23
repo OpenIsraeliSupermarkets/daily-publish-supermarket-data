@@ -100,6 +100,12 @@ check_container_health() {
     return 1
 }
 
+# `docker compose up` exits 0 even when the container it ran exited non-zero,
+# so read the container's own exit code.
+container_exit_code() {
+    docker inspect --format='{{.State.ExitCode}}' "$1" 2>/dev/null
+}
+
 echo "Step 3: Stopping and removing existing Docker containers"
 docker compose down -v
 docker compose rm -f
@@ -146,7 +152,7 @@ if [ "$TEST_MODE" == "production" ]; then
     export OPERATION="scraping,converting,clean_dump_files,api_update"
     docker compose up data_processor
     
-    if [ $? -ne 0 ]; then
+    if [ $? -ne 0 ] || [ "$(container_exit_code data-fetcher)" != "0" ]; then
         echo -e "\033[31mScrape operation failed. Exiting.\033[0m"
         exit 1
     fi
@@ -157,7 +163,7 @@ if [ "$TEST_MODE" == "production" ]; then
     export OPERATION="publishing,clean_all_source_data"
     docker compose up data_processor
     
-    if [ $? -ne 0 ]; then
+    if [ $? -ne 0 ] || [ "$(container_exit_code data-fetcher)" != "0" ]; then
         echo -e "\033[31mPublishing operation failed. Exiting.\033[0m"
         exit 1
     fi
