@@ -114,10 +114,11 @@ def test_file_complete_follows_the_files_acked_rows(tmp_path):
     assert sorted(stream.stored_files) == ["a.xml", "b.xml", "s.xml"]
     assert sorted(streamed) == ["a.xml", "b.xml", "s.xml"]
     sent = [(t, v) for kind, t, v in producer.log if kind == "send"]
-    for topic, file_name, count in [
-        ("price_full_file_test", "a.xml", 3),
-        ("price_full_file_test", "b.xml", 2),
-        ("store_file_test", "s.xml", 1),
+    for topic, file_name, first, count in [
+        ("price_full_file_test", "a.xml", 0, 3),
+        # row_index runs on across the table's files, as in its CSV
+        ("price_full_file_test", "b.xml", 3, 2),
+        ("store_file_test", "s.xml", 0, 1),
     ]:
         mine = [
             v
@@ -125,7 +126,9 @@ def test_file_complete_follows_the_files_acked_rows(tmp_path):
             if t == topic and v.get("file_name", file_name) == file_name
         ]
         values = [v for v in mine if "flush" not in v]
-        assert [v.get("row_index") for v in values] == list(range(count)) + [None]
+        assert [v.get("row_index") for v in values] == list(
+            range(first, first + count)
+        ) + [None]
         assert values[-1] == {
             "file_complete": "true",
             "file_name": file_name,
@@ -139,6 +142,25 @@ def test_file_complete_follows_the_files_acked_rows(tmp_path):
             if kind == "ack" and t == topic and v.get("file_name") == file_name
         ]
         assert len(acked_rows) == count
+
+
+def test_row_index_continues_from_earlier_cycles(tmp_path):
+    with CacheManager(str(tmp_path)) as cache:
+        # the CSV push already sent rows 0-4 of this table's CSV
+        cache.update_last_processed_row("price_full_file_test.csv", 4)
+    producer = DelayedAckProducer()
+    queues = {("TEST", "PRICE_FULL_FILE"): Rows(_file("a.xml", 2))}
+
+    _stream(tmp_path, _uploader(producer), queues)
+    queues = {("TEST", "PRICE_FULL_FILE"): Rows(_file("b.xml", 2))}
+    _stream(tmp_path, _uploader(producer), queues)
+
+    sent = [
+        v["row_index"]
+        for kind, _, v in producer.log
+        if kind == "send" and "row_index" in v
+    ]
+    assert sent == [5, 6, 7, 8]
 
 
 def test_failed_ack_leaves_no_file_complete_and_no_progress(tmp_path):

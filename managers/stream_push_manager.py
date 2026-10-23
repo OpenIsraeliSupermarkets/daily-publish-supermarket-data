@@ -64,11 +64,26 @@ class StreamPushManager:
         self.database_manager = database_manager
         self.read_batch = read_batch
 
-    async def _drain(self, key, rows_queue, stream, executor):
+    @staticmethod
+    def _first_row_index(table: str, local_cache: CacheState) -> int:
+        """The row_index the table's next row gets.
+
+        row_index is unique per table (Mongo indexes it), and the CSV push
+        numbers rows by their position in the table's CSV, which holds every
+        file of every cycle until clean_all_source_data. The converter appends
+        the rows it streams to that CSV in the same order, so counting on from
+        where the CSV push stopped gives each row its CSV position.
+        """
+        return max(
+            local_cache.get_last_processed_row(f"{table}.csv") + 1,
+            local_cache.get_next_streamed_row_index(table),
+        )
+
+    async def _drain(self, key, rows_queue, stream, executor, local_cache):
         parser_name, file_type = key
         table = get_table_name(file_type, parser_name)
         loop = asyncio.get_running_loop()
-        next_row_index = {}
+        row_index = self._first_row_index(table, local_cache)
         rows = 0
         while True:
             batch = await loop.run_in_executor(
@@ -84,9 +99,9 @@ class StreamPushManager:
                         table, file_name, int(message["total_expected_records"])
                     )
                     continue
-                row_index = next_row_index.get(file_name, 0)
-                next_row_index[file_name] = row_index + 1
                 await stream.add_row(table, row_to_item(message, row_index))
+                row_index += 1
+                local_cache.set_next_streamed_row_index(table, row_index)
                 rows += 1
 
     def push(self, queues: dict, local_cache: CacheState):
@@ -105,7 +120,7 @@ class StreamPushManager:
         async def _push(stream):
             await asyncio.gather(
                 *(
-                    self._drain(key, rows_queue, stream, executor)
+                    self._drain(key, rows_queue, stream, executor, local_cache)
                     for key, rows_queue in queues.items()
                 )
             )

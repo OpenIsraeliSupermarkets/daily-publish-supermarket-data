@@ -110,6 +110,29 @@ class CacheState:
         if file_name not in streamed:
             streamed.append(file_name)
 
+    def get_next_streamed_row_index(self, table_name):
+        """
+        Get the row_index after the last row the streaming push sent to a table.
+
+        Args:
+            table_name (str): Short-term database table name
+
+        Returns:
+            int: The next row_index, or 0 if nothing was streamed to the table
+        """
+        return self._data.get("streamed_row_index", {}).get(table_name, 0)
+
+    def set_next_streamed_row_index(self, table_name, row_index):
+        """
+        Record the row_index the next row streamed to a table gets, so a later
+        cycle does not reuse one even if its CSV push did not finish.
+
+        Args:
+            table_name (str): Short-term database table name
+            row_index (int): The next row_index
+        """
+        self._data.setdefault("streamed_row_index", {})[table_name] = row_index
+
     def clear(self):
         """
         Clear the cache data.
