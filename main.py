@@ -17,7 +17,15 @@ def output_short_term_destination_from_env(output_destination):
 
     Logger.info(f"Output destination: {output_destination}")
     if output_destination == "kafka":
-        return KafkaDbUploader()
+        compression = os.environ.get("KAFKA_COMPRESSION_TYPE", "none").strip().lower()
+        idempotence = os.environ.get("KAFKA_ENABLE_IDEMPOTENCE", "true").strip().lower()
+        return KafkaDbUploader(
+            max_batch_size=int(os.environ.get("KAFKA_MAX_BATCH_SIZE", 1024 * 1024)),
+            linger_ms=int(os.environ.get("KAFKA_LINGER_MS", 0)),
+            compression_type=None if compression in ("", "none") else compression,
+            enable_idempotence=idempotence in ("1", "true", "yes"),
+            max_pending_rows=int(os.environ.get("KAFKA_MAX_PENDING_ROWS", 100000)),
+        )
     elif output_destination == "mongo":
         return MongoDbUploader()
     elif output_destination == "file":
@@ -29,7 +37,6 @@ def output_short_term_destination_from_env(output_destination):
 if __name__ == "__main__":
     exit_cleanly_on_sigterm()
     use_forkserver()
-
 
     # Allow providing when from environment variable, otherwise use current time
     when_str = os.environ.get("WHEN", None)
@@ -126,6 +133,8 @@ if __name__ == "__main__":
                 "EXEC_FINAL_OPERATIONS_CONDITION", "EOD"
             ),
             should_stop_dag=os.environ.get("STOP_DAG_CONDITION", "NEVER"),
-            operations="scraping,converting,api_update,clean_dump_files",
+            # scraping also parses and pushes rows as they are parsed (#114);
+            # api_update then sends the status files and any file it missed.
+            operations="scraping,api_update,clean_dump_files",
             final_operations="publishing,clean_all_source_data",
         )

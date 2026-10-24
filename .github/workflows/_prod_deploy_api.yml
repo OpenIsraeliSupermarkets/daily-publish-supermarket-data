@@ -1,9 +1,16 @@
 name: Production | Deploy to Runner Machine 
 
+# Pulls the released erlichsefi/raw-data-api image (published by release.yml);
+# nothing is built on the runner. Called by release.yml with the new tag, or run
+# by hand to (re)deploy the release in VERSION.
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
+  workflow_call:
+    inputs:
+      tag:
+        description: "Release tag to deploy, e.g. v1.2.3"
+        type: string
+        required: true
 
 jobs:
   deploy:
@@ -35,7 +42,16 @@ jobs:
           echo "LOG_LEVEL=WARNING" >> $GITHUB_ENV
           echo "DISCORD_WEBHOOK_URL=${{ secrets.DISCORD_WEBHOOK_URL }}" >> $GITHUB_ENV
 
-          
+      - name: Resolve release version
+        run: |
+          tag="${{ inputs.tag }}"
+          if [ -z "$tag" ]; then tag="v$(tr -d '[:space:]' < VERSION)"; fi
+          echo "Using release $tag"
+          echo "IMAGE_TAG=$tag" >> $GITHUB_ENV
+
+      - name: Pull released API image
+        run: docker compose pull api
+
       - name: Stoping Old Container
         run: docker compose down --remove-orphans
 
@@ -44,9 +60,6 @@ jobs:
           mkdir -p "${{ env.APP_DATA_PATH }}" &&
           mkdir -p "${{ env.MONGO_DATA_PATH }}"
 
-      - name: Build and tag Docker image
-        run:  docker compose build
-        
       - name: Start Docker daemon (if not already running)
         run: systemctl start docker || true # Start if not already running
       
@@ -54,4 +67,4 @@ jobs:
         run: docker compose up -d mongodb
 
       - name: Run Docker Compose
-        run: docker compose up -d api
+        run: docker compose up -d --no-build api

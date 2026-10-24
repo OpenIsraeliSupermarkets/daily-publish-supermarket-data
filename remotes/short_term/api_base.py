@@ -4,7 +4,10 @@ This module defines the base class for database uploaders that interact with API
 providing a consistent interface for different implementations.
 """
 
+import asyncio
+
 from data_models.raw_schema import list_all_dynamic_tables, status_table_names
+from .row_stream import BufferedRowStream
 
 
 # pylint: disable=too-few-public-methods
@@ -30,6 +33,28 @@ class ShortTermDatabaseUploader:
             table_target_name (str): Name of the target table/collection
             items (list): List of items to insert
         """
+
+    def stream_rows(self, push, on_file_stored=None):
+        """Run ``push(stream)`` with a row stream into this database.
+
+        ``push`` is an async function that calls ``stream.add_row`` and
+        ``stream.end_file``. Returns the stream once every ended file is
+        stored, with ``stored_files`` and ``failed_files`` filled in.
+
+        Args:
+            push: async callable taking a RowStream
+            on_file_stored: called with each file name whose file_complete is stored
+        """
+
+        async def _run():
+            stream = BufferedRowStream(self, on_file_stored=on_file_stored)
+            try:
+                await push(stream)
+            finally:
+                await stream.close()
+            return stream
+
+        return asyncio.run(_run())
 
     def _create_destinations(self, partition_id, table_name):
         """Create a new table/collection in the database.

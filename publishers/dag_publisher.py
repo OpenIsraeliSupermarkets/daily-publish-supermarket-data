@@ -22,6 +22,7 @@ class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
         # Initialize heartbeat manager
         heartbeat_path = os.path.join(self.app_folder, "heartbeat.json")
         self.heartbeat = HeartbeatManager(heartbeat_path)
+        self.heartbeat.reset()
 
     def _execute_single_operation(self, operation):
         """
@@ -33,7 +34,9 @@ class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
         if operation == "scraping":
             self._execute_scraping()
         elif operation == "converting":
-            self._execute_converting()
+            # Parsing runs inside "scraping" since #114; kept so existing
+            # OPERATION strings do not fail.
+            Logger.warning("'converting' is a no-op: scraping also parses now")
         elif operation == "download_from_long_term":
             self._download_from_long_term_database()
         elif operation == "clean_dump_files":

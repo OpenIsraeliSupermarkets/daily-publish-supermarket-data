@@ -58,6 +58,11 @@ if [ -f .env.test ]; then
 fi
 
 echo "Step 2: Setting up test environment variables"
+# Step 10 joins the compose network by name, and compose derives that name from
+# the checkout folder. Pin it so the test works from any folder or worktree.
+export COMPOSE_PROJECT_NAME=publisher
+# Same overrides as the CI system test (see docker-compose.ci.yml).
+export COMPOSE_FILE=${COMPOSE_FILE:-docker-compose.yml:docker-compose.ci.yml}
 # limit the run time — keep in sync with tests.validation_utils.scrapers_to_test()
 export ENABLED_SCRAPERS=BAREKET,WOLT
 export LIMIT=10
@@ -92,9 +97,60 @@ check_container_health() {
     return 1
 }
 
+# `docker compose up` exits 0 even when the container it ran exited non-zero,
+# so read the container's own exit code.
+container_exit_code() {
+    docker inspect --format='{{.State.ExitCode}}' "$1" 2>/dev/null
+}
+
+# Run the data processor for one OPERATION and watch Docker's health status of
+# the container while it runs: it must never turn unhealthy, and with
+# require_healthy=true it must report healthy at least once (#129).
+run_data_processor_watching_health() {
+    local require_healthy=$1
+    local container_name="data-fetcher"
+    local seen_healthy=false
+
+    docker compose up -d data_processor || return 1
+    docker logs -f "$container_name" &
+    local logs_pid=$!
+
+    while [ "$(docker inspect -f '{{.State.Running}}' "$container_name" 2>/dev/null)" == "true" ]; do
+        health_status=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_name")
+        if [ "$health_status" == "unhealthy" ]; then
+            kill $logs_pid 2>/dev/null
+            echo -e "\033[31m$container_name turned unhealthy while running:\033[0m"
+            docker inspect -f '{{range .State.Health.Log}}{{.End}} exit={{.ExitCode}} {{.Output}}{{end}}' "$container_name"
+            return 1
+        elif [ "$health_status" == "healthy" ]; then
+            seen_healthy=true
+        elif [ "$health_status" == "none" ]; then
+            kill $logs_pid 2>/dev/null
+            echo -e "\033[31m$container_name has no health check. Exiting.\033[0m"
+            return 1
+        fi
+        sleep 5
+    done
+    kill $logs_pid 2>/dev/null
+
+    exit_code=$(docker inspect -f '{{.State.ExitCode}}' "$container_name")
+    if [ "$exit_code" != "0" ]; then
+        echo -e "\033[31m$container_name exited with code $exit_code\033[0m"
+        return 1
+    fi
+    if [ "$require_healthy" == "true" ] && [ "$seen_healthy" != "true" ]; then
+        echo -e "\033[31m$container_name never reported healthy while running\033[0m"
+        return 1
+    fi
+    echo "$container_name finished; health while running: never unhealthy, seen healthy=$seen_healthy"
+}
+
 echo "Step 3: Stopping and removing existing Docker containers"
 docker compose down -v
 docker compose rm -f
+# The services have fixed container names, so a leftover from a run under a
+# different compose project name (or a cancelled run) would block this one.
+docker rm -f raw-data-mongodb raw-data-api data-fetcher >/dev/null 2>&1 || true
 
 echo "Step 4: Cleaning app data directory"
 # Clean the app data folder
@@ -115,15 +171,18 @@ fi
 mkdir -p "$MONGO_DATA_PATH/mongo_data"
 
 echo "Step 6: Building Docker images from this checkout"
-# Always build: data_processor also names a published image, and without a
-# local build `docker compose up` pulls it, so the test would skip this code.
+# Build the same way publish_docker.yml does (scripts/build_docker.sh), under a
+# local tag that compose then uses. Always build: both services name published
+# images, and without a local build `docker compose up` pulls them, so the
+# test would skip this code.
+export IMAGE_TAG=local
+BUILD_ARGS=(--tag "$IMAGE_TAG")
 if [[ "$BUILD_NO_CACHE" =~ ^[Yy]$ ]]; then
-    docker compose build --no-cache api data_processor
-else
-    docker compose build api data_processor
+    BUILD_ARGS+=(--no-cache)
 fi
 
-if [ $? -ne 0 ]; then
+if ! ./scripts/build_docker.sh --target data_processing "${BUILD_ARGS[@]}" ||
+   ! ./scripts/build_docker.sh --image erlichsefi/raw-data-api --target serving "${BUILD_ARGS[@]}"; then
     echo -e "\033[31mDocker build failed. Exiting.\033[0m"
     exit 1
 fi
@@ -134,11 +193,11 @@ docker compose up -d mongodb api
 echo "Step 8: Starting data processor"
 
 if [ "$TEST_MODE" == "production" ]; then
-    echo "Step 8.1: Running SCRAPE operation (scraping,converting,clean_dump_files,api_update)"
-    export OPERATION="scraping,converting,clean_dump_files,api_update"
-    docker compose up data_processor
+    echo "Step 8.1: Running SCRAPE operation (scraping,clean_dump_files,api_update)"
+    export OPERATION="scraping,clean_dump_files,api_update"
+    run_data_processor_watching_health true
     
-    if [ $? -ne 0 ]; then
+    if [ $? -ne 0 ] || [ "$(container_exit_code data-fetcher)" != "0" ]; then
         echo -e "\033[31mScrape operation failed. Exiting.\033[0m"
         exit 1
     fi
@@ -147,9 +206,9 @@ if [ "$TEST_MODE" == "production" ]; then
     
     echo "Step 8.3: Running PUBLISHING operation (publishing,clean_all_source_data)"
     export OPERATION="publishing,clean_all_source_data"
-    docker compose up data_processor
+    run_data_processor_watching_health false
     
-    if [ $? -ne 0 ]; then
+    if [ $? -ne 0 ] || [ "$(container_exit_code data-fetcher)" != "0" ]; then
         echo -e "\033[31mPublishing operation failed. Exiting.\033[0m"
         exit 1
     fi
@@ -228,7 +287,7 @@ echo "Step 10: Running system tests"
 
 docker build --target testing -t supermarket-testing .
 docker run \
-    --network=daily-publish-supermarket-data_mongo-network \
+    --network=${COMPOSE_PROJECT_NAME}_mongo-network \
     -e API_HOST=http://api:8000/ \
     -e MONGODB_URI=mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@mongodb:${MONGO_PORT} \
     -e API_TOKEN=${API_TOKEN} \

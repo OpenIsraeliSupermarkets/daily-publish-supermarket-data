@@ -8,6 +8,7 @@ PUSH_TO_DOCKERHUB=false
 TARGET="data_processing"
 TAG="latest"
 REGISTRY=""
+NO_CACHE=""
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -28,6 +29,14 @@ while [[ $# -gt 0 ]]; do
             REGISTRY="$2"
             shift 2
             ;;
+        --image)
+            IMAGE_NAME="$2"
+            shift 2
+            ;;
+        --no-cache)
+            NO_CACHE="--no-cache"
+            shift
+            ;;
         --help)
             echo "Usage: $0 [OPTIONS]"
             echo "Options:"
@@ -35,6 +44,8 @@ while [[ $# -gt 0 ]]; do
             echo "  --target TARGET     Docker build target (default: data_processing)"
             echo "  --tag TAG           Image tag (default: latest)"
             echo "  --registry REGISTRY Registry URL (e.g., ghcr.io/username/repo)"
+            echo "  --image IMAGE       Image name (default: erlichsefi/data-fetcher)"
+            echo "  --no-cache          Build without the Docker layer cache"
             echo "  --help              Show this help message"
             exit 0
             ;;
@@ -56,7 +67,7 @@ fi
 echo "Building Docker image: $FULL_IMAGE_NAME (target: $TARGET)"
 
 # Build the Docker image
-docker build \
+docker build $NO_CACHE \
     --target "$TARGET" \
     -t "$FULL_IMAGE_NAME" \
     .

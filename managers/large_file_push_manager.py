@@ -45,6 +45,8 @@ class LargeFilePushManager:
         # Get last processed row from cache
         last_row = local_cache.get_last_processed_row(file, default=-1)
         Logger.info(f"Last row: {last_row}")
+        # source files the streaming push already delivered in full (#114)
+        streamed = set(local_cache.get_streamed_files())
 
         # Read header for column names
         header = self._get_header(file)
@@ -105,17 +107,20 @@ class LargeFilePushManager:
                     if open_file == record["file_name"]:
                         total_expected_records += 1
                     else:
-                        eof_to_send.append(
-                            {
-                                "file_complete": "true",
-                                "file_name": open_file,
-                                "total_expected_records": total_expected_records,
-                            }
-                        )
+                        if open_file not in streamed:
+                            eof_to_send.append(
+                                {
+                                    "file_complete": "true",
+                                    "file_name": open_file,
+                                    "total_expected_records": total_expected_records,
+                                }
+                            )
                         open_file = record["file_name"]
                         total_expected_records = 1
                         last_completed_row = record["row_index"] - 1
 
+                    if record["file_name"] in streamed:
+                        continue
                     items.append(
                         DataTable(
                             row_index=record["row_index"],
@@ -133,25 +138,27 @@ class LargeFilePushManager:
                 Logger.error(f"Chunk: {chunk}")
                 raise e
 
-            self.database_manager._insert_to_destinations(
-                target_table_name, [sanitize_for_mongo(item) for item in items]
-            )
+            if items:
+                self.database_manager._insert_to_destinations(
+                    target_table_name, [sanitize_for_mongo(item) for item in items]
+                )
             if eof_to_send:
                 self.database_manager._insert_to_destinations(
                     target_table_name,
                     [sanitize_for_mongo(e) for e in eof_to_send],
                 )
+            if last_completed_row is not None:
                 # Track progress at the last completed source file, whose next
-                # row is a full (unmasked) row. CacheManager writes it on exit,
-                # including a SIGTERM exit, so a restart resumes there instead
-                # of from row 0. The rows of the source file that was still
+                # row is a full (unmasked) row. CacheManager saves it right away
+                # (and on exit), so a restart resumes there instead of from
+                # row 0. The rows of the source file that was still
                 # open are sent again, so consumers must tolerate re-sent
                 # records (#108).
                 local_cache.update_last_processed_row(file, last_completed_row)
             # Save last row for next iteration
             last_row_saw = chunk.tail(1).set_index("row_index")
 
-        if open_file is not None:
+        if open_file is not None and open_file not in streamed:
             self.database_manager._insert_to_destinations(
                 target_table_name,
                 [
