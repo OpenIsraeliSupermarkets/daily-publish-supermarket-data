@@ -111,3 +111,12 @@ jobs:
           git add VERSION
           git commit -m "chore: release $TAG [skip ci]"
           git push origin HEAD:main
+
+  # Deploy the API image just published (the VERSION commit is [skip ci], so
+  # nothing else would trigger it).
+  deploy_api:
+    needs: [version, release]
+    uses: ./.github/workflows/_prod_deploy_api.yml
+    with:
+      tag: ${{ needs.version.outputs.tag }}
+    secrets: inherit
