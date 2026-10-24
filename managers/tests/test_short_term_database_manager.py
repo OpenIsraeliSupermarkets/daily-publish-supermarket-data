@@ -4,10 +4,9 @@ import tempfile
 
 import pytest
 
-from managers.short_term_database_manager import (
-    VERIFIED_SCRAPER_DOWNLOADS_TABLE,
-    ShortTermDBDatasetManager,
-)
+from managers.short_term_database_manager import ShortTermDBDatasetManager
+
+VERIFIED_SCRAPER_DOWNLOADS_TABLE = "status_scraper_verified_downloads"
 
 
 class RecordingUploader:
@@ -111,11 +110,11 @@ def test_push_scraper_status_persists_verified_downloads(scraper_status_payload)
         )
         os.makedirs(manager.converting_status_folder, exist_ok=True)
 
-        manager._push_scraper_status(cache)
+        manager._push_status_files(cache)
 
     tables = {table for table, _ in uploader.inserts}
-    assert "ScraperStatus" in tables
-    assert "GlobalScraperStatus" in tables
+    assert "status_scraper_events" in tables
+    assert "status_scraper_global_status" in tables
     assert VERIFIED_SCRAPER_DOWNLOADS_TABLE in tables
 
     verified_rows = [
@@ -125,6 +124,7 @@ def test_push_scraper_status_persists_verified_downloads(scraper_status_payload)
         for row in rows
     ]
     assert len(verified_rows) == 1
-    assert verified_rows[0]["listing_hash"] == "listing-1"
-    assert verified_rows[0]["task_id"] == "task-1"
+    assert verified_rows[0]["data"]["listing_hash"] == "listing-1"
+    assert verified_rows[0]["data"]["task_id"] == "task-1"
+    assert verified_rows[0]["chain"] == "bareket"
     assert "index" in verified_rows[0]

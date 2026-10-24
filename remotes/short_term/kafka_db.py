@@ -9,7 +9,7 @@ import os
 import json
 import asyncio
 from typing import Dict, Any, Optional, List
-from data_models.raw_schema import ParserStatus, ScraperStatus, list_all_dynamic_tables
+from data_models.raw_schema import list_all_dynamic_tables, status_table_names
 
 from aiokafka import AIOKafkaProducer, AIOKafkaConsumer
 from aiokafka.errors import KafkaError
@@ -167,6 +167,14 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
         """
         return f"{table_target_name}"
 
+    @staticmethod
+    def _message_key(item) -> Optional[bytes]:
+        """Partition key for a row: its file_name; a status row's chain, so one
+        chain's status events stay in order (#115, #127); else its index;
+        else no key."""
+        key = item.get("file_name") or item.get("chain") or item.get("index")
+        return None if key is None else str(key).encode("utf-8")
+
     def _insert_to_destinations(self, table_target_name, items):
         """Insert items into a Kafka topic with error handling.
 
@@ -215,15 +223,17 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
                     pending.append(
                         await self.producer.send(
                             topic=topic_name,
-                            key=item["file_name"].encode("utf-8"),
+                            key=self._message_key(item),
                             value=item,
                         )
                     )
                 except KafkaError as inner_e:
                     Logger.error("Failed to send record: %s", str(inner_e))
                     failed_records += 1
-                if item["file_name"] not in flushs:
-                    flushs.append(item["file_name"])
+                # only per-file rows get a flush marker; status rows have no file
+                file_name = item.get("file_name")
+                if file_name is not None and file_name not in flushs:
+                    flushs.append(file_name)
 
             for result in await asyncio.gather(*pending, return_exceptions=True):
                 if isinstance(result, KafkaError):
@@ -559,12 +569,8 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
         try:
             # self._clean_all_destinations()
             #
-            self._create_destinations(
-                ParserStatus.get_index(), ParserStatus.get_table_name()
-            )
-            self._create_destinations(
-                ScraperStatus.get_index(), ScraperStatus.get_table_name()
-            )
+            for table in status_table_names():
+                self._create_destinations("index", table)
             for table in list_all_dynamic_tables(enabled_scrapers, enabled_file_types):
                 self._create_destinations(table.get_index(), table.get_table_name())
         except Exception as e:

@@ -16,13 +16,17 @@ from il_supermarket_scarper import (
     ScraperFactory,
 )
 from il_supermarket_parsers import ParserStatusOutput
-from data_models.raw_schema import ScraperStatus, ParserStatus, file_name_to_table
+from data_models.raw_schema import (
+    PARSER_STAGE,
+    SCRAPER_STAGE,
+    file_name_to_table,
+    status_table_name,
+)
 from managers.quality_indicators import (
     PARSER_QUALITY_FILENAME,
     PIPELINE_HEALTH_FILENAME,
     SCRAPER_QUALITY_FILENAME,
 )
-from managers.short_term_database_manager import VERIFIED_SCRAPER_DOWNLOADS_TABLE
 from managers.cache_manager import CacheManager
 from access.access_layer import AccessLayer
 
@@ -167,38 +171,26 @@ def validate_converting_output(
             ), f"Expected output file {output_file} does not exist. {downloaded_file}. {chain_folder}"
 
 
+def _group_status_by_task(short_term_db_target, stage, model_type) -> dict:
+    """Reconstruct per-task status payloads, one list per field of
+    ``model_type``, from the ``status_<stage>_<section>`` tables."""
+    by_task: dict = {}
+    for section in model_type.model_fields:
+        for doc in short_term_db_target.get_destinations_content(
+            status_table_name(stage, section)
+        ):
+            row = doc["data"]
+            parts = by_task.setdefault(
+                row["task_id"], {name: [] for name in model_type.model_fields}
+            )
+            parts[section].append(row)
+    return by_task
+
+
 def _group_scraper_status_by_task(short_term_db_target) -> dict:
-    """Reconstruct per-task scraper status payloads from short-term tables."""
-    scraper_by_task: dict = {}
-    for doc in short_term_db_target.get_destinations_content("GlobalScraperStatus"):
-        tid = doc["task_id"]
-        scraper_by_task.setdefault(
-            tid, {"events": [], "global_status": [], "verified_downloads": []}
-        )
-        payload = {k: v for k, v in doc.items() if k != "index"}
-        scraper_by_task[tid]["global_status"].append(payload)
-
-    for doc in short_term_db_target.get_destinations_content(
-        ScraperStatus.get_table_name()
-    ):
-        tid = doc["task_id"]
-        scraper_by_task.setdefault(
-            tid, {"events": [], "global_status": [], "verified_downloads": []}
-        )
-        payload = {k: v for k, v in doc.items() if k != "index"}
-        scraper_by_task[tid]["events"].append(payload)
-
-    for doc in short_term_db_target.get_destinations_content(
-        VERIFIED_SCRAPER_DOWNLOADS_TABLE
-    ):
-        tid = doc["task_id"]
-        scraper_by_task.setdefault(
-            tid, {"events": [], "global_status": [], "verified_downloads": []}
-        )
-        payload = {k: v for k, v in doc.items() if k != "index"}
-        scraper_by_task[tid]["verified_downloads"].append(payload)
-
-    return scraper_by_task
+    return _group_status_by_task(
+        short_term_db_target, SCRAPER_STAGE, ScraperStatusOutput
+    )
 
 
 def validate_state_after_api_update(
@@ -223,16 +215,12 @@ def validate_state_after_api_update(
         f"found {len(scraper_by_task)}"
     )
     for tid, parts in scraper_by_task.items():
-        model = ScraperStatusOutput(
-            events=parts["events"],
-            global_status=parts["global_status"],
-            verified_downloads=parts["verified_downloads"],
-        )
+        model = ScraperStatusOutput(**parts)
         assert (
             model.validate_file_status()
         ), f"ScraperStatusOutput invalid for task {tid}"
 
-    parser_status_table = ParserStatus.get_table_name()
+    parser_status_table = status_table_name(PARSER_STAGE, "events")
     parser_status_count = len(
         short_term_db_target.get_destinations_content(parser_status_table)
     )
@@ -433,24 +421,19 @@ def validate_short_term_structure(
         enabled_scrapers: List of enabled scrapers
         num_of_occasions: Expected number of scraping occasions (None = any)
     """
+    for stage in (SCRAPER_STAGE, PARSER_STAGE):
+        for section in ("events", "global_status"):
+            table = status_table_name(stage, section)
+            assert short_term_db_target.get_destinations_content(
+                table
+            ), f"Expected at least one {table} document."
+            assert short_term_db_target._is_collection_updated(
+                table, seconds=60 * 60 * 3
+            ), f"{table} should be updated in the last 3 hours"
+
     # ------------------------------------------------------------------ #
     # Scraper                                                              #
     # ------------------------------------------------------------------ #
-    scraper_events_docs = short_term_db_target.get_destinations_content(
-        ScraperStatus.get_table_name()
-    )
-    scraper_global_docs = short_term_db_target.get_destinations_content(
-        "GlobalScraperStatus"
-    )
-    scraper_verified_docs = short_term_db_target.get_destinations_content(
-        VERIFIED_SCRAPER_DOWNLOADS_TABLE
-    )
-
-    assert len(scraper_events_docs) > 0, "Expected at least one ScraperStatus document."
-    assert (
-        len(scraper_global_docs) > 0
-    ), "Expected at least one GlobalScraperStatus document."
-
     scraper_by_task = _group_scraper_status_by_task(short_term_db_target)
 
     # all scrapers ran at least once
@@ -460,11 +443,7 @@ def validate_short_term_structure(
 
     # each task forms a valid lifecycle
     for tid, parts in scraper_by_task.items():
-        model = ScraperStatusOutput(
-            events=parts["events"],
-            global_status=parts["global_status"],
-            verified_downloads=parts["verified_downloads"],
-        )
+        model = ScraperStatusOutput(**parts)
         assert (
             model.validate_file_status()
         ), f"ScraperStatusOutput invalid for task {tid}"
@@ -475,44 +454,13 @@ def validate_short_term_structure(
             len(scraper_by_task) == expected_tasks
         ), f"Expected {expected_tasks} scraper tasks, found {len(scraper_by_task)}"
 
-    assert short_term_db_target._is_collection_updated(
-        ScraperStatus.get_table_name(), seconds=60 * 60 * 3
-    ), "ScraperStatus should be updated in the last 3 hours"
-    assert short_term_db_target._is_collection_updated(
-        "GlobalScraperStatus", seconds=60 * 60 * 3
-    ), "GlobalScraperStatus should be updated in the last 3 hours"
-    if scraper_verified_docs:
-        assert short_term_db_target._is_collection_updated(
-            VERIFIED_SCRAPER_DOWNLOADS_TABLE, seconds=60 * 60 * 3
-        ), "VerifiedScraperDownloads should be updated in the last 3 hours"
-
     # ------------------------------------------------------------------ #
     # Parser                                                               #
     # ------------------------------------------------------------------ #
-    parser_events_docs = short_term_db_target.get_destinations_content(
-        ParserStatus.get_table_name()
+    # one task per (chain, file_type) per occasion
+    parser_by_task = _group_status_by_task(
+        short_term_db_target, PARSER_STAGE, ParserStatusOutput
     )
-    parser_global_docs = short_term_db_target.get_destinations_content(
-        "GlobalParserStatus"
-    )
-
-    assert len(parser_events_docs) > 0, "Expected at least one ParserStatus document."
-    assert (
-        len(parser_global_docs) > 0
-    ), "Expected at least one GlobalParserStatus document."
-
-    # group by task_id — one group per (chain, file_type) per occasion
-    parser_by_task: dict = {}
-    for doc in parser_global_docs:
-        tid = doc["task_id"]
-        parser_by_task.setdefault(tid, {"events": [], "global_status": []})
-        payload = {k: v for k, v in doc.items() if k != "index"}
-        parser_by_task[tid]["global_status"].append(payload)
-
-    for doc in parser_events_docs:
-        tid = doc["task_id"]
-        payload = {k: v for k, v in doc.items() if k != "index"}
-        parser_by_task[tid]["events"].append(payload)
 
     # all enabled scrapers are represented in the started events
     scrapers_seen = {
@@ -528,10 +476,7 @@ def validate_short_term_structure(
     # each task forms a valid lifecycle
     for tid, parts in parser_by_task.items():
         try:
-            model = ParserStatusOutput(
-                events=parts["events"],
-                global_status=parts["global_status"],
-            )
+            model = ParserStatusOutput(**parts)
             valid = model.validate_file_status()
             assert valid, f"ParserStatusOutput invalid for task {tid}"
         except Exception as e:
@@ -544,13 +489,6 @@ def validate_short_term_structure(
         assert (
             len(parser_by_task) == expected_tasks
         ), f"Expected {expected_tasks} parser tasks, found {len(parser_by_task)}"
-
-    assert short_term_db_target._is_collection_updated(
-        ParserStatus.get_table_name(), seconds=60 * 60 * 3
-    ), "ParserStatus should be updated in the last 3 hours"
-    assert short_term_db_target._is_collection_updated(
-        "GlobalParserStatus", seconds=60 * 60 * 3
-    ), "GlobalParserStatus should be updated in the last 3 hours"
 
 
 # def validate_longterm_and_short_sync(
