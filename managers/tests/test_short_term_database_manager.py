@@ -155,9 +155,7 @@ def test_upload_with_empty_cache_keeps_existing_rows():
 
         _manager(tmpdir, uploader).upload()
 
-        assert uploader.get_destinations_content("Existing") == [
-            {"index": "1", "v": 1}
-        ]
+        assert uploader.get_destinations_content("Existing") == [{"index": "1", "v": 1}]
         assert "ScraperStatus" in uploader._list_destinations()
 
 
