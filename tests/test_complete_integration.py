@@ -6,6 +6,7 @@ Tests the full DAG execution pipeline from disk.
 import os
 import tempfile
 import mongomock
+import pytest
 import random
 from unittest.mock import patch
 from il_supermarket_scarper.scrappers_factory import ScraperFactory
@@ -35,6 +36,7 @@ def run_full_dag_integration(
     enabled_scrapers,
     file_per_run=3,
     num_of_occasions=2,
+    operations="scraping,api_update,clean_dump_files",
 ):
     """
     Test the full DAG integration for the SupermarketDataPublisher.
@@ -70,7 +72,7 @@ def run_full_dag_integration(
         second_to_wait_between_opreation=wait_time_seconds,
         should_execute_final_operations=num_of_occasions,
         should_stop_dag="ONCE",
-        operations="scraping,converting,api_update,clean_dump_files",
+        operations=operations,
         final_operations="publishing,clean_all_source_data",
     )
 

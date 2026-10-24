@@ -120,7 +120,7 @@ docker run -d \
   -e WAIT_TIME_SECONDS="1800" \  # Seconds to wait between operation cycles (default: 1800 = 30 minutes)
   -e STOP="EOD" \  # When to execute final operations (options: EOD = End of Day, NEVER)
   -e REPEAT="FOREVER" \  # Whether to repeat the DAG (options: FOREVER, ONCE)
-  -e OPERATION="" \  # Optional: Execute specific operations only (comma-separated: scraping,converting,api_update,publishing,clean_dump_files,clean_all_source_data, if not spesificed execute scraping,converting,api_update,clean_dump_files at Stop on publishing,clean_all_source_data
+  -e OPERATION="" \  # Optional: Execute specific operations only (comma-separated: scraping,api_update,publishing,clean_dump_files,clean_all_source_data, if not spesificed execute scraping,api_update,clean_dump_files at Stop on publishing,clean_all_source_data. `scraping` scrapes, parses and pushes each row to the short-term database as soon as it is parsed; `api_update` pushes the status files and any file the scraping push did not finish
   -e WHEN="" \  # Optional: Override timestamp for data processing (ISO format: 2024-01-01T00:00:00)
   -e LOG_LEVEL="INFO" \  # Logging level (options: DEBUG, INFO, WARNING, ERROR)
   -e HEALTHCHECK_MAX_AGE_SECONDS="300" \  # Maximum seconds before healthcheck fails (default: 300)
@@ -143,7 +143,7 @@ docker run --rm \
 **Execute specific operation only:**
 ```bash
 docker run --rm \
-  -e OPERATION="scraping" \  # Only run the scraping operation
+  -e OPERATION="scraping" \  # Only scrape, parse and push
   # ... other env vars ...
   supermarket-data-processor
 ```
@@ -197,7 +197,6 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/service_health
 
 ## Development Setup
 
-
 Testing:
 ```bash
 ./run_test.sh
@@ -229,6 +228,11 @@ Testing:
 - `LIMIT` - Limit number of files to process
 - `WAIT_TIME_SECONDS` - Seconds between cycles (default: 1800)
 - `HEALTHCHECK_MAX_AGE_SECONDS` - Health check timeout (default: 300)
+- `KAFKA_MAX_BATCH_SIZE` - Producer batch per partition in bytes (default: 1048576, capped at `KAFKA_MAX_REQUEST_SIZE`)
+- `KAFKA_LINGER_MS` - Producer linger (default: 0)
+- `KAFKA_COMPRESSION_TYPE` - `none` (default) or `gzip`; lz4/zstd also need the library on the consumer side
+- `KAFKA_ENABLE_IDEMPOTENCE` - Idempotent producer, so retries add no duplicates (default: true)
+- `KAFKA_MAX_PENDING_ROWS` - Streamed rows waiting for an ack before the push waits (default: 100000)
 
 
 ---

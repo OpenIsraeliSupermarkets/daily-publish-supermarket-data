@@ -89,6 +89,50 @@ class CacheState:
         if self._on_progress is not None:
             self._on_progress()
 
+    def get_streamed_files(self):
+        """
+        Get the source files the streaming push already delivered in full.
+
+        Returns:
+            list: Source file names whose file_complete message was acked
+        """
+        return self._data.get("streamed_files", [])
+
+    def mark_file_streamed(self, file_name):
+        """
+        Record that the streaming push delivered every row of a source file,
+        so the CSV push in api_update does not send it again.
+
+        Args:
+            file_name (str): Source file name, as in the rows' file_name field
+        """
+        streamed = self._data.setdefault("streamed_files", [])
+        if file_name not in streamed:
+            streamed.append(file_name)
+
+    def get_next_streamed_row_index(self, table_name):
+        """
+        Get the row_index after the last row the streaming push sent to a table.
+
+        Args:
+            table_name (str): Short-term database table name
+
+        Returns:
+            int: The next row_index, or 0 if nothing was streamed to the table
+        """
+        return self._data.get("streamed_row_index", {}).get(table_name, 0)
+
+    def set_next_streamed_row_index(self, table_name, row_index):
+        """
+        Record the row_index the next row streamed to a table gets, so a later
+        cycle does not reuse one even if its CSV push did not finish.
+
+        Args:
+            table_name (str): Short-term database table name
+            row_index (int): The next row_index
+        """
+        self._data.setdefault("streamed_row_index", {})[table_name] = row_index
+
     def clear(self):
         """
         Clear the cache data.
