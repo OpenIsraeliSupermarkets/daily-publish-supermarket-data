@@ -140,7 +140,8 @@ class BaseSupermarketDataPublisher:
 
         with CacheManager(self.app_folder) as local_cache:
             if local_cache.is_empty():
-                self.short_term_db_target.restart_database(
+                # never wipe here: only clean_all_source_data resets the DB
+                self.short_term_db_target.create_database(
                     self.enabled_scrapers, self.enabled_file_types
                 )
             Logger.info("Starting the scraping task")
@@ -275,3 +276,7 @@ class BaseSupermarketDataPublisher:
 
         with CacheManager(self.app_folder) as cache:
             cache.clear()
+        # the push cache is gone, so reset the DB with it
+        self.short_term_db_target.restart_database(
+            self.enabled_scrapers, self.enabled_file_types
+        )

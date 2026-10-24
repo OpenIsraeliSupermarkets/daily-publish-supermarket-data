@@ -156,8 +156,13 @@ class ShortTermDBDatasetManager:
         Upload the data to the database.
         """
         with CacheManager(self.app_folder) as local_cache:
-            if local_cache.is_empty() or force_restart:
+            if force_restart:
                 self.uploader.restart_database(
+                    self.enabled_scrapers, self.enabled_file_types
+                )
+            elif local_cache.is_empty():
+                # never wipe here: only clean_all_source_data resets the DB
+                self.uploader.create_database(
                     self.enabled_scrapers, self.enabled_file_types
                 )
 

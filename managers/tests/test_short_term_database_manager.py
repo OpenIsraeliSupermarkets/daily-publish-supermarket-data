@@ -4,6 +4,7 @@ import tempfile
 
 import pytest
 
+from remotes import DummyDocumentDbUploader
 from managers.short_term_database_manager import (
     VERIFIED_SCRAPER_DOWNLOADS_TABLE,
     ShortTermDBDatasetManager,
@@ -128,3 +129,44 @@ def test_push_scraper_status_persists_verified_downloads(scraper_status_payload)
     assert verified_rows[0]["listing_hash"] == "listing-1"
     assert verified_rows[0]["task_id"] == "task-1"
     assert "index" in verified_rows[0]
+
+
+def _manager(tmpdir, uploader):
+    for folder in ["outputs", "status", "scraping_status", "converting_status"]:
+        os.makedirs(os.path.join(tmpdir, folder), exist_ok=True)
+    return ShortTermDBDatasetManager(
+        app_folder=tmpdir,
+        outputs_folder=os.path.join(tmpdir, "outputs"),
+        status_folder=os.path.join(tmpdir, "status"),
+        short_term_db_target=uploader,
+        enabled_scrapers=["BAREKET"],
+        enabled_file_types=["PRICE_FULL_FILE"],
+        scraping_status_folder=os.path.join(tmpdir, "scraping_status"),
+        converting_status_folder=os.path.join(tmpdir, "converting_status"),
+    )
+
+
+def test_upload_with_empty_cache_keeps_existing_rows():
+    """An empty push cache (e.g. a fresh deploy) must not wipe the DB (#137)."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        uploader = DummyDocumentDbUploader(db_path=os.path.join(tmpdir, "db"))
+        uploader._create_destinations("index", "Existing")
+        uploader._insert_to_destinations("Existing", [{"index": "1", "v": 1}])
+
+        _manager(tmpdir, uploader).upload()
+
+        assert uploader.get_destinations_content("Existing") == [
+            {"index": "1", "v": 1}
+        ]
+        assert "ScraperStatus" in uploader._list_destinations()
+
+
+def test_upload_force_restart_wipes_the_db():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        uploader = DummyDocumentDbUploader(db_path=os.path.join(tmpdir, "db"))
+        uploader._create_destinations("index", "Existing")
+        uploader._insert_to_destinations("Existing", [{"index": "1", "v": 1}])
+
+        _manager(tmpdir, uploader).upload(force_restart=True)
+
+        assert "Existing" not in uploader._list_destinations()

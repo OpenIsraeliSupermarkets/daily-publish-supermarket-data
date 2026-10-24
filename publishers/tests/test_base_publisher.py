@@ -297,3 +297,24 @@ def test_clean_all_source_data_integration():
         # Clean up anything that might remain
         if os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
+
+
+def test_clean_all_source_data_resets_the_db():
+    """clean_all_source_data is the one operation that wipes the DB (#137)."""
+    temp_dir = tempfile.mkdtemp(prefix="test_clean_db_")
+    try:
+        target = DummyDocumentDbUploader(db_path=os.path.join(temp_dir, "db"))
+        target._create_destinations("index", "Existing")
+        target._insert_to_destinations("Existing", [{"index": "1"}])
+        publisher = BaseSupermarketDataPublisher(
+            app_folder=os.path.join(temp_dir, "app"),
+            enabled_scrapers=["BAREKET"],
+            short_term_db_target=target,
+        )
+
+        publisher._clean_all_source_data()
+
+        assert "Existing" not in target._list_destinations()
+        assert "ScraperStatus" in target._list_destinations()
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)

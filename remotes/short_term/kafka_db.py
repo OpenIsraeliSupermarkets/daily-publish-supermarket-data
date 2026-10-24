@@ -552,20 +552,18 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
     def restart_database(
         self, enabled_scrapers: list[str], enabled_file_types: list[str]
     ):
-        """Clean and recreate all tables in the database.
+        """Kafka topics are never dropped: only create the missing ones."""
+        self.create_database(enabled_scrapers, enabled_file_types)
 
-        This function drops all existing tables and recreates them with their original structure.
-        """
-        try:
-            # self._clean_all_destinations()
-            #
-            self._create_destinations(
-                ParserStatus.get_index(), ParserStatus.get_table_name()
-            )
-            self._create_destinations(
-                ScraperStatus.get_index(), ScraperStatus.get_table_name()
-            )
-            for table in list_all_dynamic_tables(enabled_scrapers, enabled_file_types):
-                self._create_destinations(table.get_index(), table.get_table_name())
-        except Exception as e:
-            raise
+    def create_database(
+        self, enabled_scrapers: list[str], enabled_file_types: list[str]
+    ):
+        """Create the topics that don't exist yet."""
+        self._create_destinations(
+            ParserStatus.get_index(), ParserStatus.get_table_name()
+        )
+        self._create_destinations(
+            ScraperStatus.get_index(), ScraperStatus.get_table_name()
+        )
+        for table in list_all_dynamic_tables(enabled_scrapers, enabled_file_types):
+            self._create_destinations(table.get_index(), table.get_table_name())

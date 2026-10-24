@@ -109,25 +109,28 @@ class ShortTermDatabaseUploader:
         """Clean and recreate all tables in the database.
 
         This function drops all existing tables and recreates them with their original structure.
+        Only clean_all_source_data and reload_complete_api should call it.
         """
-        try:
-            self._clean_all_destinations()
-            #
-            self._create_destinations(
-                ParserStatus.get_index(), ParserStatus.get_table_name()
-            )
-            self._create_destinations(
-                ScraperStatus.get_index(), ScraperStatus.get_table_name()
-            )
-            self._create_destinations(ParserStatus.get_index(), "GlobalParserStatus")
-            self._create_destinations(ScraperStatus.get_index(), "GlobalScraperStatus")
-            self._create_destinations(
-                ScraperStatus.get_index(), "VerifiedScraperDownloads"
-            )
-            self._create_destinations(
-                ParserStatus.get_index(), "VerifiedParserDownloads"
-            )
-            for table in list_all_dynamic_tables(enabled_scrapers, enabled_file_types):
-                self._create_destinations(table.get_index(), table.get_table_name())
-        except Exception as e:
-            raise
+        self._clean_all_destinations()
+        self.create_database(enabled_scrapers, enabled_file_types)
+
+    def create_database(
+        self, enabled_scrapers: list[str], enabled_file_types: list[str]
+    ):
+        """Create the tables that don't exist yet; existing tables keep their rows."""
+        self._create_destinations(
+            ParserStatus.get_index(), ParserStatus.get_table_name()
+        )
+        self._create_destinations(
+            ScraperStatus.get_index(), ScraperStatus.get_table_name()
+        )
+        self._create_destinations(ParserStatus.get_index(), "GlobalParserStatus")
+        self._create_destinations(ScraperStatus.get_index(), "GlobalScraperStatus")
+        self._create_destinations(
+            ScraperStatus.get_index(), "VerifiedScraperDownloads"
+        )
+        self._create_destinations(
+            ParserStatus.get_index(), "VerifiedParserDownloads"
+        )
+        for table in list_all_dynamic_tables(enabled_scrapers, enabled_file_types):
+            self._create_destinations(table.get_index(), table.get_table_name())

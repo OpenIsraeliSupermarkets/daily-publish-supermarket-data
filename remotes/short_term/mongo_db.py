@@ -84,6 +84,8 @@ class MongoDbUploader(ShortTermDatabaseUploader):
             partition_id (str): Field to use as partition key
             table_name (str): Name of the collection to create
         """
+        if table_name in self.db.list_collection_names():
+            return
         Logger.info("Creating collection: %s", table_name)
         try:
             self.db.create_collection(table_name)
