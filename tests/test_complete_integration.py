@@ -36,7 +36,7 @@ def run_full_dag_integration(
     enabled_scrapers,
     file_per_run=3,
     num_of_occasions=2,
-    operations="scraping,converting,api_update,clean_dump_files",
+    operations="scraping,api_update,clean_dump_files",
 ):
     """
     Test the full DAG integration for the SupermarketDataPublisher.
@@ -97,14 +97,7 @@ def run_full_dag_integration(
     )
 
 
-@pytest.mark.parametrize(
-    "operations",
-    [
-        "scraping,converting,api_update,clean_dump_files",
-        "streaming,api_update,clean_dump_files",
-    ],
-)
-def test_full_dag_integration_from_disk(operations):
+def test_full_dag_integration_from_disk():
 
     with tempfile.TemporaryDirectory() as temp_dir:
 
@@ -124,7 +117,6 @@ def test_full_dag_integration_from_disk(operations):
             short_term_db_target,
             temp_dir,
             enabled_scrapers=random.sample(scrapers_to_test(), 1),
-            operations=operations,
         )
 
 

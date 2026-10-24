@@ -190,8 +190,8 @@ docker compose up -d mongodb api
 echo "Step 8: Starting data processor"
 
 if [ "$TEST_MODE" == "production" ]; then
-    echo "Step 8.1: Running SCRAPE operation (scraping,converting,clean_dump_files,api_update)"
-    export OPERATION="scraping,converting,clean_dump_files,api_update"
+    echo "Step 8.1: Running SCRAPE operation (scraping,clean_dump_files,api_update)"
+    export OPERATION="scraping,clean_dump_files,api_update"
     run_data_processor_watching_health true
     
     if [ $? -ne 0 ] || [ "$(container_exit_code data-fetcher)" != "0" ]; then

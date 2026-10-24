@@ -30,7 +30,6 @@ if __name__ == "__main__":
     exit_cleanly_on_sigterm()
     use_forkserver()
 
-
     # Allow providing when from environment variable, otherwise use current time
     when_str = os.environ.get("WHEN", None)
     when = None
@@ -126,12 +125,8 @@ if __name__ == "__main__":
                 "EXEC_FINAL_OPERATIONS_CONDITION", "EOD"
             ),
             should_stop_dag=os.environ.get("STOP_DAG_CONDITION", "NEVER"),
-            # "streaming" scrapes, converts and pushes rows as they are parsed;
-            # api_update then sends only what streaming did not finish (#114).
-            # CYCLE_OPERATIONS=scraping,converting,api_update,clean_dump_files
-            # restores the batch cycle.
-            operations=os.environ.get(
-                "CYCLE_OPERATIONS", "streaming,api_update,clean_dump_files"
-            ),
+            # scraping also parses and pushes rows as they are parsed (#114);
+            # api_update then sends the status files and any file it missed.
+            operations="scraping,api_update,clean_dump_files",
             final_operations="publishing,clean_all_source_data",
         )
