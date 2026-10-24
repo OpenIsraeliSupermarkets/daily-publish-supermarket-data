@@ -64,3 +64,13 @@ jobs:
         if: steps.version.outputs.is_release == 'true'
         run: |
           ./scripts/build_docker.sh --push --target data_processing --tag latest
+
+      # raw-data-api (api.py), deployed by _prod_deploy_api.yml
+      - name: Build and push API image with version tag
+        run: |
+          ./scripts/build_docker.sh --push --image erlichsefi/raw-data-api --target serving --tag ${{ steps.version.outputs.tag }}
+
+      - name: Build and push API image with latest tag
+        if: steps.version.outputs.is_release == 'true'
+        run: |
+          ./scripts/build_docker.sh --push --image erlichsefi/raw-data-api --target serving --tag latest

@@ -19,9 +19,11 @@ services:
           memory: 4G
 
   api:
+    image: erlichsefi/raw-data-api:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: Dockerfile
+      target: serving
     container_name: raw-data-api
     ports:
       - "8080:8000"

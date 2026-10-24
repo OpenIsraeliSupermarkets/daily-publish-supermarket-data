@@ -28,6 +28,10 @@ while [[ $# -gt 0 ]]; do
             REGISTRY="$2"
             shift 2
             ;;
+        --image)
+            IMAGE_NAME="$2"
+            shift 2
+            ;;
         --help)
             echo "Usage: $0 [OPTIONS]"
             echo "Options:"
@@ -35,6 +39,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --target TARGET     Docker build target (default: data_processing)"
             echo "  --tag TAG           Image tag (default: latest)"
             echo "  --registry REGISTRY Registry URL (e.g., ghcr.io/username/repo)"
+            echo "  --image IMAGE       Image name (default: erlichsefi/data-fetcher)"
             echo "  --help              Show this help message"
             exit 0
             ;;
