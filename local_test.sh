@@ -171,15 +171,18 @@ fi
 mkdir -p "$MONGO_DATA_PATH/mongo_data"
 
 echo "Step 6: Building Docker images from this checkout"
-# Always build: data_processor also names a published image, and without a
-# local build `docker compose up` pulls it, so the test would skip this code.
+# Build the same way publish_docker.yml does (scripts/build_docker.sh), under a
+# local tag that compose then uses. Always build: both services name published
+# images, and without a local build `docker compose up` pulls them, so the
+# test would skip this code.
+export IMAGE_TAG=local
+BUILD_ARGS=(--tag "$IMAGE_TAG")
 if [[ "$BUILD_NO_CACHE" =~ ^[Yy]$ ]]; then
-    docker compose build --no-cache api data_processor
-else
-    docker compose build api data_processor
+    BUILD_ARGS+=(--no-cache)
 fi
 
-if [ $? -ne 0 ]; then
+if ! ./scripts/build_docker.sh --target data_processing "${BUILD_ARGS[@]}" ||
+   ! ./scripts/build_docker.sh --image erlichsefi/raw-data-api --target serving "${BUILD_ARGS[@]}"; then
     echo -e "\033[31mDocker build failed. Exiting.\033[0m"
     exit 1
 fi
