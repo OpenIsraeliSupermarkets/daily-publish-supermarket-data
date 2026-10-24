@@ -17,7 +17,15 @@ def output_short_term_destination_from_env(output_destination):
 
     Logger.info(f"Output destination: {output_destination}")
     if output_destination == "kafka":
-        return KafkaDbUploader()
+        compression = os.environ.get("KAFKA_COMPRESSION_TYPE", "none").strip().lower()
+        idempotence = os.environ.get("KAFKA_ENABLE_IDEMPOTENCE", "true").strip().lower()
+        return KafkaDbUploader(
+            max_batch_size=int(os.environ.get("KAFKA_MAX_BATCH_SIZE", 1024 * 1024)),
+            linger_ms=int(os.environ.get("KAFKA_LINGER_MS", 0)),
+            compression_type=None if compression in ("", "none") else compression,
+            enable_idempotence=idempotence in ("1", "true", "yes"),
+            max_pending_rows=int(os.environ.get("KAFKA_MAX_PENDING_ROWS", 100000)),
+        )
     elif output_destination == "mongo":
         return MongoDbUploader()
     elif output_destination == "file":

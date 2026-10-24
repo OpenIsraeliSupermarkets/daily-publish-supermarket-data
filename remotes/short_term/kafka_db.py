@@ -18,10 +18,6 @@ from .api_base import ShortTermDatabaseUploader
 from .row_stream import KafkaRowStream
 
 
-def _env_bool(name: str, default: bool) -> bool:
-    return os.getenv(name, str(default)).strip().lower() in ("1", "true", "yes")
-
-
 class KafkaDbUploader(ShortTermDatabaseUploader):
     """Kafka implementation for storing and managing supermarket data.
 
@@ -30,12 +26,33 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
     message serialization and bulk operations.
     """
 
-    def __init__(self, kafka_bootstrap_servers: Optional[str] = None):
+    def __init__(
+        self,
+        kafka_bootstrap_servers: Optional[str] = None,
+        max_batch_size: int = 1024 * 1024,
+        linger_ms: int = 0,
+        compression_type: Optional[str] = None,
+        enable_idempotence: bool = True,
+        max_pending_rows: int = 100000,
+    ):
         """Initialize Kafka connection.
 
         Args:
             kafka_bootstrap_servers (str, optional): Kafka bootstrap servers. If not provided,
                                                    uses environment variable or default.
+            max_batch_size (int): Producer batch per partition in bytes, capped
+                at the max request size. aiokafka sends one request per broker
+                at a time, and its 16 KB default is about 20 rows per round
+                trip (#114).
+            linger_ms (int): Producer linger. Measured on a local broker
+                (#114), linger only adds a wait at the end of every chunk.
+            compression_type (str, optional): None or "gzip" (lz4/zstd also
+                need the library on the consumer side). gzip cost more CPU
+                than it saved on a broker on the same host (#114).
+            enable_idempotence (bool): Idempotent producer, so retries add no
+                duplicates.
+            max_pending_rows (int): Rows waiting for an ack in the streaming
+                push before it blocks.
         """
         self.bootstrap_servers = kafka_bootstrap_servers or os.getenv(
             "KAFKA_BOOTSTRAP_SERVERS", "localhost:9092"
@@ -55,24 +72,11 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
         )
         if self.max_partition_fetch_bytes > self.fetch_max_bytes:
             self.max_partition_fetch_bytes = self.fetch_max_bytes
-        # aiokafka sends one request per broker at a time, holding at most
-        # max_batch_size bytes per partition. The 16 KB default is about 20
-        # rows per round trip (#114).
-        self.max_batch_size = min(
-            int(os.getenv("KAFKA_MAX_BATCH_SIZE", str(1024 * 1024))),
-            self.max_request_size,
-        )
-        # Measured on a local broker (#114): linger only adds a wait at the end
-        # of every chunk, and gzip costs more CPU than it saves on a broker on
-        # the same host, so both are off by default. If retention disk is
-        # tight, set KAFKA_COMPRESSION_TYPE=gzip (lz4/zstd also need the
-        # library on the consumer side).
-        self.linger_ms = int(os.getenv("KAFKA_LINGER_MS", "0"))
-        compression = os.getenv("KAFKA_COMPRESSION_TYPE", "none").strip().lower()
-        self.compression_type = None if compression in ("", "none") else compression
-        self.enable_idempotence = _env_bool("KAFKA_ENABLE_IDEMPOTENCE", True)
-        # rows waiting for an ack in the streaming push before it blocks
-        self.max_pending_rows = int(os.getenv("KAFKA_MAX_PENDING_ROWS", "100000"))
+        self.max_batch_size = min(max_batch_size, self.max_request_size)
+        self.linger_ms = linger_ms
+        self.compression_type = compression_type
+        self.enable_idempotence = enable_idempotence
+        self.max_pending_rows = max_pending_rows
         self.producer: Optional[AIOKafkaProducer] = None
         self.admin_client: Optional[KafkaAdminClient] = None
         self._connection_tested = False
