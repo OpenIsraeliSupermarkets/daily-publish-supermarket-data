@@ -198,3 +198,33 @@ def test_status_rows_are_keyed_by_chain_without_flush(tmp_path):
     assert [(t, k) for t, k, _ in uploader.producer.sent] == [
         (topic, envelopes[0]["chain"].encode())
     ] * len(envelopes)
+
+
+def test_scraper_and_parser_rows_of_a_chain_share_its_name(tmp_path):
+    """Scraper status files are named by the dump folder (ramilevy.json), parser
+    files by the scraper (rami_levy_<file_type>.json): both rows say rami_levy
+    (#139)."""
+    scraping = tmp_path / "scraping_status"
+    converting = tmp_path / "converting_status"
+    scraping.mkdir()
+    converting.mkdir()
+    (scraping / "ramilevy.json").write_text(json.dumps(SCRAPER_STATUS))
+    (converting / "rami_levy_store_file.json").write_text(json.dumps(PARSER_STATUS))
+    uploader = RecordingUploader()
+    ShortTermDBDatasetManager(
+        app_folder=str(tmp_path),
+        outputs_folder=str(tmp_path / "outputs"),
+        status_folder=str(tmp_path / "status"),
+        short_term_db_target=uploader,
+        enabled_scrapers=["RAMI_LEVY"],
+        enabled_file_types=["STORE_FILE"],
+        scraping_status_folder=str(scraping),
+        converting_status_folder=str(converting),
+    )._push_status_files(DummyCache())
+
+    chains = {
+        (table.split("_")[1], e["chain"])
+        for table, rows in uploader.inserts
+        for e in rows
+    }
+    assert chains == {("scraper", "rami_levy"), ("parser", "rami_levy")}
