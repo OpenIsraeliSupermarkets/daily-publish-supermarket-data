@@ -197,7 +197,6 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/service_health
 
 ## Development Setup
 
-
 Testing:
 ```bash
 ./run_test.sh
@@ -234,8 +233,6 @@ Testing:
 - `KAFKA_COMPRESSION_TYPE` - `none` (default) or `gzip`; lz4/zstd also need the library on the consumer side
 - `KAFKA_ENABLE_IDEMPOTENCE` - Idempotent producer, so retries add no duplicates (default: true)
 - `KAFKA_MAX_PENDING_ROWS` - Streamed rows waiting for an ack before the push waits (default: 100000)
-
-To measure the scraper-to-Kafka latency of a cycle (per row: broker append time minus the scraper's `saw` time for its file), run `python scripts/kpi_scraper_to_kafka.py --scraping-status-folder <APP_DATA_PATH>/scraping_status` against a broker with `log.message.timestamp.type=LogAppendTime`.
 
 
 ---
