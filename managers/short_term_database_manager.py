@@ -7,7 +7,7 @@ from remotes import ShortTermDatabaseUploader
 from managers.cache_manager import CacheManager, CacheState
 from managers.large_file_push_manager import LargeFilePushManager
 from il_supermarket_parsers import ParserStatusOutput
-from il_supermarket_scarper import ScraperStatusOutput
+from il_supermarket_scarper import DumpFolderNames, ScraperStatusOutput
 from typing import Union
 
 from utils.mongo_bson import sanitize_for_mongo
@@ -44,9 +44,15 @@ class ShortTermDBDatasetManager:
 
     def _chain_of_status_file(self, file_name: str) -> str:
         """Chain a status file belongs to, from its name alone: scraper files
-        are ``<chain>.json``, parser files ``<chain>_<file_type>.json``. Chain
-        names contain ``_``, so match the enabled scrapers, longest first."""
+        are named by the chain's dump folder (``ramilevy.json``), parser files
+        ``<chain>_<file_type>.json``. Both give the scraper's name
+        (``rami_levy``), so one chain's stages share it (#139). Chain names
+        contain ``_``, so match the enabled scrapers, longest first."""
         stem = file_name[: -len(".json")].lower()
+        for scraper in self.enabled_scrapers:
+            folder = DumpFolderNames.__members__.get(scraper.upper())
+            if folder is not None and stem == folder.value.lower():
+                return scraper.lower()
         for chain in sorted(
             (c.lower() for c in self.enabled_scrapers), key=len, reverse=True
         ):
