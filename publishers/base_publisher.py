@@ -39,6 +39,9 @@ class BaseSupermarketDataPublisher:
         status_configuration=None,
         limit=None,
         when_date=None,
+        scrape_queue_max_files=0,
+        parse_queue_max_files=0,
+        parsed_rows_queue_max=0,
     ):
         """
         Initialize the BaseSupermarketDataPublisher.
@@ -56,6 +59,12 @@ class BaseSupermarketDataPublisher:
             enabled_file_types: List of enabled file types
             limit: Limit on the number of items to scrape
             when_date: Date for which to scrape data
+            scrape_queue_max_files: Files held in each chain's scraper -> parser
+                queue (0 = unbounded)
+            parse_queue_max_files: Files held in each parse worker's inbox
+                (0 = unbounded)
+            parsed_rows_queue_max: Rows held in each (chain, file type) parsed
+                rows queue (0 = unbounded)
         """
         self.short_term_db_target = short_term_db_target
         self.long_term_db_target = long_term_db_target
@@ -78,6 +87,9 @@ class BaseSupermarketDataPublisher:
             enabled_file_types if enabled_file_types else FileTypesFilters.all_types()
         )
         self.limit = limit
+        self.scrape_queue_max_files = scrape_queue_max_files
+        self.parse_queue_max_files = parse_queue_max_files
+        self.parsed_rows_queue_max = parsed_rows_queue_max
         self.status_configuration = status_configuration or {"database_type": "json"}
         self.scraping_status_folder = os.path.join(app_folder, "scraping_status")
         self.converting_status_folder = os.path.join(app_folder, "converting_status")
@@ -119,7 +131,11 @@ class BaseSupermarketDataPublisher:
                 **self.status_configuration,
                 "base_path": self.scraping_status_folder,
             },
-            output_configuration={"output_mode": "queue", "queue_type": "memory"},
+            output_configuration={
+                "output_mode": "queue",
+                "queue_type": "memory",
+                "max_queue_size": self.scrape_queue_max_files,
+            },
         )
         converter = ConvertingTask(
             enabled_parsers=self.enabled_scrapers,
@@ -134,6 +150,8 @@ class BaseSupermarketDataPublisher:
                 {"output_mode": "queue", "queue_type": "memory"},
                 {"output_mode": "csv", "output_folder": self.outputs_folder},
             ],
+            max_queue_size=self.parse_queue_max_files,
+            max_output_queue_size=self.parsed_rows_queue_max,
         )
         # queues must exist before the converter's workers start
         parsed_rows = converter.consume()

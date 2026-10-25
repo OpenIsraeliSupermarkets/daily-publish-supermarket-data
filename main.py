@@ -34,6 +34,53 @@ def output_short_term_destination_from_env(output_destination):
         raise ValueError(f"Invalid output destination: {output_destination}")
 
 
+def _non_negative_int_from_env(name, default=0):
+    raw = os.environ.get(name, "")
+    if raw.strip() == "":
+        return default
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be an integer, but got {raw!r}") from exc
+    if value < 0:
+        raise ValueError(f"{name} must be >= 0, but got {value}")
+    return value
+
+
+# After the parser's router stops reading a chain's queue, up to 3 more
+# end-of-stream markers are put on it: the one the router puts back, plus the
+# scraper's second and third close. A smaller cap blocks the last put forever.
+MIN_SCRAPE_QUEUE_MAX_FILES = 3
+
+
+def processing_settings_from_env():
+    """Process counts and queue caps (#141). Unset keeps today's behaviour:
+    parsing uses as many processes as scraping, and every queue is unbounded."""
+    num_of_processes = os.environ.get("NUM_OF_PROCESSES", 5)
+    try:
+        num_of_processes = int(num_of_processes)
+    except ValueError:
+        num_of_processes = os.cpu_count()
+
+    scrape_queue_max_files = _non_negative_int_from_env("SCRAPE_QUEUE_MAX_FILES")
+    if 0 < scrape_queue_max_files < MIN_SCRAPE_QUEUE_MAX_FILES:
+        raise ValueError(
+            f"SCRAPE_QUEUE_MAX_FILES must be 0 or >= {MIN_SCRAPE_QUEUE_MAX_FILES}, "
+            f"but got {scrape_queue_max_files}"
+        )
+
+    return {
+        "number_of_scraping_processes": num_of_processes,
+        "number_of_parseing_processs": _non_negative_int_from_env(
+            "NUM_OF_PARSING_PROCESSES"
+        )
+        or num_of_processes,
+        "scrape_queue_max_files": scrape_queue_max_files,
+        "parse_queue_max_files": _non_negative_int_from_env("PARSE_QUEUE_MAX_FILES"),
+        "parsed_rows_queue_max": _non_negative_int_from_env("PARSED_ROWS_QUEUE_MAX"),
+    }
+
+
 if __name__ == "__main__":
     exit_cleanly_on_sigterm()
     use_forkserver()
@@ -50,11 +97,7 @@ if __name__ == "__main__":
 
             when = pytz.timezone("Asia/Jerusalem").localize(when)
 
-    num_of_processes = os.environ.get("NUM_OF_PROCESSES", 5)
-    try:
-        num_of_processes = int(num_of_processes)
-    except ValueError:
-        num_of_processes = os.cpu_count()
+    processing_settings = processing_settings_from_env()
 
     limit = os.environ.get("LIMIT", None)
     if limit is not None:
@@ -75,7 +118,7 @@ if __name__ == "__main__":
     else:
         enabled_file_types = enabled_file_types.split(",")
 
-    Logger.info(f"Number of processes: {num_of_processes}")
+    Logger.info(f"Processing settings: {processing_settings}")
     Logger.info(f"Enabled scrapers: {enabled_scrapers}")
     Logger.info(f"Enabled file types: {enabled_file_types}")
     Logger.info(f"Limit: {limit}")
@@ -100,8 +143,7 @@ if __name__ == "__main__":
         second_to_wait_after_final_operations = 0
 
     publisher = SupermarketDataPublisher(
-        number_of_scraping_processes=num_of_processes,
-        number_of_parseing_processs=num_of_processes,
+        **processing_settings,
         app_folder=os.environ["APP_DATA_PATH"],
         data_folder="dumps",
         outputs_folder="outputs",

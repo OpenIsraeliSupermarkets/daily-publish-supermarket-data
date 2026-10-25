@@ -21,7 +21,21 @@ from tests.validation_utils import (
 from publishers.base_publisher import BaseSupermarketDataPublisher
 
 
-def test_execute_scraping_integration():
+@pytest.mark.parametrize(
+    "queue_caps",
+    [
+        {},
+        # every hop full almost all the time (#141); 3 is the smallest
+        # scraper cap that fits the extra end-of-stream markers
+        {
+            "scrape_queue_max_files": 3,
+            "parse_queue_max_files": 1,
+            "parsed_rows_queue_max": 10,
+        },
+    ],
+    ids=["unbounded", "tight-caps"],
+)
+def test_execute_scraping_integration(queue_caps):
     """
     Integration test for the scraping execution: scrape, parse and push in
     one pipeline (#114).
@@ -44,6 +58,7 @@ def test_execute_scraping_integration():
             enabled_scrapers=enabled_scrapers,
             limit=1,  # Limit to just 1 item for faster tests
             short_term_db_target=short_term_db_target,
+            **queue_caps,
         )
 
         # Execute scraping

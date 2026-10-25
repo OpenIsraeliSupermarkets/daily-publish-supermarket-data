@@ -220,7 +220,7 @@ Testing:
 - `SUPABASE_KEY` - Supabase anonymous key
 
 ### Optional Configuration
-- `NUM_OF_PROCESSES` - Parallel processes (default: 5)
+- `NUM_OF_PROCESSES` - Parallel processes (default: 5); see [memory controls](#memory-controls-for-the-scrape-pipeline)
 - `ENABLED_SCRAPERS` - Filter specific scrapers (comma-separated)
 - `ENABLED_FILE_TYPES` - Filter file types (comma-separated)
 - `OUTPUT_DESTINATION` - Storage target: mongo/kafka/file (default: mongo)
@@ -233,6 +233,16 @@ Testing:
 - `KAFKA_COMPRESSION_TYPE` - `none` (default) or `gzip`; lz4/zstd also need the library on the consumer side
 - `KAFKA_ENABLE_IDEMPOTENCE` - Idempotent producer, so retries add no duplicates (default: true)
 - `KAFKA_MAX_PENDING_ROWS` - Streamed rows waiting for an ack before the push waits (default: 100000)
+
+### Memory controls for the scrape pipeline
+`scraping` keeps files and parsed rows in in-memory queues between the scraper, the parser and the push. A cap makes the producer wait instead of buffering, so each one trades memory for throughput. `0` (the default) leaves a queue unbounded, which is the behaviour before #141. Production values are set in `.github/workflows/template.yml` and can be overridden with repository variables of the same name.
+
+- `NUM_OF_PROCESSES` - Scraper pool size (default: 5). More processes download faster and hold more files at once.
+- `NUM_OF_PARSING_PROCESSES` - Parser workers (default: `NUM_OF_PROCESSES`). Each worker holds the file it is parsing, so this is the biggest memory lever.
+- `SCRAPE_QUEUE_MAX_FILES` - Files waiting in each chain's scraper -> parser queue. Must be `0` or at least `3`: the libraries put up to 3 extra end-of-stream markers on the queue after the parser stops reading it, and a smaller cap hangs the run.
+- `PARSE_QUEUE_MAX_FILES` - Files waiting in each parser worker's inbox. At most `NUM_OF_PARSING_PROCESSES x PARSE_QUEUE_MAX_FILES` files wait for the parser.
+- `PARSED_ROWS_QUEUE_MAX` - Parsed rows waiting in each (chain, file type) queue for the short-term database push. The queues are drained in parallel, so a low cap only slows the parser when the database is slow.
+- `DATA_FETCHER_MEMORY_LIMIT` - `docker-compose.yml` memory limit of the data-fetcher container (default: 4G).
 
 
 ---
