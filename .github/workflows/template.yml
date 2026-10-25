@@ -18,6 +18,10 @@ on:
       kaggle_dataset_remote_name:
         type: string
         default: 'erlichsefi/test-super-dataset-2'
+      # Run a specific release (e.g. 'v0.0.11') instead of the latest one in VERSION.
+      image_tag:
+        type: string
+        default: ''
 jobs:
   build:
 
@@ -60,7 +64,8 @@ jobs:
     # VERSION is committed by release.yml; the runner has the repo (no git needed).
     - name: Resolve latest release version
       run: |
-        tag="v$(tr -d '[:space:]' < VERSION)"
+        tag="${{ inputs.image_tag }}"
+        [ -n "$tag" ] || tag="v$(tr -d '[:space:]' < VERSION)"
         echo "Using release $tag"
         echo "IMAGE_TAG=$tag" >> $GITHUB_ENV
 
