@@ -33,9 +33,6 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
         enabled_file_types=None,
         limit=None,
         when_date=None,
-        scrape_queue_max_files=0,
-        parse_queue_max_files=0,
-        parsed_rows_queue_max=0,
     ):
         super().__init__(
             number_of_scraping_processes=number_of_scraping_processes,
@@ -50,9 +47,6 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
             enabled_file_types=enabled_file_types,
             limit=limit,
             when_date=when_date,
-            scrape_queue_max_files=scrape_queue_max_files,
-            parse_queue_max_files=parse_queue_max_files,
-            parsed_rows_queue_max=parsed_rows_queue_max,
         )
         self.executed_jobs = 0
         self.last_execution_time = None

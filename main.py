@@ -34,7 +34,7 @@ def output_short_term_destination_from_env(output_destination):
         raise ValueError(f"Invalid output destination: {output_destination}")
 
 
-def _non_negative_int_from_env(name, default=0):
+def _process_count_from_env(name, default):
     raw = os.environ.get(name, "")
     if raw.strip() == "":
         return default
@@ -42,42 +42,25 @@ def _non_negative_int_from_env(name, default=0):
         value = int(raw)
     except ValueError as exc:
         raise ValueError(f"{name} must be an integer, but got {raw!r}") from exc
-    if value < 0:
-        raise ValueError(f"{name} must be >= 0, but got {value}")
+    if value < 1:
+        raise ValueError(f"{name} must be >= 1, but got {value}")
     return value
 
 
-# After the parser's router stops reading a chain's queue, up to 3 more
-# end-of-stream markers are put on it: the one the router puts back, plus the
-# scraper's second and third close. A smaller cap blocks the last put forever.
-MIN_SCRAPE_QUEUE_MAX_FILES = 3
-
-
 def processing_settings_from_env():
-    """Process counts and queue caps (#141). Unset keeps today's behaviour:
-    parsing uses as many processes as scraping, and every queue is unbounded."""
+    """Scraper and parser pool sizes (#141). Unset NUM_OF_PARSING_PROCESSES
+    uses as many processes as scraping, as before."""
     num_of_processes = os.environ.get("NUM_OF_PROCESSES", 5)
     try:
         num_of_processes = int(num_of_processes)
     except ValueError:
         num_of_processes = os.cpu_count()
 
-    scrape_queue_max_files = _non_negative_int_from_env("SCRAPE_QUEUE_MAX_FILES")
-    if 0 < scrape_queue_max_files < MIN_SCRAPE_QUEUE_MAX_FILES:
-        raise ValueError(
-            f"SCRAPE_QUEUE_MAX_FILES must be 0 or >= {MIN_SCRAPE_QUEUE_MAX_FILES}, "
-            f"but got {scrape_queue_max_files}"
-        )
-
     return {
         "number_of_scraping_processes": num_of_processes,
-        "number_of_parseing_processs": _non_negative_int_from_env(
-            "NUM_OF_PARSING_PROCESSES"
-        )
-        or num_of_processes,
-        "scrape_queue_max_files": scrape_queue_max_files,
-        "parse_queue_max_files": _non_negative_int_from_env("PARSE_QUEUE_MAX_FILES"),
-        "parsed_rows_queue_max": _non_negative_int_from_env("PARSED_ROWS_QUEUE_MAX"),
+        "number_of_parseing_processs": _process_count_from_env(
+            "NUM_OF_PARSING_PROCESSES", num_of_processes
+        ),
     }
 
 
@@ -175,8 +158,6 @@ if __name__ == "__main__":
                 "EXEC_FINAL_OPERATIONS_CONDITION", "EOD"
             ),
             should_stop_dag=os.environ.get("STOP_DAG_CONDITION", "NEVER"),
-            # scraping also parses and pushes rows as they are parsed (#114);
-            # api_update then sends the status files and any file it missed.
-            operations="scraping,api_update,clean_dump_files",
+            operations="scraping,converting,api_update,clean_dump_files",
             final_operations="publishing,clean_all_source_data",
         )

@@ -12,10 +12,9 @@ from il_supermarket_parsers import ConvertingTask, FileTypesFilters
 from managers.long_term_database_manager import LongTermDatasetManager
 from managers.short_term_database_manager import ShortTermDBDatasetManager
 from managers.cache_manager import CacheManager
-from managers.stream_push_manager import StreamPushManager
 from managers.quality_indicators import write_quality_indicators
 from remotes import KaggleUploader, MongoDbUploader
-from utils import now, use_forkserver
+from utils import now
 
 
 class BaseSupermarketDataPublisher:
@@ -39,9 +38,6 @@ class BaseSupermarketDataPublisher:
         status_configuration=None,
         limit=None,
         when_date=None,
-        scrape_queue_max_files=0,
-        parse_queue_max_files=0,
-        parsed_rows_queue_max=0,
     ):
         """
         Initialize the BaseSupermarketDataPublisher.
@@ -59,12 +55,6 @@ class BaseSupermarketDataPublisher:
             enabled_file_types: List of enabled file types
             limit: Limit on the number of items to scrape
             when_date: Date for which to scrape data
-            scrape_queue_max_files: Files held in each chain's scraper -> parser
-                queue (0 = unbounded)
-            parse_queue_max_files: Files held in each parse worker's inbox
-                (0 = unbounded)
-            parsed_rows_queue_max: Rows held in each (chain, file type) parsed
-                rows queue (0 = unbounded)
         """
         self.short_term_db_target = short_term_db_target
         self.long_term_db_target = long_term_db_target
@@ -87,9 +77,6 @@ class BaseSupermarketDataPublisher:
             enabled_file_types if enabled_file_types else FileTypesFilters.all_types()
         )
         self.limit = limit
-        self.scrape_queue_max_files = scrape_queue_max_files
-        self.parse_queue_max_files = parse_queue_max_files
-        self.parsed_rows_queue_max = parsed_rows_queue_max
         self.status_configuration = status_configuration or {"database_type": "json"}
         self.scraping_status_folder = os.path.join(app_folder, "scraping_status")
         self.converting_status_folder = os.path.join(app_folder, "converting_status")
@@ -110,34 +97,49 @@ class BaseSupermarketDataPublisher:
 
     def _execute_scraping(self):
         """
-        Scrape, parse and push in one pipeline, the way the parser's
-        example.py does (#114). The scraper hands files to the parser through
-        queues, and the parser writes every row both to the CSV outputs (for
-        the long-term upload) and to a queue that is pushed to the short-term
-        database as rows arrive. A file is recorded in the push cache once its
-        file_complete is stored, so api_update only resends what did not
-        finish here.
+        Execute the scraping task to collect supermarket data.
+
+        Raises:
+            Exception: If an error occurs during scraping.
         """
-        os.makedirs(self.data_folder, exist_ok=True)
-        # The scraper and parser start their pools from background threads
-        # while the push threads run; main.py already does this at startup,
-        # repeated here for callers that skip main.py (#116).
-        use_forkserver()
-        scraper = ScarpingTask(
-            enabled_scrapers=self.enabled_scrapers,
-            files_types=self.enabled_file_types,
-            multiprocessing=self.number_of_scraping_processes,
-            status_configuration={
-                **self.status_configuration,
-                "base_path": self.scraping_status_folder,
-            },
-            output_configuration={
-                "output_mode": "queue",
-                "queue_type": "memory",
-                "max_queue_size": self.scrape_queue_max_files,
-            },
-        )
-        converter = ConvertingTask(
+        try:
+            os.makedirs(self.data_folder, exist_ok=True)
+
+            Logger.info("Starting the scraping task")
+            task = ScarpingTask(
+                enabled_scrapers=self.enabled_scrapers,
+                files_types=self.enabled_file_types,
+                multiprocessing=self.number_of_scraping_processes,
+                status_configuration={
+                    **self.status_configuration,
+                    "base_path": self.scraping_status_folder,
+                },
+                output_configuration={
+                    "output_mode": "disk",
+                    "base_storage_path": self.data_folder,
+                },
+            )
+            task.start(
+                limit=self.limit,
+                when_date=self.when_date if self.when_date else now(backfill_hours=1),
+            )
+            task.join()
+            Logger.info("Scraping task is done")
+        except Exception as e:
+            Logger.error("An error occurred during scraping: %s", e)
+            raise e
+
+    def _execute_converting(self):
+        """
+        Execute the converting task to parse scraped data into structured format.
+        """
+        output_configuration = [
+            {
+                "output_mode": "csv",
+                "output_folder": self.outputs_folder,
+            }
+        ]
+        task = ConvertingTask(
             enabled_parsers=self.enabled_scrapers,
             files_types=self.enabled_file_types,
             multiprocessing=self.number_of_parseing_processs,
@@ -145,39 +147,14 @@ class BaseSupermarketDataPublisher:
                 **self.status_configuration,
                 "base_path": self.converting_status_folder,
             },
-            source_configuration={"queue_handlers": scraper.consume()},
-            output_configuration=[
-                {"output_mode": "queue", "queue_type": "memory"},
-                {"output_mode": "csv", "output_folder": self.outputs_folder},
-            ],
-            max_queue_size=self.parse_queue_max_files,
-            max_output_queue_size=self.parsed_rows_queue_max,
+            output_configuration=output_configuration,
+            source_configuration={
+                "folder": self.data_folder,
+            },
         )
-        # queues must exist before the converter's workers start
-        parsed_rows = converter.consume()
-
-        with CacheManager(self.app_folder) as local_cache:
-            if local_cache.is_empty():
-                self.short_term_db_target.restart_database(
-                    self.enabled_scrapers, self.enabled_file_types
-                )
-            Logger.info("Starting the scraping task")
-            scraper.start(
-                limit=self.limit,
-                when_date=self.when_date if self.when_date else now(backfill_hours=1),
-            )
-            converter.start()
-            try:
-                StreamPushManager(self.short_term_db_target).push(
-                    parsed_rows, local_cache
-                )
-            finally:
-                scraper.join()
-                try:
-                    converter.join()
-                except RuntimeError:
-                    pass  # already finished: join() raises once the thread is done
-        Logger.info("Scraping task is done")
+        task.start()
+        task.join()
+        Logger.info("Converting task is done")
         write_quality_indicators(
             quality_folder=self.quality_folder,
             scraping_status_folder=self.scraping_status_folder,

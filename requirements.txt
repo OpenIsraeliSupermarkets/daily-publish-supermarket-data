@@ -1,6 +1,5 @@
 il-supermarket-scraper>=1.0.18
-# Unreleased bounded queues (israeli-supermarket-parsers#121); back to a >= floor once released.
-il-supermarket-parser @ git+https://github.com/OpenIsraeliSupermarkets/israeli-supermarket-parsers.git@fix/issue-120-bounded-queues
+il-supermarket-parser>=1.0.14
 kagglehub==1.0.0
 schedule==1.2.2
 fastapi[all]==0.109.2

@@ -1,30 +1,23 @@
-# 141: Memory controls for the scrape pipeline
+# 141: Go back to the v0.0.11 disk pipeline
 
-**Decision (2026-10-25):** `scraping` reads `NUM_OF_PARSING_PROCESSES`, `SCRAPE_QUEUE_MAX_FILES`, `PARSE_QUEUE_MAX_FILES` and `PARSED_ROWS_QUEUE_MAX`, and compose reads `NUM_OF_PROCESSES` and `DATA_FETCHER_MEMORY_LIMIT`. Unset values keep the old behaviour. `template.yml` sets 5 / 3 / 8 / 4 / 2000 / 4G, each overridable by a repository variable of the same name. Requires il-supermarket-scraper 1.0.18 and israeli-supermarket-parsers#121.
+**Decision (2026-10-25):** the publisher runs `scraping` (to `dumps/` on disk), then `converting` (to CSV in `outputs/`), then `api_update` (pushes the CSVs), as in v0.0.11. The streaming path from #117 (in-memory queues from the scraper to the parser to Mongo) is no longer used. Requires il-supermarket-scraper 1.0.18 and il-supermarket-parser 1.0.14, both released.
 
-The prod scrape stays pinned to v0.0.11 (decision 142). The caps alone do not keep the pipeline inside 4G.
+Controls: `NUM_OF_PROCESSES` (scrapers, default 5), `NUM_OF_PARSING_PROCESSES` (parsers; unset means the same as `NUM_OF_PROCESSES`), and `DATA_FETCHER_MEMORY_LIMIT` (compose, default 4G). `template.yml` reads each one from a repository variable of the same name.
 
-**Evidence:** a load test of the data-fetcher image with the prod compose limits (4G, 2 CPUs). Workload: SHUFERSAL, RAMI_LEVY, VICTORY_NEW_SOURCE, YOHANANOF, TIV_TAAM, HAZI_HINAM, YAYNO_BITAN_AND_CARREFOUR, `PRICE_FULL_FILE,PROMO_FULL_FILE`, `LIMIT=150`, Mongo output.
+**Evidence:** a load test of the data-fetcher image on a VM about the size of [home-server](https://github.com/OpenIsraeliSupermarkets/runners-profiles/blob/main/home-server) (7.65 GiB RAM, 1 GiB swap, 2 CPUs). Workload: SHUFERSAL, RAMI_LEVY, VICTORY_NEW_SOURCE, YOHANANOF, TIV_TAAM, HAZI_HINAM, YAYNO_BITAN_AND_CARREFOUR, `PRICE_FULL_FILE,PROMO_FULL_FILE`, `LIMIT=150`. Memory is the container's anonymous memory (page cache excluded).
 
-| Settings (scrapers / parsers / scrape cap / parse cap / rows cap) | Result |
-|---|---|
-| 5 / 5 / unbounded | Kernel OOM-killed the scraper's queue Manager after 77 s (1.15 GB RSS). Every router then failed and the run hung. Same failure as prod runs 4189 and 40109084395. |
-| 5 / 3 / 8 / 4 / 2000 | OOM kill after about 2 min. |
-| 3 / 2 / 3 / 2 / 2000 | OOM kill (the scraper Manager, about 860 MB, and a parse worker, about 970 MB). The run then hung in `StreamPushManager.push`. |
+| Pipeline | Settings (scrapers / parsers / queue caps) | Limit | Result |
+|---|---|---|---|
+| Streaming | 5 / 5 / unbounded | 4G | Kernel OOM-killed the scraper's queue Manager after 77 s (1.15 GB). The run then hung, like prod runs 4189 and 40109084395. |
+| Streaming | 5 / 3 / 8, 4, 2000 | 4G | OOM kill after about 2 min. |
+| Streaming | 3 / 2 / 3, 2, 2000 | 4G | OOM kill, then a hang in `StreamPushManager.push`. |
+| Streaming | 5 / 3 / 8, 4, 2000 | 7G | Reached 6.2 GiB, then broken pipes and the VM went down. |
+| **Disk (this decision)** | 5 / 5 | 4G | Exit 0, no OOM, peak 1.4 GiB, 13.5 min. 7.1 GB of dumps and 2.3 GB of CSV on disk. |
 
-The prod runner is [home-server](https://github.com/OpenIsraeliSupermarkets/runners-profiles/blob/main/home-server): 7.7 GiB RAM (about 6 GiB available), 2 GiB swap, 2 cores / 4 threads, shared with Mongo and the API. The test VM was about the same size (7.65 GiB, 1 GiB swap). Two more runs measured the need with a higher limit:
+Streaming holds memory per process, not in the queues: a parse worker keeps a whole extracted file plus its parse (0.5 to 1.2 GB on the largest chains), the scraper's Manager keeps its peak, and blocked scraper workers keep their downloads. On disk, each stage frees its memory before the next starts.
 
-| Settings | Limit | Result |
-|---|---|---|
-| 5 / 3 / 8 / 4 / 2000 (the `template.yml` values) | 7G | Process memory reached 6.2 GiB. Parse jobs failed with broken pipes, then the whole VM went down. |
-| 3 / 2 / 3 / 2 / 2000 | 5.5G | Reached the limit; a 2.1 GB Python process was OOM-killed after about 9 min. |
+**Cost:** each stage waits for the previous one, so rows reach Mongo later than with streaming, and the run needs disk for the dumps until `clean_dump_files`.
 
-No setting fits what home-server can give the data-fetcher.
+**Bugs found in the streaming path:** israeli-supermarket-scarpers#207, #208, #209; israeli-supermarket-parsers#124, #125, #126; daily-publish-supermarket-data#147.
 
-With caps, the memory is held per process, not in the queues. A parse worker holds a whole extracted file plus its parse, 0.5 to 1.2 GB on the largest chains, and keeps that peak afterwards. The scraper's Manager keeps its peak too. A full queue makes each scraper worker hold its in-flight downloads instead.
-
-**Constraints found:**
-- `SCRAPE_QUEUE_MAX_FILES` must be 0 or at least 3. After the parser's router reads the end-of-stream marker, it puts the marker back, and the scraper closes the queue twice more (`_scrape_one`, `_close_file_outputs`). A smaller cap blocks the last `put` forever. Reproduced with cap 2 (hangs) vs 3 (passes).
-- When a parse worker is killed, its parsed-rows queue never gets an end-of-stream marker, so `StreamPushManager` waits forever.
-
-**Until:** the libraries stop holding whole files in memory across processes (queue file paths, or parse from a stream), or the container gets more memory. Then rerun the load test above and remove `image_tag` from `_prod_scrape.yml`.
+**Until:** the scraper hands off file paths on disk instead of file contents, with a byte budget checked before download (option 3 on #141). Then rerun the load test above with the streaming pipeline.
