@@ -15,6 +15,7 @@ from managers.quality_indicators import (
     collect_parse_run_parameters,
     collect_scrape_problem_filenames,
     collect_scrape_run_parameters,
+    compute_files_to_download,
     compute_improvement_priorities,
     compute_parser_quality,
     compute_pipeline_health,
@@ -382,6 +383,102 @@ def test_compute_parser_quality_zero_records_and_not_parsed(status_dirs):
     assert parser_metrics["global_status"][0]["status"] == "started"
     assert parser_metrics["global_status"][0]["scraper"] == "BAREKET"
     assert parser_metrics["global_status"][0]["files_types"] == "PRICE_FILE"
+
+
+def _parsed_files(names: list[str], task_id: str = "parse-task") -> list[dict]:
+    return [
+        {
+            "file_name": name,
+            "store_folder": "bareket",
+            "file_type": "PRICE_FILE",
+            "row_count": 1,
+            "task_id": task_id,
+            "system_timestamp": datetime(2026, 1, 1, 10, 5).isoformat(),
+        }
+        for name in names
+    ]
+
+
+def test_compute_files_to_download_is_verified_minus_parsed(status_dirs):
+    bareket_file = DumpFolderNames["BAREKET"].value.lower()
+    earlier = _scraper_status(
+        "task-1",
+        datetime(2026, 1, 1, 7, 0),
+        saw_files=[],
+        downloaded_files=["Price111.xml", "Promo999.xml"],
+    )
+    later = _scraper_status(
+        "task-2",
+        datetime(2026, 1, 1, 10, 0),
+        saw_files=[],
+        downloaded_files=["Price222.xml", "Price333.xml"],
+    )
+    earlier["verified_downloads"].extend(later["verified_downloads"])
+    _write_json(os.path.join(status_dirs["scraping"], f"{bareket_file}.json"), earlier)
+
+    parser = _parser_status(
+        "parse-task", datetime(2026, 1, 1, 10, 5), processed=[("Price222", 1)]
+    )
+    parser["parsed_files"] = _parsed_files(["Price111", "Price222.xml"])
+    _write_json(os.path.join(status_dirs["converting"], "bareket_price_file.json"), parser)
+
+    result = compute_files_to_download(
+        status_dirs["scraping"],
+        status_dirs["converting"],
+        ["BAREKET", "WOLT"],
+        ["PRICE_FILE"],
+    )
+
+    # Promo999 is a disabled type; WOLT has no status file
+    assert result == {"BAREKET": ["Price333"]}
+
+
+def test_compute_files_to_download_without_parser_status_requests_all(status_dirs):
+    bareket_file = DumpFolderNames["BAREKET"].value.lower()
+    _write_json(
+        os.path.join(status_dirs["scraping"], f"{bareket_file}.json"),
+        _scraper_status(
+            "task-1",
+            datetime(2026, 1, 1, 7, 0),
+            saw_files=[],
+            downloaded_files=["Price111.xml"],
+        ),
+    )
+
+    result = compute_files_to_download(
+        status_dirs["scraping"],
+        status_dirs["converting"],
+        ["BAREKET"],
+        ["PRICE_FILE"],
+    )
+
+    assert result == {"BAREKET": ["Price111"]}
+
+
+def test_compute_files_to_download_empty_when_all_parsed(status_dirs):
+    bareket_file = DumpFolderNames["BAREKET"].value.lower()
+    _write_json(
+        os.path.join(status_dirs["scraping"], f"{bareket_file}.json"),
+        _scraper_status(
+            "task-1",
+            datetime(2026, 1, 1, 7, 0),
+            saw_files=[],
+            downloaded_files=["Price111.xml"],
+        ),
+    )
+    parser = _parser_status("parse-task", datetime(2026, 1, 1, 7, 5), processed=[])
+    parser["parsed_files"] = _parsed_files(["Price111.xml"])
+    _write_json(os.path.join(status_dirs["converting"], "bareket_price_file.json"), parser)
+
+    assert (
+        compute_files_to_download(
+            status_dirs["scraping"],
+            status_dirs["converting"],
+            ["BAREKET"],
+            ["PRICE_FILE"],
+        )
+        == {}
+    )
 
 
 def test_compute_pipeline_health_flags_unhealthy_parser():

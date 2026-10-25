@@ -11,7 +11,7 @@ from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 import pytz
 
-from il_supermarket_parsers import ParserStatusOutput
+from il_supermarket_parsers import ParserStatusOutput, files_to_download
 from il_supermarket_parsers.utils.status.parser_status_contract import (
     FailedFileStatus,
     ProcessedFileStatus,
@@ -1226,6 +1226,56 @@ def compute_pipeline_health(
         "parser": parser,
         "overall_healthy": scraper["healthy"] and parser["healthy"],
     }
+
+
+def compute_files_to_download(
+    scraping_status_folder: str,
+    converting_status_folder: str,
+    enabled_scrapers: List[str],
+    enabled_file_types: List[str],
+) -> Dict[str, List[str]]:
+    """Per chain: files the scraper verified as downloaded that the parser never
+    resolved, across every task in the status folders.
+
+    Downloaded comes from the scraper ``verified_downloads`` registry; parsed
+    from the parser ``parsed_files`` registry of every enabled file type. Only
+    enabled file types are requested, since the parser ignores the rest.
+    """
+    requests: Dict[str, List[str]] = {}
+    for scraper in enabled_scrapers:
+        scraper_raw = _load_status_json(
+            os.path.join(
+                scraping_status_folder,
+                f"{DumpFolderNames[scraper].value.lower()}.json",
+            )
+        )
+        if not scraper_raw:
+            continue
+        downloaded = {
+            row.get("file_name")
+            for row in scraper_raw.get("verified_downloads") or []
+            if row.get("file_name")
+        }
+        downloaded = {
+            name
+            for file_type in enabled_file_types
+            for name in _filter_files_by_type(downloaded, file_type)
+        }
+
+        parsed: Set[str] = set()
+        for file_type in enabled_file_types:
+            parser_key = f"{scraper}_{file_type}".lower()
+            parser_raw = _load_status_json(
+                os.path.join(converting_status_folder, f"{parser_key}.json")
+            )
+            for row in (parser_raw or {}).get("parsed_files") or []:
+                if row.get("file_name"):
+                    parsed.add(row["file_name"])
+
+        missing = files_to_download(downloaded, parsed)
+        if missing:
+            requests[scraper] = missing
+    return requests
 
 
 def write_quality_indicators(

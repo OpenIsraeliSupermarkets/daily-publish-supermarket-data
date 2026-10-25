@@ -12,7 +12,10 @@ from il_supermarket_parsers import ConvertingTask, FileTypesFilters
 from managers.long_term_database_manager import LongTermDatasetManager
 from managers.short_term_database_manager import ShortTermDBDatasetManager
 from managers.cache_manager import CacheManager
-from managers.quality_indicators import write_quality_indicators
+from managers.quality_indicators import (
+    compute_files_to_download,
+    write_quality_indicators,
+)
 from remotes import KaggleUploader, MongoDbUploader
 from utils import now
 
@@ -105,6 +108,20 @@ class BaseSupermarketDataPublisher:
         try:
             os.makedirs(self.data_folder, exist_ok=True)
 
+            # files an earlier run downloaded but the parser never resolved; the
+            # scraper skips verified files, so ask for these explicitly
+            file_to_download = compute_files_to_download(
+                scraping_status_folder=self.scraping_status_folder,
+                converting_status_folder=self.converting_status_folder,
+                enabled_scrapers=self.enabled_scrapers,
+                enabled_file_types=self.enabled_file_types,
+            )
+            if file_to_download:
+                Logger.info(
+                    "Requesting re-download of unparsed files: %s",
+                    {chain: len(names) for chain, names in file_to_download.items()},
+                )
+
             Logger.info("Starting the scraping task")
             task = ScarpingTask(
                 enabled_scrapers=self.enabled_scrapers,
@@ -122,6 +139,7 @@ class BaseSupermarketDataPublisher:
             task.start(
                 limit=self.limit,
                 when_date=self.when_date if self.when_date else now(backfill_hours=1),
+                file_to_download=file_to_download,
             )
             task.join()
             Logger.info("Scraping task is done")
