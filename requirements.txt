@@ -1,4 +1,4 @@
-il-supermarket-scraper>=1.0.15
+il-supermarket-scraper>=1.0.18
 il-supermarket-parser>=1.0.14
 kagglehub==1.0.0
 schedule==1.2.2

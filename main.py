@@ -34,6 +34,36 @@ def output_short_term_destination_from_env(output_destination):
         raise ValueError(f"Invalid output destination: {output_destination}")
 
 
+def _process_count_from_env(name, default):
+    raw = os.environ.get(name, "")
+    if raw.strip() == "":
+        return default
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be an integer, but got {raw!r}") from exc
+    if value < 1:
+        raise ValueError(f"{name} must be >= 1, but got {value}")
+    return value
+
+
+def processing_settings_from_env():
+    """Scraper and parser pool sizes (#141). Unset NUM_OF_PARSING_PROCESSES
+    uses as many processes as scraping, as before."""
+    num_of_processes = os.environ.get("NUM_OF_PROCESSES", 5)
+    try:
+        num_of_processes = int(num_of_processes)
+    except ValueError:
+        num_of_processes = os.cpu_count()
+
+    return {
+        "number_of_scraping_processes": num_of_processes,
+        "number_of_parseing_processs": _process_count_from_env(
+            "NUM_OF_PARSING_PROCESSES", num_of_processes
+        ),
+    }
+
+
 if __name__ == "__main__":
     exit_cleanly_on_sigterm()
     use_forkserver()
@@ -50,11 +80,7 @@ if __name__ == "__main__":
 
             when = pytz.timezone("Asia/Jerusalem").localize(when)
 
-    num_of_processes = os.environ.get("NUM_OF_PROCESSES", 5)
-    try:
-        num_of_processes = int(num_of_processes)
-    except ValueError:
-        num_of_processes = os.cpu_count()
+    processing_settings = processing_settings_from_env()
 
     limit = os.environ.get("LIMIT", None)
     if limit is not None:
@@ -75,7 +101,7 @@ if __name__ == "__main__":
     else:
         enabled_file_types = enabled_file_types.split(",")
 
-    Logger.info(f"Number of processes: {num_of_processes}")
+    Logger.info(f"Processing settings: {processing_settings}")
     Logger.info(f"Enabled scrapers: {enabled_scrapers}")
     Logger.info(f"Enabled file types: {enabled_file_types}")
     Logger.info(f"Limit: {limit}")
@@ -100,8 +126,7 @@ if __name__ == "__main__":
         second_to_wait_after_final_operations = 0
 
     publisher = SupermarketDataPublisher(
-        number_of_scraping_processes=num_of_processes,
-        number_of_parseing_processs=num_of_processes,
+        **processing_settings,
         app_folder=os.environ["APP_DATA_PATH"],
         data_folder="dumps",
         outputs_folder="outputs",
@@ -133,8 +158,6 @@ if __name__ == "__main__":
                 "EXEC_FINAL_OPERATIONS_CONDITION", "EOD"
             ),
             should_stop_dag=os.environ.get("STOP_DAG_CONDITION", "NEVER"),
-            # scraping also parses and pushes rows as they are parsed (#114);
-            # api_update then sends the status files and any file it missed.
-            operations="scraping,api_update,clean_dump_files",
+            operations="scraping,converting,api_update,clean_dump_files",
             final_operations="publishing,clean_all_source_data",
         )

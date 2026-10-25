@@ -59,6 +59,10 @@ jobs:
         echo "KAGGLE_DATASET_REMOTE_NAME=${{ inputs.kaggle_dataset_remote_name }}" >> $GITHUB_ENV
         echo "LOG_LEVEL=WARNING" >> $GITHUB_ENV
         echo "DISCORD_WEBHOOK_URL=${{ secrets.DISCORD_WEBHOOK_URL }}" >> $GITHUB_ENV
+        # Memory controls (#141), see README "Memory controls".
+        echo "NUM_OF_PROCESSES=${{ vars.NUM_OF_PROCESSES || '5' }}" >> $GITHUB_ENV
+        echo "NUM_OF_PARSING_PROCESSES=${{ vars.NUM_OF_PARSING_PROCESSES }}" >> $GITHUB_ENV
+        echo "DATA_FETCHER_MEMORY_LIMIT=${{ vars.DATA_FETCHER_MEMORY_LIMIT || '4G' }}" >> $GITHUB_ENV
        
         
     # VERSION is committed by release.yml; the runner has the repo (no git needed).

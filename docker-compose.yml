@@ -76,6 +76,8 @@ services:
       - SECOND_TO_WAIT_AFTER_FINAL_OPERATIONS=${SECOND_TO_WAIT_AFTER_FINAL_OPERATIONS}
       - SECOND_TO_WAIT_BETWEEN_OPERATIONS=${SECOND_TO_WAIT_BETWEEN_OPERATIONS}
       - HEALTHCHECK_MAX_AGE_SECONDS=${HEALTHCHECK_MAX_AGE_SECONDS:-3600}
+      - NUM_OF_PROCESSES=${NUM_OF_PROCESSES:-5}
+      - NUM_OF_PARSING_PROCESSES=${NUM_OF_PARSING_PROCESSES:-}
     volumes:
       - app_data:/usr/src/app/app_data
     networks:
@@ -90,7 +92,7 @@ services:
       resources:
         limits:
           cpus: '2'
-          memory: 4G
+          memory: ${DATA_FETCHER_MEMORY_LIMIT:-4G}
 
 volumes:
   mongo-data:

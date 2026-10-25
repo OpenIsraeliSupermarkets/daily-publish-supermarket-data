@@ -220,7 +220,7 @@ Testing:
 - `SUPABASE_KEY` - Supabase anonymous key
 
 ### Optional Configuration
-- `NUM_OF_PROCESSES` - Parallel processes (default: 5)
+- `NUM_OF_PROCESSES` - Parallel processes (default: 5); see [memory controls](#memory-controls)
 - `ENABLED_SCRAPERS` - Filter specific scrapers (comma-separated)
 - `ENABLED_FILE_TYPES` - Filter file types (comma-separated)
 - `OUTPUT_DESTINATION` - Storage target: mongo/kafka/file (default: mongo)
@@ -233,6 +233,13 @@ Testing:
 - `KAFKA_COMPRESSION_TYPE` - `none` (default) or `gzip`; lz4/zstd also need the library on the consumer side
 - `KAFKA_ENABLE_IDEMPOTENCE` - Idempotent producer, so retries add no duplicates (default: true)
 - `KAFKA_MAX_PENDING_ROWS` - Streamed rows waiting for an ack before the push waits (default: 100000)
+
+### Memory controls
+`scraping` writes the downloaded files to `dumps/`, `converting` parses them into CSV files in `outputs/`, and `api_update` pushes the CSV files to the short-term database. Files move between the stages on disk, so memory is roughly the number of processes times the file each one is handling. Production values are set in `.github/workflows/template.yml` and can be overridden with repository variables of the same name.
+
+- `NUM_OF_PROCESSES` - Scraper pool size (default: 5).
+- `NUM_OF_PARSING_PROCESSES` - Parser pool size (default: `NUM_OF_PROCESSES`). Each process holds the file it is parsing.
+- `DATA_FETCHER_MEMORY_LIMIT` - `docker-compose.yml` memory limit of the data-fetcher container (default: 4G).
 
 
 ---

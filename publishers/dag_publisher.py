@@ -34,9 +34,7 @@ class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
         if operation == "scraping":
             self._execute_scraping()
         elif operation == "converting":
-            # Parsing runs inside "scraping" since #114; kept so existing
-            # OPERATION strings do not fail.
-            Logger.warning("'converting' is a no-op: scraping also parses now")
+            self._execute_converting()
         elif operation == "download_from_long_term":
             self._download_from_long_term_database()
         elif operation == "clean_dump_files":

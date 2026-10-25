@@ -36,7 +36,7 @@ def run_full_dag_integration(
     enabled_scrapers,
     file_per_run=3,
     num_of_occasions=2,
-    operations="scraping,api_update,clean_dump_files",
+    operations="scraping,converting,api_update,clean_dump_files",
 ):
     """
     Test the full DAG integration for the SupermarketDataPublisher.
