@@ -12,6 +12,15 @@ The prod scrape stays pinned to v0.0.11 (decision 142). The caps alone do not ke
 | 5 / 3 / 8 / 4 / 2000 | OOM kill after about 2 min. |
 | 3 / 2 / 3 / 2 / 2000 | OOM kill (the scraper Manager, about 860 MB, and a parse worker, about 970 MB). The run then hung in `StreamPushManager.push`. |
 
+The prod runner is [home-server](https://github.com/OpenIsraeliSupermarkets/runners-profiles/blob/main/home-server): 7.7 GiB RAM (about 6 GiB available), 2 GiB swap, 2 cores / 4 threads, shared with Mongo and the API. The test VM was about the same size (7.65 GiB, 1 GiB swap). Two more runs measured the need with a higher limit:
+
+| Settings | Limit | Result |
+|---|---|---|
+| 5 / 3 / 8 / 4 / 2000 (the `template.yml` values) | 7G | Process memory reached 6.2 GiB. Parse jobs failed with broken pipes, then the whole VM went down. |
+| 3 / 2 / 3 / 2 / 2000 | 5.5G | Reached the limit; a 2.1 GB Python process was OOM-killed after about 9 min. |
+
+No setting fits what home-server can give the data-fetcher.
+
 With caps, the memory is held per process, not in the queues. A parse worker holds a whole extracted file plus its parse, 0.5 to 1.2 GB on the largest chains, and keeps that peak afterwards. The scraper's Manager keeps its peak too. A full queue makes each scraper worker hold its in-flight downloads instead.
 
 **Constraints found:**
