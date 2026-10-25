@@ -455,6 +455,30 @@ def test_compute_files_to_download_without_parser_status_requests_all(status_dir
     assert result == {"BAREKET": ["Price111"]}
 
 
+def test_compute_files_to_download_requests_listing_substrings(status_dirs):
+    bareket_file = DumpFolderNames["BAREKET"].value.lower()
+    _write_json(
+        os.path.join(status_dirs["scraping"], f"{bareket_file}.json"),
+        _scraper_status(
+            "task-1",
+            datetime(2026, 1, 1, 7, 0),
+            saw_files=[],
+            downloaded_files=["PriceNULL444.xml", "PriceNULL555.gz"],
+        ),
+    )
+    parser = _parser_status("parse-task", datetime(2026, 1, 1, 7, 5), processed=[])
+    parser["parsed_files"] = _parsed_files(["Price555.xml"])
+    _write_json(os.path.join(status_dirs["converting"], "bareket_price_file.json"), parser)
+
+    # compared without NULL, but NULL kept so the name stays a substring
+    assert compute_files_to_download(
+        status_dirs["scraping"],
+        status_dirs["converting"],
+        ["BAREKET"],
+        ["PRICE_FILE"],
+    ) == {"BAREKET": ["PriceNULL444"]}
+
+
 def test_compute_files_to_download_empty_when_all_parsed(status_dirs):
     bareket_file = DumpFolderNames["BAREKET"].value.lower()
     _write_json(
