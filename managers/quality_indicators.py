@@ -918,8 +918,8 @@ SCRAPER_STARTED_FIELD_ORDER = (
     "system_timestamp",
     "task_id",
     "limit",
-    "files_requested",
     "store_id",
+    "re_download",
     "files_names_to_scrape",
     "when_date",
     "filter_null",
@@ -1237,7 +1237,7 @@ def _detected_type_name(file_name: str) -> Optional[str]:
     return detected.name if detected is not None else None
 
 
-def compute_files_to_download(
+def compute_re_download(
     scraping_status_folder: str,
     converting_status_folder: str,
     enabled_scrapers: List[str],

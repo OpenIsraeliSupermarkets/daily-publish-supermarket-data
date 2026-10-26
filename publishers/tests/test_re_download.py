@@ -40,4 +40,4 @@ def test_execute_scraping_passes_unparsed_files(tmp_path):
         publisher._execute_scraping()
 
     start_kwargs = task_cls.return_value.start.call_args.kwargs
-    assert start_kwargs["file_to_download"] == {"BAREKET": ["Price222"]}
+    assert start_kwargs["re_download"] == {"BAREKET": ["Price222"]}

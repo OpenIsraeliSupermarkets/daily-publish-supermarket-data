@@ -15,7 +15,7 @@ from managers.quality_indicators import (
     collect_parse_run_parameters,
     collect_scrape_problem_filenames,
     collect_scrape_run_parameters,
-    compute_files_to_download,
+    compute_re_download,
     compute_improvement_priorities,
     compute_parser_quality,
     compute_pipeline_health,
@@ -399,7 +399,7 @@ def _parsed_files(names: list[str], task_id: str = "parse-task") -> list[dict]:
     ]
 
 
-def test_compute_files_to_download_is_verified_minus_parsed(status_dirs):
+def test_compute_re_download_is_verified_minus_parsed(status_dirs):
     bareket_file = DumpFolderNames["BAREKET"].value.lower()
     earlier = _scraper_status(
         "task-1",
@@ -422,7 +422,7 @@ def test_compute_files_to_download_is_verified_minus_parsed(status_dirs):
     parser["parsed_files"] = _parsed_files(["Price111", "Price222.xml"])
     _write_json(os.path.join(status_dirs["converting"], "bareket_price_file.json"), parser)
 
-    result = compute_files_to_download(
+    result = compute_re_download(
         status_dirs["scraping"],
         status_dirs["converting"],
         ["BAREKET", "WOLT"],
@@ -433,7 +433,7 @@ def test_compute_files_to_download_is_verified_minus_parsed(status_dirs):
     assert result == {"BAREKET": ["Price333"]}
 
 
-def test_compute_files_to_download_without_parser_status_requests_all(status_dirs):
+def test_compute_re_download_without_parser_status_requests_all(status_dirs):
     bareket_file = DumpFolderNames["BAREKET"].value.lower()
     _write_json(
         os.path.join(status_dirs["scraping"], f"{bareket_file}.json"),
@@ -445,7 +445,7 @@ def test_compute_files_to_download_without_parser_status_requests_all(status_dir
         ),
     )
 
-    result = compute_files_to_download(
+    result = compute_re_download(
         status_dirs["scraping"],
         status_dirs["converting"],
         ["BAREKET"],
@@ -455,7 +455,7 @@ def test_compute_files_to_download_without_parser_status_requests_all(status_dir
     assert result == {"BAREKET": ["Price111"]}
 
 
-def test_compute_files_to_download_requests_listing_substrings(status_dirs):
+def test_compute_re_download_requests_listing_substrings(status_dirs):
     bareket_file = DumpFolderNames["BAREKET"].value.lower()
     _write_json(
         os.path.join(status_dirs["scraping"], f"{bareket_file}.json"),
@@ -471,7 +471,7 @@ def test_compute_files_to_download_requests_listing_substrings(status_dirs):
     _write_json(os.path.join(status_dirs["converting"], "bareket_price_file.json"), parser)
 
     # compared without NULL, but NULL kept so the name stays a substring
-    assert compute_files_to_download(
+    assert compute_re_download(
         status_dirs["scraping"],
         status_dirs["converting"],
         ["BAREKET"],
@@ -479,7 +479,7 @@ def test_compute_files_to_download_requests_listing_substrings(status_dirs):
     ) == {"BAREKET": ["PriceNULL444"]}
 
 
-def test_compute_files_to_download_empty_when_all_parsed(status_dirs):
+def test_compute_re_download_empty_when_all_parsed(status_dirs):
     bareket_file = DumpFolderNames["BAREKET"].value.lower()
     _write_json(
         os.path.join(status_dirs["scraping"], f"{bareket_file}.json"),
@@ -495,7 +495,7 @@ def test_compute_files_to_download_empty_when_all_parsed(status_dirs):
     _write_json(os.path.join(status_dirs["converting"], "bareket_price_file.json"), parser)
 
     assert (
-        compute_files_to_download(
+        compute_re_download(
             status_dirs["scraping"],
             status_dirs["converting"],
             ["BAREKET"],
@@ -889,12 +889,13 @@ def test_collect_scrape_and_parse_run_parameters():
         "system_timestamp": "2026-08-31 07:45:05.843123+03:00",
         "task_id": "task-a",
         "limit": None,
-        "files_requested": ["PRICE_FILE", "PROMO_FILE"],
         "store_id": None,
+        "re_download": None,
         "files_names_to_scrape": None,
         "when_date": "2026-08-31 06:44:59.238626+03:00",
         "filter_null": False,
         "filter_zero": False,
+        "files_requested": ["PRICE_FILE", "PROMO_FILE"],
     }
     assert scrape_groups[1]["started"]["task_id"] == "task-b"
     assert scrape_groups[1]["started"]["when_date"] == "2026-08-31 18:00:00+03:00"
