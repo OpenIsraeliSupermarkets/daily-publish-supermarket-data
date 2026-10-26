@@ -918,8 +918,8 @@ SCRAPER_STARTED_FIELD_ORDER = (
     "system_timestamp",
     "task_id",
     "limit",
-    "files_requested",
     "store_id",
+    "re_download",
     "files_names_to_scrape",
     "when_date",
     "filter_null",
@@ -1226,6 +1226,70 @@ def compute_pipeline_health(
         "parser": parser,
         "overall_healthy": scraper["healthy"] and parser["healthy"],
     }
+
+
+def _strip_extensions(file_name: str) -> str:
+    return file_name.replace(".aspx", "").replace(".xml", "").replace(".gz", "")
+
+
+def _detected_type_name(file_name: str) -> Optional[str]:
+    detected = FileTypesFilters.get_type_from_file(normalize_filename(file_name))
+    return detected.name if detected is not None else None
+
+
+def compute_re_download(
+    scraping_status_folder: str,
+    converting_status_folder: str,
+    enabled_scrapers: List[str],
+    enabled_file_types: List[str],
+) -> Dict[str, List[str]]:
+    """Per chain: files the scraper verified as downloaded that the parser never
+    resolved, across every task in the status folders.
+
+    Downloaded comes from the scraper ``verified_downloads`` registry; parsed
+    from the parser ``parsed_files`` registry of every enabled file type. Only
+    enabled file types are requested, since the parser ignores the rest.
+
+    Names are compared normalized, and returned without extensions: the
+    scraper matches each one as a substring of the listed file name.
+    """
+    requests: Dict[str, List[str]] = {}
+    for scraper in enabled_scrapers:
+        scraper_raw = _load_status_json(
+            os.path.join(
+                scraping_status_folder,
+                f"{DumpFolderNames[scraper].value.lower()}.json",
+            )
+        )
+        if not scraper_raw:
+            continue
+        downloaded = {
+            row["file_name"]
+            for row in scraper_raw.get("verified_downloads") or []
+            if row.get("file_name")
+            and _detected_type_name(row["file_name"]) in enabled_file_types
+        }
+
+        parsed: Set[str] = set()
+        for file_type in enabled_file_types:
+            parser_key = f"{scraper}_{file_type}".lower()
+            parser_raw = _load_status_json(
+                os.path.join(converting_status_folder, f"{parser_key}.json")
+            )
+            for row in (parser_raw or {}).get("parsed_files") or []:
+                if row.get("file_name"):
+                    parsed.add(normalize_filename(row["file_name"]))
+
+        missing = sorted(
+            {
+                _strip_extensions(name)
+                for name in downloaded
+                if normalize_filename(name) not in parsed
+            }
+        )
+        if missing:
+            requests[scraper] = missing
+    return requests
 
 
 def write_quality_indicators(

@@ -63,6 +63,7 @@ jobs:
         echo "NUM_OF_PROCESSES=${{ vars.NUM_OF_PROCESSES || '5' }}" >> $GITHUB_ENV
         echo "NUM_OF_PARSING_PROCESSES=${{ vars.NUM_OF_PARSING_PROCESSES }}" >> $GITHUB_ENV
         echo "DATA_FETCHER_MEMORY_LIMIT=${{ vars.DATA_FETCHER_MEMORY_LIMIT || '4G' }}" >> $GITHUB_ENV
+        echo "RE_DOWNLOAD_UNPARSED=${{ vars.RE_DOWNLOAD_UNPARSED || 'false' }}" >> $GITHUB_ENV
        
         
     # VERSION is committed by release.yml; the runner has the repo (no git needed).
