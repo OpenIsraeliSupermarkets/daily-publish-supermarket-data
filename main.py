@@ -104,8 +104,13 @@ if __name__ == "__main__":
     Logger.info(f"Processing settings: {processing_settings}")
     Logger.info(f"Enabled scrapers: {enabled_scrapers}")
     Logger.info(f"Enabled file types: {enabled_file_types}")
+    re_download_unparsed = os.environ.get(
+        "RE_DOWNLOAD_UNPARSED", "false"
+    ).strip().lower() in ("1", "true", "yes")
+
     Logger.info(f"Limit: {limit}")
     Logger.info(f"When: {when}")
+    Logger.info(f"Re-download unparsed: {re_download_unparsed}")
 
     second_to_wait_between_opreation = os.environ.get(
         "SECOND_TO_WAIT_BETWEEN_OPERATIONS", 60 * 30
@@ -142,6 +147,7 @@ if __name__ == "__main__":
         ),
         limit=limit,
         when_date=when,
+        re_download_unparsed=re_download_unparsed,
     )
 
     # self execute operations if OPERATION is set

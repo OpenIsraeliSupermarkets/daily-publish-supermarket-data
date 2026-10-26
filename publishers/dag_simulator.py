@@ -33,6 +33,7 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
         enabled_file_types=None,
         limit=None,
         when_date=None,
+        re_download_unparsed=False,
     ):
         super().__init__(
             number_of_scraping_processes=number_of_scraping_processes,
@@ -47,6 +48,7 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
             enabled_file_types=enabled_file_types,
             limit=limit,
             when_date=when_date,
+            re_download_unparsed=re_download_unparsed,
         )
         self.executed_jobs = 0
         self.last_execution_time = None

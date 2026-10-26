@@ -78,6 +78,7 @@ services:
       - HEALTHCHECK_MAX_AGE_SECONDS=${HEALTHCHECK_MAX_AGE_SECONDS:-3600}
       - NUM_OF_PROCESSES=${NUM_OF_PROCESSES:-5}
       - NUM_OF_PARSING_PROCESSES=${NUM_OF_PARSING_PROCESSES:-}
+      - RE_DOWNLOAD_UNPARSED=${RE_DOWNLOAD_UNPARSED:-false}
     volumes:
       - app_data:/usr/src/app/app_data
     networks:

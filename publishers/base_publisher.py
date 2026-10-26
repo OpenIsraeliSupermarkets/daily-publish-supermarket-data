@@ -41,6 +41,7 @@ class BaseSupermarketDataPublisher:
         status_configuration=None,
         limit=None,
         when_date=None,
+        re_download_unparsed=False,
     ):
         """
         Initialize the BaseSupermarketDataPublisher.
@@ -58,6 +59,8 @@ class BaseSupermarketDataPublisher:
             enabled_file_types: List of enabled file types
             limit: Limit on the number of items to scrape
             when_date: Date for which to scrape data
+            re_download_unparsed: Ask the scraper to re-download files it
+                downloaded that the parser never resolved
         """
         self.short_term_db_target = short_term_db_target
         self.long_term_db_target = long_term_db_target
@@ -80,6 +83,7 @@ class BaseSupermarketDataPublisher:
             enabled_file_types if enabled_file_types else FileTypesFilters.all_types()
         )
         self.limit = limit
+        self.re_download_unparsed = re_download_unparsed
         self.status_configuration = status_configuration or {"database_type": "json"}
         self.scraping_status_folder = os.path.join(app_folder, "scraping_status")
         self.converting_status_folder = os.path.join(app_folder, "converting_status")
@@ -110,12 +114,14 @@ class BaseSupermarketDataPublisher:
 
             # files an earlier run downloaded but the parser never resolved; the
             # scraper skips verified files, so ask for these explicitly
-            re_download = compute_re_download(
-                scraping_status_folder=self.scraping_status_folder,
-                converting_status_folder=self.converting_status_folder,
-                enabled_scrapers=self.enabled_scrapers,
-                enabled_file_types=self.enabled_file_types,
-            )
+            re_download = None
+            if self.re_download_unparsed:
+                re_download = compute_re_download(
+                    scraping_status_folder=self.scraping_status_folder,
+                    converting_status_folder=self.converting_status_folder,
+                    enabled_scrapers=self.enabled_scrapers,
+                    enabled_file_types=self.enabled_file_types,
+                )
             if re_download:
                 Logger.info(
                     "Requesting re-download of unparsed files: %s",
