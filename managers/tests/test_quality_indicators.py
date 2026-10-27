@@ -296,7 +296,7 @@ def test_compute_scraper_quality_skipped_by_limit(status_dirs):
     assert result["iterations"][0]["scrapers"]["BAREKET"]["global_status"][0]["limit"] == 1
 
 
-def test_compute_scraper_quality_two_iterations(status_dirs):
+def test_compute_scraper_quality_unions_every_task(status_dirs):
     bareket_file = DumpFolderNames["BAREKET"].value.lower()
     _write_json(
         os.path.join(status_dirs["scraping"], f"{bareket_file}.json"),
@@ -342,10 +342,12 @@ def test_compute_scraper_quality_two_iterations(status_dirs):
 
     result = compute_scraper_quality(status_dirs["scraping"], ["BAREKET"])
 
-    assert len(result["iterations"]) == 2
-    assert result["iterations"][0]["scrapers"]["BAREKET"]["downloaded"] == 1
-    assert result["iterations"][1]["scrapers"]["BAREKET"]["downloaded"] == 0
-    assert result["iterations"][1]["scrapers"]["BAREKET"]["saw_not_downloaded"] == [
+    assert len(result["iterations"]) == 1
+    bareket = result["iterations"][0]["scrapers"]["BAREKET"]
+    assert bareket["saw"] == 3
+    assert bareket["downloaded"] == 1
+    assert bareket["no_data"] is False
+    assert bareket["saw_not_downloaded"] == [
         {
             "file_name": "Price2",
             "reason": "skipped_by_filter",
@@ -357,7 +359,8 @@ def test_compute_scraper_quality_two_iterations(status_dirs):
             "error": "not selected for download (filtered before collection)",
         },
     ]
-    assert result["iterations"][1]["scrapers_with_no_data"] == 1
+    assert result["iterations"][0]["scrapers_with_no_data"] == 0
+    assert len(bareket["global_status"]) == 2
 
 
 def test_compute_parser_quality_zero_records_and_not_parsed(status_dirs):
@@ -398,6 +401,61 @@ def test_compute_parser_quality_zero_records_and_not_parsed(status_dirs):
     assert parser_metrics["global_status"][0]["status"] == "started"
     assert parser_metrics["global_status"][0]["scraper"] == "BAREKET"
     assert parser_metrics["global_status"][0]["files_types"] == "PRICE_FILE"
+
+
+def test_compute_parser_quality_unions_every_task(status_dirs):
+    bareket_file = DumpFolderNames["BAREKET"].value.lower()
+    morning = datetime(2026, 10, 26, 8, 0, 0)
+    afternoon = datetime(2026, 10, 26, 16, 0, 0)
+    morning_scrape = _scraper_status(
+        "scrape-morning",
+        morning,
+        saw_files=["PriceMorning.xml", "PriceEmpty.xml"],
+        downloaded_files=["PriceMorning.xml", "PriceEmpty.xml"],
+    )
+    afternoon_scrape = _scraper_status(
+        "scrape-afternoon",
+        afternoon,
+        saw_files=["PriceMorning.xml", "PriceAfternoon.xml"],
+        downloaded_files=["PriceMorning.xml", "PriceAfternoon.xml"],
+    )
+    morning_scrape["events"].extend(afternoon_scrape["events"])
+    morning_scrape["global_status"].extend(afternoon_scrape["global_status"])
+    morning_scrape["verified_downloads"].extend(afternoon_scrape["verified_downloads"])
+    _write_json(
+        os.path.join(status_dirs["scraping"], f"{bareket_file}.json"),
+        morning_scrape,
+    )
+
+    morning_parse = _parser_status(
+        "parse-morning",
+        morning,
+        processed=[("PriceMorning.xml", 4), ("PriceEmpty.xml", 0)],
+    )
+    afternoon_parse = _parser_status(
+        "parse-afternoon",
+        afternoon,
+        processed=[("PriceEmpty.xml", 2)],
+    )
+    morning_parse["events"].extend(afternoon_parse["events"])
+    morning_parse["global_status"].extend(afternoon_parse["global_status"])
+    _write_json(
+        os.path.join(status_dirs["converting"], "bareket_price_file.json"),
+        morning_parse,
+    )
+
+    result = compute_parser_quality(
+        status_dirs["scraping"],
+        status_dirs["converting"],
+        ["BAREKET"],
+        ["PRICE_FILE"],
+    )
+
+    assert len(result["iterations"]) == 1
+    metrics = result["iterations"][0]["parsers"]["bareket_price_file"]
+    assert metrics["downloaded_not_parsed"] == ["PriceAfternoon"]
+    assert metrics["zero_record_files"] == []
+    assert len(metrics["global_status"]) == 2
 
 
 def _parsed_files(names: list[str], task_id: str = "parse-task") -> list[dict]:

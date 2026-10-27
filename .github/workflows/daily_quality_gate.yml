@@ -15,7 +15,7 @@ on:
         description: Minimum parse success rate
         default: '0.98'
       scraper_no_data_scrapers_max:
-        description: Maximum scrapers with no data in one iteration
+        description: Maximum scrapers with no downloaded files in the status window
         default: '0'
       selected_not_seen_max:
         description: Maximum files selected for download with no parser record, across the whole day

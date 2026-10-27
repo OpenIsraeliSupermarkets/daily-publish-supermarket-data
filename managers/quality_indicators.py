@@ -6,7 +6,7 @@ import json
 import os
 import re
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 import pytz
@@ -44,8 +44,12 @@ KAGGLE_QUALITY_JSON_FILES = frozenset(
 SCRAPERS_GITHUB_REPO = "OpenIsraeliSupermarkets/israeli-supermarket-scarpers"
 PARSERS_GITHUB_REPO = "OpenIsraeliSupermarkets/israeli-supermarket-parsers"
 KAGGLE_DATASET_HANDLE = "erlichsefi/israeli-supermarkets-2024"
-ITERATION_CLUSTER_WINDOW = timedelta(hours=2)
 _TZ = pytz.timezone("Asia/Jerusalem")
+
+
+def _same_task(event_task_id: str, task_id: Optional[str]) -> bool:
+    """True when ``task_id`` is unset (the whole status file) or matches."""
+    return task_id is None or event_task_id == task_id
 
 
 def _normalize_timestamp(value: Optional[datetime]) -> Optional[datetime]:
@@ -193,22 +197,28 @@ def _task_started_at_parser(
     return None
 
 
-def _scraper_saw_files(status: ScraperStatusOutput, task_id: str) -> Set[str]:
+def _scraper_saw_files(
+    status: ScraperStatusOutput, task_id: Optional[str] = None
+) -> Set[str]:
     saw: Set[str] = set()
     for event in status.events:
-        if event.task_id != task_id or not isinstance(event, SawStatus):
+        if not _same_task(event.task_id, task_id) or not isinstance(event, SawStatus):
             continue
         saw.add(normalize_filename(event.file_name))
     return saw
 
 
-def _scraper_downloaded_files(status: ScraperStatusOutput, task_id: str) -> Set[str]:
+def _scraper_downloaded_files(
+    status: ScraperStatusOutput, task_id: Optional[str] = None
+) -> Set[str]:
     downloaded: Set[str] = set()
     for verified in status.verified_downloads:
-        if verified.task_id == task_id:
+        if _same_task(verified.task_id, task_id):
             downloaded.add(normalize_filename(verified.file_name))
     for event in status.events:
-        if event.task_id != task_id or not isinstance(event, DownloadedStatus):
+        if not _same_task(event.task_id, task_id) or not isinstance(
+            event, DownloadedStatus
+        ):
             continue
         if event.downloaded_successfully and event.extracted_successfully:
             downloaded.add(normalize_filename(event.file_name))
@@ -232,18 +242,23 @@ def _save_decision_queued_for_parse(save_decision: Optional[str]) -> bool:
 
 
 def _scraper_files_queued_for_parse(
-    status: ScraperStatusOutput, task_id: str
+    status: ScraperStatusOutput, task_id: Optional[str] = None
 ) -> Set[str]:
-    """Files this scrape task actually sent to the parser."""
+    """Files this scrape status actually sent to the parser.
+
+    ``task_id`` unset means every task in the file.
+    """
     decisions: Dict[str, List[Optional[str]]] = defaultdict(list)
 
     for verified in status.verified_downloads:
-        if verified.task_id != task_id:
+        if not _same_task(verified.task_id, task_id):
             continue
         decisions[normalize_filename(verified.file_name)].append(verified.save_decision)
 
     for event in status.events:
-        if event.task_id != task_id or not isinstance(event, DownloadedStatus):
+        if not _same_task(event.task_id, task_id) or not isinstance(
+            event, DownloadedStatus
+        ):
             continue
         if not (event.downloaded_successfully and event.extracted_successfully):
             continue
@@ -258,16 +273,19 @@ def _scraper_files_queued_for_parse(
 
 def _started_global_status_from_raw(
     raw: Optional[Dict[str, Any]],
-    task_id: str,
+    task_id: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
-    """Copy `status: started` objects from a status JSON `global_status` array."""
+    """Copy `status: started` objects from a status JSON `global_status` array.
+
+    ``task_id`` unset copies every started event in the file.
+    """
     if not raw:
         return []
     started: List[Dict[str, Any]] = []
     for event in raw.get("global_status") or []:
         if not isinstance(event, dict):
             continue
-        if event.get("task_id") != task_id:
+        if not _same_task(event.get("task_id"), task_id):
             continue
         if event.get("status") != "started":
             continue
@@ -276,18 +294,25 @@ def _started_global_status_from_raw(
 
 
 def _task_started_limit_scraper(
-    status: ScraperStatusOutput, task_id: str
+    status: ScraperStatusOutput, task_id: Optional[str] = None
 ) -> Optional[int]:
+    """Return a download limit only when every matching run set the same one."""
+    limits: List[Optional[int]] = []
     for event in status.global_status:
-        if event.task_id == task_id and isinstance(event, StartedStatus):
-            return event.limit
-    return None
+        if _same_task(event.task_id, task_id) and isinstance(event, StartedStatus):
+            limits.append(event.limit)
+    if not limits or any(limit is None for limit in limits):
+        return None
+    unique = set(limits)
+    if len(unique) != 1:
+        return None
+    return unique.pop()
 
 
 def _scraper_file_lifecycle(
-    status: ScraperStatusOutput, task_id: str
+    status: ScraperStatusOutput, task_id: Optional[str] = None
 ) -> Dict[str, Dict[str, Any]]:
-    """Per-file flags and saw metadata for one scraper task."""
+    """Per-file flags and saw metadata. ``task_id`` unset covers the whole file."""
     lifecycle: Dict[str, Dict[str, Any]] = defaultdict(
         lambda: {
             "saw": False,
@@ -298,7 +323,7 @@ def _scraper_file_lifecycle(
     )
 
     for event in status.events:
-        if event.task_id != task_id:
+        if not _same_task(event.task_id, task_id):
             continue
         if isinstance(event, SawStatus):
             file_name = normalize_filename(event.file_name)
@@ -314,7 +339,7 @@ def _scraper_file_lifecycle(
                 lifecycle[file_name]["downloaded_ok"] = True
 
     for verified in status.verified_downloads:
-        if verified.task_id != task_id:
+        if not _same_task(verified.task_id, task_id):
             continue
         lifecycle[normalize_filename(verified.file_name)]["downloaded_ok"] = True
 
@@ -322,12 +347,12 @@ def _scraper_file_lifecycle(
 
 
 def _scraper_download_errors(
-    status: ScraperStatusOutput, task_id: str
+    status: ScraperStatusOutput, task_id: Optional[str] = None
 ) -> Dict[str, str]:
     """Map normalized file name to the best available download failure reason."""
     errors: Dict[str, str] = {}
     for event in status.events:
-        if event.task_id != task_id:
+        if not _same_task(event.task_id, task_id):
             continue
         if isinstance(event, DownloadedStatus):
             file_name = normalize_filename(event.file_name)
@@ -389,7 +414,7 @@ def _explain_saw_not_downloaded_entry(
 
 
 def _scraper_saw_not_downloaded(
-    status: ScraperStatusOutput, task_id: str
+    status: ScraperStatusOutput, task_id: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     saw_files = _scraper_saw_files(status, task_id)
     downloaded_files = _scraper_downloaded_files(status, task_id)
@@ -412,25 +437,39 @@ def _scraper_saw_not_downloaded(
 
 
 def _parser_zero_record_file_names(
-    status: ParserStatusOutput, task_id: str
+    status: ParserStatusOutput, task_id: Optional[str] = None
 ) -> List[str]:
+    """Processed files whose rows stayed at zero across the selected tasks.
+
+    A later task that parsed rows for the same name drops it from the list.
+    """
     zero_record: Set[str] = set()
+    with_rows: Set[str] = set()
     for event in status.events:
-        if event.task_id != task_id or not isinstance(event, ProcessedFileStatus):
+        if not _same_task(event.task_id, task_id) or not isinstance(
+            event, ProcessedFileStatus
+        ):
             continue
+        name = normalize_filename(event.file_name)
         if event.row_count == 0:
-            zero_record.add(normalize_filename(event.file_name))
-    return sorted(zero_record)
+            zero_record.add(name)
+        else:
+            with_rows.add(name)
+    return sorted(zero_record - with_rows)
 
 
 def _parser_downloaded_not_parsed_file_names(
     status: ParserStatusOutput,
-    task_id: str,
     scraper_status: Optional[ScraperStatusOutput],
-    scraper_task_id: Optional[str],
     file_type: str,
+    task_id: Optional[str] = None,
+    scraper_task_id: Optional[str] = None,
 ) -> List[str]:
-    if scraper_status is None or scraper_task_id is None:
+    """Queued scrape files of this type with no parser event in the window.
+
+    Unset task ids cover every task in the status files.
+    """
+    if scraper_status is None:
         return []
 
     downloaded = _scraper_files_queued_for_parse(scraper_status, scraper_task_id)
@@ -439,10 +478,12 @@ def _parser_downloaded_not_parsed_file_names(
     return sorted(downloaded_for_type - resolved)
 
 
-def _parser_resolved_files(status: ParserStatusOutput, task_id: str) -> Set[str]:
+def _parser_resolved_files(
+    status: ParserStatusOutput, task_id: Optional[str] = None
+) -> Set[str]:
     resolved: Set[str] = set()
     for event in status.events:
-        if event.task_id != task_id:
+        if not _same_task(event.task_id, task_id):
             continue
         if isinstance(event, (ProcessedFileStatus, SkippedFileStatus, FailedFileStatus)):
             resolved.add(normalize_filename(event.file_name))
@@ -458,43 +499,18 @@ def _filter_files_by_type(file_names: Iterable[str], file_type: str) -> Set[str]
     return filtered
 
 
-def _cluster_runs_by_time(
-    runs: List[Tuple[datetime, str, str]],
-) -> List[List[Tuple[datetime, str, str]]]:
-    """Group (timestamp, entity_key, task_id) tuples into DAG iteration clusters."""
-    if not runs:
-        return []
-
-    sorted_runs = sorted(runs, key=lambda item: item[0])
-    clusters: List[List[Tuple[datetime, str, str]]] = [[sorted_runs[0]]]
-
-    for run in sorted_runs[1:]:
-        if run[0] - clusters[-1][-1][0] <= ITERATION_CLUSTER_WINDOW:
-            clusters[-1].append(run)
-        else:
-            clusters.append([run])
-
-    return clusters
-
-
-def _pick_task_for_cluster(
-    runs: List[Tuple[datetime, str, str]],
-    entity_key: str,
-) -> Optional[str]:
-    entity_runs = [run for run in runs if run[1] == entity_key]
-    if not entity_runs:
-        return None
-    return max(entity_runs, key=lambda item: item[0])[2]
+def _single_task_id(task_ids: List[str]) -> Optional[str]:
+    return task_ids[0] if len(task_ids) == 1 else None
 
 
 def compute_scraper_quality(
     scraping_status_folder: str,
     enabled_scrapers: List[str],
 ) -> Dict[str, Any]:
-    """Build scraper quality snapshots grouped by DAG iteration (time cluster)."""
+    """Build one scraper quality snapshot across every task in the status files."""
     scraper_status: Dict[str, ScraperStatusOutput] = {}
     scraper_raw: Dict[str, Dict[str, Any]] = {}
-    scraper_runs: List[Tuple[datetime, str, str]] = []
+    started_times: List[datetime] = []
 
     for scraper in enabled_scrapers:
         status_path = os.path.join(
@@ -511,41 +527,40 @@ def compute_scraper_quality(
         for task_id in _task_ids_from_scraper(status):
             started_at = _task_started_at_scraper(status, task_id)
             if started_at is not None:
-                scraper_runs.append((started_at, scraper, task_id))
+                started_times.append(started_at)
 
-    iterations: List[Dict[str, Any]] = []
-    for cluster in _cluster_runs_by_time(scraper_runs):
-        started_at = min(run[0] for run in cluster)
-        scrapers_metrics: Dict[str, Dict[str, Any]] = {}
+    if not scraper_status:
+        return {"computed_at": now().isoformat(), "iterations": []}
 
-        for scraper in enabled_scrapers:
-            task_id = _pick_task_for_cluster(cluster, scraper)
-            if task_id is None or scraper not in scraper_status:
-                scrapers_metrics[scraper] = {
-                    "task_id": None,
-                    "saw": 0,
-                    "downloaded": 0,
-                    "no_data": True,
-                    "saw_not_downloaded": [],
-                    "global_status": [],
-                }
-                continue
-
-            status = scraper_status[scraper]
-            saw_files = _scraper_saw_files(status, task_id)
-            downloaded_files = _scraper_downloaded_files(status, task_id)
+    scrapers_metrics: Dict[str, Dict[str, Any]] = {}
+    for scraper in enabled_scrapers:
+        if scraper not in scraper_status:
             scrapers_metrics[scraper] = {
-                "task_id": task_id,
-                "saw": len(saw_files),
-                "downloaded": len(downloaded_files),
-                "no_data": len(downloaded_files) == 0,
-                "saw_not_downloaded": _scraper_saw_not_downloaded(status, task_id),
-                "global_status": _started_global_status_from_raw(
-                    scraper_raw.get(scraper), task_id
-                ),
+                "task_id": None,
+                "saw": 0,
+                "downloaded": 0,
+                "no_data": True,
+                "saw_not_downloaded": [],
+                "global_status": [],
             }
+            continue
 
-        iterations.append(
+        status = scraper_status[scraper]
+        saw_files = _scraper_saw_files(status)
+        downloaded_files = _scraper_downloaded_files(status)
+        scrapers_metrics[scraper] = {
+            "task_id": _single_task_id(_task_ids_from_scraper(status)),
+            "saw": len(saw_files),
+            "downloaded": len(downloaded_files),
+            "no_data": len(downloaded_files) == 0,
+            "saw_not_downloaded": _scraper_saw_not_downloaded(status),
+            "global_status": _started_global_status_from_raw(scraper_raw.get(scraper)),
+        }
+
+    started_at = min(started_times) if started_times else now()
+    return {
+        "computed_at": now().isoformat(),
+        "iterations": [
             {
                 "started_at": started_at.isoformat(),
                 "scrapers_with_no_data": sum(
@@ -555,11 +570,7 @@ def compute_scraper_quality(
                 ),
                 "scrapers": scrapers_metrics,
             }
-        )
-
-    return {
-        "computed_at": now().isoformat(),
-        "iterations": iterations,
+        ],
     }
 
 
@@ -569,7 +580,11 @@ def compute_parser_quality(
     enabled_scrapers: List[str],
     enabled_file_types: List[str],
 ) -> Dict[str, Any]:
-    """Build parser quality snapshots grouped by DAG iteration (time cluster)."""
+    """Build one parser quality snapshot across every task in the status files.
+
+    A file queued by any scrape task and recorded by any parser task is resolved.
+    Parser tasks are not paired to a single scrape run.
+    """
     scraper_status_by_chain: Dict[str, ScraperStatusOutput] = {}
     for scraper in enabled_scrapers:
         status_path = os.path.join(
@@ -582,8 +597,8 @@ def compute_parser_quality(
 
     parser_status: Dict[str, ParserStatusOutput] = {}
     parser_raw: Dict[str, Dict[str, Any]] = {}
-    parser_runs: List[Tuple[datetime, str, str]] = []
     parser_key_parts: Dict[str, Tuple[str, str]] = {}
+    started_times: List[datetime] = []
 
     for scraper in enabled_scrapers:
         for file_type in enabled_file_types:
@@ -602,60 +617,37 @@ def compute_parser_quality(
             for task_id in _task_ids_from_parser(status):
                 started_at = _task_started_at_parser(status, task_id)
                 if started_at is not None:
-                    parser_runs.append((started_at, parser_key, task_id))
+                    started_times.append(started_at)
 
-    iterations: List[Dict[str, Any]] = []
-    for cluster in _cluster_runs_by_time(parser_runs):
-        started_at = min(run[0] for run in cluster)
-        parsers_metrics: Dict[str, Dict[str, Any]] = {}
+    parsers_metrics: Dict[str, Dict[str, Any]] = {}
+    for parser_key, (scraper, file_type) in parser_key_parts.items():
+        if parser_key not in parser_status:
+            continue
 
-        for parser_key, (scraper, file_type) in parser_key_parts.items():
-            task_id = _pick_task_for_cluster(cluster, parser_key)
-            if task_id is None or parser_key not in parser_status:
-                continue
+        status = parser_status[parser_key]
+        parsers_metrics[parser_key] = {
+            "task_id": _single_task_id(_task_ids_from_parser(status)),
+            "zero_record_files": _parser_zero_record_file_names(status),
+            "downloaded_not_parsed": _parser_downloaded_not_parsed_file_names(
+                status,
+                scraper_status_by_chain.get(scraper),
+                file_type,
+            ),
+            "global_status": _started_global_status_from_raw(parser_raw.get(parser_key)),
+        }
 
-            status = parser_status[parser_key]
-            scraper_status = scraper_status_by_chain.get(scraper)
-            scraper_task_id = None
-            if scraper_status is not None:
-                best_delta = None
-                for candidate_task_id in _task_ids_from_scraper(scraper_status):
-                    scraper_started = _task_started_at_scraper(
-                        scraper_status, candidate_task_id
-                    )
-                    if scraper_started is None or scraper_started > started_at:
-                        continue
-                    delta = started_at - scraper_started
-                    if best_delta is None or delta < best_delta:
-                        scraper_task_id = candidate_task_id
-                        best_delta = delta
+    if not parsers_metrics:
+        return {"computed_at": now().isoformat(), "iterations": []}
 
-            parsers_metrics[parser_key] = {
-                "task_id": task_id,
-                "zero_record_files": _parser_zero_record_file_names(status, task_id),
-                "downloaded_not_parsed": _parser_downloaded_not_parsed_file_names(
-                    status,
-                    task_id,
-                    scraper_status,
-                    scraper_task_id,
-                    file_type,
-                ),
-                "global_status": _started_global_status_from_raw(
-                    parser_raw.get(parser_key), task_id
-                ),
-            }
-
-        if parsers_metrics:
-            iterations.append(
-                {
-                    "started_at": started_at.isoformat(),
-                    "parsers": parsers_metrics,
-                }
-            )
-
+    started_at = min(started_times) if started_times else now()
     return {
         "computed_at": now().isoformat(),
-        "iterations": iterations,
+        "iterations": [
+            {
+                "started_at": started_at.isoformat(),
+                "parsers": parsers_metrics,
+            }
+        ],
     }
 
 
@@ -732,12 +724,11 @@ def compute_improvement_priorities(
             and stats["no_data_iterations"] == stats["iterations"]
         ):
             issue = "no_data"
-            why = "no files downloaded in any iteration"
+            why = "no files downloaded"
         elif stats["latest_no_data"] and stats["latest_saw"] > 0:
             issue = "saw_but_not_downloaded"
             why = (
-                f"saw {stats['latest_saw']} files in the latest iteration "
-                "but downloaded none"
+                f"saw {stats['latest_saw']} files but downloaded none"
             )
         else:
             continue
@@ -1170,8 +1161,8 @@ def compute_selected_not_seen(
     """Files the scraper selected that the parser has no record of, for the day.
 
     Selected is every ``collected`` event. Parser-saw is every processed,
-    skipped, or failed event. All tasks in the status folders are one set;
-    runs are not split into two-hour iterations. Names are normalized.
+    skipped, or failed event. All tasks in the status folders are one set.
+    Names are normalized.
     """
     by_chain: List[Dict[str, Any]] = []
     total = 0
@@ -1524,9 +1515,9 @@ def write_quality_indicators(
         json.dump(pipeline_health, handle, indent=2, default=str)
 
     Logger.info(
-        "Quality indicators written: %s scraper iterations, %s parser iterations, "
+        "Quality indicators written: scrape_snapshot=%s parse_snapshot=%s "
         "overall_healthy=%s",
-        len(scraper_quality["iterations"]),
-        len(parser_quality["iterations"]),
+        bool(scraper_quality["iterations"]),
+        bool(parser_quality["iterations"]),
         pipeline_health["overall_healthy"],
     )

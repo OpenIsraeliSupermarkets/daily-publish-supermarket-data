@@ -138,11 +138,11 @@ class LongTermDatasetManager:
                 },
                 {
                     "path": SCRAPER_QUALITY_FILENAME,
-                    "description": "Scraper quality indicators across DAG iterations",
+                    "description": "Scraper quality indicators across the full status window",
                 },
                 {
                     "path": PARSER_QUALITY_FILENAME,
-                    "description": "Parser quality indicators across DAG iterations",
+                    "description": "Parser quality indicators across the full status window",
                 },
                 {
                     "path": PIPELINE_HEALTH_FILENAME,
