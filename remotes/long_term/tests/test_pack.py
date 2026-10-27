@@ -3,7 +3,7 @@ import zipfile
 from datetime import datetime
 
 import pytest
-from il_supermarket_scarper import DumpFolderNames
+from il_supermarket_scarper import DumpFolderNames, ScraperFactory
 
 from remotes.long_term.file_storage import DummyFileStorage
 from remotes.long_term.packer import StagedDatasetPacker
@@ -85,6 +85,58 @@ def test_group_files_by_scraper_name_aliases_and_temp_suffix(packer):
     assert groups[hazi_zip] == ["promo_full_file_hazi_hinam_temp.csv"]
     assert groups[keshet_zip] == ["promo_full_file_keshet_temp.csv"]
     assert groups[rami_zip] == ["promo_full_file_rami_levy_temp.csv"]
+    assert groups["misc"] == ["parser-status.json"]
+
+
+def test_group_files_for_chains_filtered_as_unstable(packer, monkeypatch):
+    """Chains omitted by all_scrapers_name() still get their own zip.
+
+    Before 08:00 Asia/Jerusalem, all_scrapers_name() drops the laibcatalog
+    chains whose catalogs are empty overnight. Their staged files must not
+    fall through to misc.
+    """
+    monkeypatch.setattr(
+        ScraperFactory,
+        "all_scrapers_name",
+        lambda *args, **kwargs: ["BAREKET"],
+    )
+    victory = DumpFolderNames["VICTORY_NEW_SOURCE"].value.lower()
+    het_cohen = DumpFolderNames["HET_COHEN_NEW_SOURCE"].value.lower()
+    mahsani = DumpFolderNames["MAHSANI_ASHUK_NEW_SOURCE"].value.lower()
+    legacy_victory = DumpFolderNames["VICTORY"].value.lower()
+
+    groups = packer.group_files_by_scraper(
+        [
+            "price_full_file_victory_new_source.csv",
+            "victory_new_source_price_full_file.json",
+            f"{victory}.json",
+            "promo_full_file_het_cohen_new_source.csv",
+            "het_cohen_new_source_store_file.json",
+            f"{het_cohen}.json",
+            "price_file_mahsani_ashuk_new_source.csv",
+            "mahsani_ashuk_new_source_promo_file.json",
+            f"{mahsani}.json",
+            "price_full_file_victory.csv",
+            "parser-status.json",
+        ]
+    )
+
+    assert set(groups[victory]) == {
+        "price_full_file_victory_new_source.csv",
+        "victory_new_source_price_full_file.json",
+        f"{victory}.json",
+    }
+    assert set(groups[het_cohen]) == {
+        "promo_full_file_het_cohen_new_source.csv",
+        "het_cohen_new_source_store_file.json",
+        f"{het_cohen}.json",
+    }
+    assert set(groups[mahsani]) == {
+        "price_file_mahsani_ashuk_new_source.csv",
+        "mahsani_ashuk_new_source_promo_file.json",
+        f"{mahsani}.json",
+    }
+    assert groups[legacy_victory] == ["price_full_file_victory.csv"]
     assert groups["misc"] == ["parser-status.json"]
 
 
