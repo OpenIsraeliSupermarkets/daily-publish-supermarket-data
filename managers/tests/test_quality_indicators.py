@@ -42,6 +42,7 @@ def _scraper_status(
     saw_links: dict[str, str] | None = None,
     files_requested: list[str] | None = None,
     when_date: datetime | None = None,
+    save_decisions: dict[str, str] | None = None,
 ) -> dict:
     saw_links = saw_links or {}
     events = [
@@ -55,6 +56,7 @@ def _scraper_status(
         }
         for name in saw_files
     ]
+    decisions = save_decisions or {}
     events.extend(
         {
             "task_id": task_id,
@@ -65,6 +67,7 @@ def _scraper_status(
             "extracted_successfully": True,
             "error_message": None,
             "restart_and_retry": False,
+            "save_decision": decisions.get(name),
         }
         for name in downloaded_files
     )
@@ -88,7 +91,7 @@ def _scraper_status(
             "system_timestamp": started_at.isoformat(),
             "listing_hash": f"hash-{name}",
             "content_sha256": f"sha-{name}",
-            "save_decision": "save",
+            "save_decision": decisions.get(name, "save"),
         }
         for name in downloaded_files
     ]
@@ -503,6 +506,51 @@ def test_compute_re_download_empty_when_all_parsed(status_dirs):
         )
         == {}
     )
+
+
+def test_parser_quality_ignores_downloads_that_were_not_requeued(status_dirs):
+    scrape_started = datetime(2026, 1, 1, 10, 0, 0)
+    parse_started = datetime(2026, 1, 1, 10, 5, 0)
+    bareket_file = DumpFolderNames["BAREKET"].value.lower()
+    same = "PriceSame.xml"
+    stale = "PriceStale.xml"
+    fresh = "PriceFresh.xml"
+    _write_json(
+        os.path.join(status_dirs["scraping"], f"{bareket_file}.json"),
+        _scraper_status(
+            "scrape-task-1",
+            scrape_started,
+            saw_files=[same, stale, fresh],
+            downloaded_files=[same, stale, fresh],
+            save_decisions={
+                same: "rewrote_same",
+                stale: "stale_older",
+                fresh: "created",
+            },
+        ),
+    )
+    _write_json(
+        os.path.join(status_dirs["converting"], "bareket_price_file.json"),
+        _parser_status("parse-task-1", parse_started, processed=[]),
+    )
+
+    parser_quality = compute_parser_quality(
+        status_dirs["scraping"],
+        status_dirs["converting"],
+        ["BAREKET"],
+        ["PRICE_FILE"],
+    )
+    scraper_quality = compute_scraper_quality(status_dirs["scraping"], ["BAREKET"])
+
+    parser_metrics = parser_quality["iterations"][0]["parsers"]["bareket_price_file"]
+    assert parser_metrics["downloaded_not_parsed"] == ["PriceFresh"]
+    assert scraper_quality["iterations"][0]["scrapers"]["BAREKET"]["downloaded"] == 3
+    assert (
+        scraper_quality["iterations"][0]["scrapers"]["BAREKET"]["saw_not_downloaded"]
+        == []
+    )
+
+
 
 
 def test_compute_pipeline_health_flags_unhealthy_parser():

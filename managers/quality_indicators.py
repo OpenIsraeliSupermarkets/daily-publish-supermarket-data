@@ -27,6 +27,7 @@ from il_supermarket_scarper import (
     ScraperStatusOutput,
     StartedStatus,
 )
+from il_supermarket_scarper.utils.files.save_policy import SaveDecision, should_persist
 
 from utils import Logger, now
 
@@ -214,6 +215,47 @@ def _scraper_downloaded_files(status: ScraperStatusOutput, task_id: str) -> Set[
     return downloaded
 
 
+def _save_decision_queued_for_parse(save_decision: Optional[str]) -> bool:
+    """True when this scrape row was handed to the parser.
+
+    ``rewrote_same`` and ``stale_older`` are stored on the scrape task but the
+    bytes are not sent again. A missing or unknown decision still counts: older
+    status files did not record one.
+    """
+    if not save_decision:
+        return True
+    try:
+        decision = SaveDecision(str(save_decision))
+    except ValueError:
+        return True
+    return should_persist(decision)
+
+
+def _scraper_files_queued_for_parse(
+    status: ScraperStatusOutput, task_id: str
+) -> Set[str]:
+    """Files this scrape task actually sent to the parser."""
+    decisions: Dict[str, List[Optional[str]]] = defaultdict(list)
+
+    for verified in status.verified_downloads:
+        if verified.task_id != task_id:
+            continue
+        decisions[normalize_filename(verified.file_name)].append(verified.save_decision)
+
+    for event in status.events:
+        if event.task_id != task_id or not isinstance(event, DownloadedStatus):
+            continue
+        if not (event.downloaded_successfully and event.extracted_successfully):
+            continue
+        decisions[normalize_filename(event.file_name)].append(event.save_decision)
+
+    return {
+        file_name
+        for file_name, recorded in decisions.items()
+        if any(_save_decision_queued_for_parse(decision) for decision in recorded)
+    }
+
+
 def _started_global_status_from_raw(
     raw: Optional[Dict[str, Any]],
     task_id: str,
@@ -391,7 +433,7 @@ def _parser_downloaded_not_parsed_file_names(
     if scraper_status is None or scraper_task_id is None:
         return []
 
-    downloaded = _scraper_downloaded_files(scraper_status, scraper_task_id)
+    downloaded = _scraper_files_queued_for_parse(scraper_status, scraper_task_id)
     downloaded_for_type = _filter_files_by_type(downloaded, file_type)
     resolved = _parser_resolved_files(status, task_id)
     return sorted(downloaded_for_type - resolved)
