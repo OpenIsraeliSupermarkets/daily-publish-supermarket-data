@@ -11,11 +11,13 @@ from managers.quality_indicators import (
     PARSER_QUALITY_FILENAME,
     PIPELINE_HEALTH_FILENAME,
     SCRAPER_QUALITY_FILENAME,
+    assess_published_health,
     collect_parse_problem_filenames,
     collect_parse_run_parameters,
     collect_scrape_problem_filenames,
     collect_scrape_run_parameters,
     compute_re_download,
+    compute_selected_not_seen,
     compute_improvement_priorities,
     compute_parser_quality,
     compute_pipeline_health,
@@ -42,6 +44,8 @@ def _scraper_status(
     saw_links: dict[str, str] | None = None,
     files_requested: list[str] | None = None,
     when_date: datetime | None = None,
+    save_decisions: dict[str, str] | None = None,
+    collected_files: list[str] | None = None,
 ) -> dict:
     saw_links = saw_links or {}
     events = [
@@ -58,6 +62,16 @@ def _scraper_status(
     events.extend(
         {
             "task_id": task_id,
+            "status": "collected",
+            "system_timestamp": started_at.isoformat(),
+            "file_name": name,
+        }
+        for name in collected_files or []
+    )
+    decisions = save_decisions or {}
+    events.extend(
+        {
+            "task_id": task_id,
             "status": "downloaded",
             "system_timestamp": started_at.isoformat(),
             "file_name": name,
@@ -65,6 +79,7 @@ def _scraper_status(
             "extracted_successfully": True,
             "error_message": None,
             "restart_and_retry": False,
+            "save_decision": decisions.get(name),
         }
         for name in downloaded_files
     )
@@ -88,7 +103,7 @@ def _scraper_status(
             "system_timestamp": started_at.isoformat(),
             "listing_hash": f"hash-{name}",
             "content_sha256": f"sha-{name}",
-            "save_decision": "save",
+            "save_decision": decisions.get(name, "save"),
         }
         for name in downloaded_files
     ]
@@ -281,7 +296,7 @@ def test_compute_scraper_quality_skipped_by_limit(status_dirs):
     assert result["iterations"][0]["scrapers"]["BAREKET"]["global_status"][0]["limit"] == 1
 
 
-def test_compute_scraper_quality_two_iterations(status_dirs):
+def test_compute_scraper_quality_unions_every_task(status_dirs):
     bareket_file = DumpFolderNames["BAREKET"].value.lower()
     _write_json(
         os.path.join(status_dirs["scraping"], f"{bareket_file}.json"),
@@ -327,10 +342,12 @@ def test_compute_scraper_quality_two_iterations(status_dirs):
 
     result = compute_scraper_quality(status_dirs["scraping"], ["BAREKET"])
 
-    assert len(result["iterations"]) == 2
-    assert result["iterations"][0]["scrapers"]["BAREKET"]["downloaded"] == 1
-    assert result["iterations"][1]["scrapers"]["BAREKET"]["downloaded"] == 0
-    assert result["iterations"][1]["scrapers"]["BAREKET"]["saw_not_downloaded"] == [
+    assert len(result["iterations"]) == 1
+    bareket = result["iterations"][0]["scrapers"]["BAREKET"]
+    assert bareket["saw"] == 3
+    assert bareket["downloaded"] == 1
+    assert bareket["no_data"] is False
+    assert bareket["saw_not_downloaded"] == [
         {
             "file_name": "Price2",
             "reason": "skipped_by_filter",
@@ -342,7 +359,8 @@ def test_compute_scraper_quality_two_iterations(status_dirs):
             "error": "not selected for download (filtered before collection)",
         },
     ]
-    assert result["iterations"][1]["scrapers_with_no_data"] == 1
+    assert result["iterations"][0]["scrapers_with_no_data"] == 0
+    assert len(bareket["global_status"]) == 2
 
 
 def test_compute_parser_quality_zero_records_and_not_parsed(status_dirs):
@@ -383,6 +401,61 @@ def test_compute_parser_quality_zero_records_and_not_parsed(status_dirs):
     assert parser_metrics["global_status"][0]["status"] == "started"
     assert parser_metrics["global_status"][0]["scraper"] == "BAREKET"
     assert parser_metrics["global_status"][0]["files_types"] == "PRICE_FILE"
+
+
+def test_compute_parser_quality_unions_every_task(status_dirs):
+    bareket_file = DumpFolderNames["BAREKET"].value.lower()
+    morning = datetime(2026, 10, 26, 8, 0, 0)
+    afternoon = datetime(2026, 10, 26, 16, 0, 0)
+    morning_scrape = _scraper_status(
+        "scrape-morning",
+        morning,
+        saw_files=["PriceMorning.xml", "PriceEmpty.xml"],
+        downloaded_files=["PriceMorning.xml", "PriceEmpty.xml"],
+    )
+    afternoon_scrape = _scraper_status(
+        "scrape-afternoon",
+        afternoon,
+        saw_files=["PriceMorning.xml", "PriceAfternoon.xml"],
+        downloaded_files=["PriceMorning.xml", "PriceAfternoon.xml"],
+    )
+    morning_scrape["events"].extend(afternoon_scrape["events"])
+    morning_scrape["global_status"].extend(afternoon_scrape["global_status"])
+    morning_scrape["verified_downloads"].extend(afternoon_scrape["verified_downloads"])
+    _write_json(
+        os.path.join(status_dirs["scraping"], f"{bareket_file}.json"),
+        morning_scrape,
+    )
+
+    morning_parse = _parser_status(
+        "parse-morning",
+        morning,
+        processed=[("PriceMorning.xml", 4), ("PriceEmpty.xml", 0)],
+    )
+    afternoon_parse = _parser_status(
+        "parse-afternoon",
+        afternoon,
+        processed=[("PriceEmpty.xml", 2)],
+    )
+    morning_parse["events"].extend(afternoon_parse["events"])
+    morning_parse["global_status"].extend(afternoon_parse["global_status"])
+    _write_json(
+        os.path.join(status_dirs["converting"], "bareket_price_file.json"),
+        morning_parse,
+    )
+
+    result = compute_parser_quality(
+        status_dirs["scraping"],
+        status_dirs["converting"],
+        ["BAREKET"],
+        ["PRICE_FILE"],
+    )
+
+    assert len(result["iterations"]) == 1
+    metrics = result["iterations"][0]["parsers"]["bareket_price_file"]
+    assert metrics["downloaded_not_parsed"] == ["PriceAfternoon"]
+    assert metrics["zero_record_files"] == []
+    assert len(metrics["global_status"]) == 2
 
 
 def _parsed_files(names: list[str], task_id: str = "parse-task") -> list[dict]:
@@ -503,6 +576,175 @@ def test_compute_re_download_empty_when_all_parsed(status_dirs):
         )
         == {}
     )
+
+
+def test_parser_quality_ignores_downloads_that_were_not_requeued(status_dirs):
+    scrape_started = datetime(2026, 1, 1, 10, 0, 0)
+    parse_started = datetime(2026, 1, 1, 10, 5, 0)
+    bareket_file = DumpFolderNames["BAREKET"].value.lower()
+    same = "PriceSame.xml"
+    stale = "PriceStale.xml"
+    fresh = "PriceFresh.xml"
+    _write_json(
+        os.path.join(status_dirs["scraping"], f"{bareket_file}.json"),
+        _scraper_status(
+            "scrape-task-1",
+            scrape_started,
+            saw_files=[same, stale, fresh],
+            downloaded_files=[same, stale, fresh],
+            save_decisions={
+                same: "rewrote_same",
+                stale: "stale_older",
+                fresh: "created",
+            },
+        ),
+    )
+    _write_json(
+        os.path.join(status_dirs["converting"], "bareket_price_file.json"),
+        _parser_status("parse-task-1", parse_started, processed=[]),
+    )
+
+    parser_quality = compute_parser_quality(
+        status_dirs["scraping"],
+        status_dirs["converting"],
+        ["BAREKET"],
+        ["PRICE_FILE"],
+    )
+    scraper_quality = compute_scraper_quality(status_dirs["scraping"], ["BAREKET"])
+
+    parser_metrics = parser_quality["iterations"][0]["parsers"]["bareket_price_file"]
+    assert parser_metrics["downloaded_not_parsed"] == ["PriceFresh"]
+    assert scraper_quality["iterations"][0]["scrapers"]["BAREKET"]["downloaded"] == 3
+    assert (
+        scraper_quality["iterations"][0]["scrapers"]["BAREKET"]["saw_not_downloaded"]
+        == []
+    )
+
+
+
+
+def _published_health(**overrides):
+    health = {
+        "computed_at": "2026-10-27T04:26:09+02:00",
+        "scraper": {
+            "attempted_download_success_rate": 0.99,
+            "scrapers_with_no_data": 0,
+        },
+        "parser": {"parse_success_rate": 0.99},
+        "selected_not_seen": {"total_files": 0, "by_chain": []},
+    }
+    health.update(overrides)
+    return health
+
+
+def test_assess_published_health_passes_at_threshold():
+    assessment = assess_published_health(
+        _published_health(),
+        thresholds={
+            "scraper_download_success_rate_min": 0.95,
+            "parser_parse_success_rate_min": 0.98,
+            "scraper_no_data_scrapers_max": 0,
+        },
+    )
+    assert assessment["ok"] is True
+    assert [check["name"] for check in assessment["checks"]] == [
+        "attempted_download_success_rate",
+        "scrapers_with_no_data",
+        "parse_success_rate",
+        "selected_not_seen",
+    ]
+
+
+def test_assess_published_health_fails_when_a_rate_is_under_threshold():
+    assessment = assess_published_health(
+        _published_health(parser={"parse_success_rate": 0.90}),
+        thresholds={
+            "scraper_download_success_rate_min": 0.95,
+            "parser_parse_success_rate_min": 0.98,
+            "scraper_no_data_scrapers_max": 0,
+        },
+    )
+    failed = [check["name"] for check in assessment["checks"] if not check["ok"]]
+    assert assessment["ok"] is False
+    assert failed == ["parse_success_rate"]
+
+
+def test_compute_selected_not_seen_is_the_day_set_difference(status_dirs):
+    morning = datetime(2026, 10, 26, 8, 13, 0)
+    evening = datetime(2026, 10, 26, 15, 6, 0)
+    bareket_file = DumpFolderNames["BAREKET"].value.lower()
+    seen = "PriceSeen.xml"
+    missed = "PriceMissed.xml"
+    failed = "PriceFailed.xml"
+    morning_status = _scraper_status(
+        "scrape-morning",
+        morning,
+        saw_files=[seen, missed],
+        downloaded_files=[seen],
+        collected_files=[seen, missed],
+    )
+    evening_status = _scraper_status(
+        "scrape-evening",
+        evening,
+        saw_files=[seen, failed],
+        downloaded_files=[seen],
+        failed_downloads=[(failed, "404")],
+        collected_files=[seen, failed],
+    )
+    morning_status["events"].extend(evening_status["events"])
+    morning_status["global_status"].extend(evening_status["global_status"])
+    _write_json(
+        os.path.join(status_dirs["scraping"], f"{bareket_file}.json"),
+        morning_status,
+    )
+    _write_json(
+        os.path.join(status_dirs["converting"], "bareket_price_file.json"),
+        _parser_status(
+            "parse-1",
+            morning,
+            processed=[(seen, 4)],
+            failed=[failed],
+        ),
+    )
+
+    result = compute_selected_not_seen(
+        status_dirs["scraping"],
+        status_dirs["converting"],
+        ["BAREKET"],
+        ["PRICE_FILE"],
+    )
+
+    assert result["total_files"] == 1
+    assert result["by_chain"] == [
+        {
+            "chain": bareket_file,
+            "enum": "BAREKET",
+            "selected": 3,
+            "parser_saw": 2,
+            "file_count": 1,
+            "files": ["PriceMissed"],
+        }
+    ]
+
+
+def test_assess_published_health_fails_when_selected_not_seen_is_over_max():
+    assessment = assess_published_health(
+        _published_health(
+            selected_not_seen={
+                "total_files": 2,
+                "by_chain": [{"chain": "shufersal", "file_count": 2, "files": []}],
+            }
+        )
+    )
+    failed = [check["name"] for check in assessment["checks"] if not check["ok"]]
+    assert assessment["ok"] is False
+    assert failed == ["selected_not_seen"]
+
+
+def test_assess_published_health_fails_when_a_rate_is_missing():
+    assessment = assess_published_health({"scraper": {}, "parser": {}})
+    assert assessment["ok"] is False
+    assert all(check["value"] is None for check in assessment["checks"])
 
 
 def test_compute_pipeline_health_flags_unhealthy_parser():
@@ -967,6 +1209,7 @@ def test_write_quality_indicators_creates_files(status_dirs):
     assert "computed_at" in scraper_payload
     assert "iterations" in parser_payload
     assert len(scraper_payload["iterations"]) >= 1
+    assert health_payload["selected_not_seen"]["total_files"] == 0
     assert "overall_healthy" in health_payload
     assert "scraper" in health_payload
     assert "parser" in health_payload

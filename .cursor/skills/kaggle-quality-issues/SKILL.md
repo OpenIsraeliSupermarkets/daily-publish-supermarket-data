@@ -49,7 +49,7 @@ Voice: **when I scrape/parse this site with these parameters, I saw these files,
 Collect not-downloaded filenames for that chain from `scraper_quality.json`:
 
 - `download_failures` → every `download_failed` name
-- `saw_but_not_downloaded` / `no_data` → latest-iteration names that were not downloaded (`skipped_by_limit` excluded)
+- `saw_but_not_downloaded` / `no_data` → names seen in the status window that were not downloaded (`skipped_by_limit` excluded)
 
 Title: `[scrape] {chain}: {pattern} failed to download`
 
