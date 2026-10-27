@@ -25,6 +25,17 @@ from data_models.response import (
 from remotes import LongTermDatabaseUploader, ShortTermDatabaseUploader
 
 
+def listed_chain_names():
+    """Chain names that exist, including ones hidden by the stability filter.
+
+    ``ScraperFactory.all_scrapers_name()`` drops chains that are expected to
+    publish nothing right now (before 08:00 Asia/Jerusalem that includes
+    Victory, Het Cohen, and Mahsani Ashuk). Catalog and request validation
+    still need those chains. Deprecated scrapers stay excluded.
+    """
+    return ScraperFactory.all_listed_scrappers()
+
+
 class AccessLayer:
     """
     Access layer responsible for interfacing with databases and providing
@@ -53,7 +64,7 @@ class AccessLayer:
         Returns:
             AvailableChains: Object containing all available chains
         """
-        return AvailableChains(list_of_chains=ScraperFactory.all_scrapers_name())
+        return AvailableChains(list_of_chains=listed_chain_names())
 
     def list_all_available_file_types(self) -> TypeOfFileScraped:
         """
@@ -110,8 +121,8 @@ class AccessLayer:
         if not chain:
             raise ValueError("'chain' parameter is required")
 
-        if chain not in ScraperFactory.all_scrapers_name():
-            valid_chains = ",".join(ScraperFactory.all_scrapers_name())
+        if chain not in listed_chain_names():
+            valid_chains = ",".join(listed_chain_names())
             raise ValueError(
                 f"chain '{chain}' is not a valid chain, valid chains are: {valid_chains}"
             )
@@ -172,8 +183,8 @@ class AccessLayer:
         if not chain:
             raise ValueError("'chain' parameter is required")
 
-        if chain not in ScraperFactory.all_scrapers_name():
-            valid_chains = ",".join(ScraperFactory.all_scrapers_name())
+        if chain not in listed_chain_names():
+            valid_chains = ",".join(listed_chain_names())
             raise ValueError(
                 f"chain '{chain}' is not a valid chain, valid chains are: {valid_chains}"
             )
@@ -255,9 +266,8 @@ class AccessLayer:
         if not file:
             raise ValueError("file parameter is required")
 
-        scraper = ScraperFactory.get(chain)
-        if not scraper:
-            valid_chains = ScraperFactory.all_scrapers_name()
+        if chain not in listed_chain_names():
+            valid_chains = listed_chain_names()
             raise ValueError(f"chain '{chain}' is not a valid chain {valid_chains}")
 
         file_type = FileTypesFilters.get_type_from_file(file.replace("NULL", ""))
@@ -295,9 +305,8 @@ class AccessLayer:
         if not file:
             raise ValueError("file parameter is required")
 
-        scraper = ScraperFactory.get(chain)
-        if not scraper:
-            valid_chains = ScraperFactory.all_scrapers_name()
+        if chain not in listed_chain_names():
+            valid_chains = listed_chain_names()
             raise ValueError(f"chain '{chain}' is not a valid chain {valid_chains}")
 
         file_type = FileTypesFilters.get_type_from_file(file.replace("NULL", ""))
@@ -360,9 +369,8 @@ class AccessLayer:
         if not file:
             raise ValueError("file parameter is required")
 
-        scraper = ScraperFactory.get(chain)
-        if not scraper:
-            valid_chains = ScraperFactory.all_scrapers_name()
+        if chain not in listed_chain_names():
+            valid_chains = listed_chain_names()
             raise ValueError(f"chain '{chain}' is not a valid chain {valid_chains}")
 
         file_type = FileTypesFilters.get_type_from_file(file.replace("NULL", ""))
