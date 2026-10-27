@@ -5,7 +5,7 @@ import os
 import re
 import zipfile
 
-from il_supermarket_scarper import DumpFolderNames, ScraperFactory
+from il_supermarket_scarper import DumpFolderNames
 from utils import Logger
 
 
@@ -30,14 +30,20 @@ class StagedDatasetPacker:
 
         Zip stems always use DumpFolderNames. Matching also accepts scraper enum
         names when they differ in spelling (e.g. meshmat_yosef vs MeshnatYosef).
+
+        Every dump folder is included, including deprecated chains and chains
+        that ScraperFactory.all_scrapers_name() drops. Publish runs before
+        08:00 Asia/Jerusalem, when that filter treats HET_COHEN_NEW_SOURCE,
+        MAHSANI_ASHUK_NEW_SOURCE, and VICTORY_NEW_SOURCE as unstable and
+        would otherwise pack their files into misc.zip.
         """
         prefixes = []
-        for scraper in ScraperFactory.all_scrapers_name():
-            dump_name = DumpFolderNames[scraper].value
+        for folder in DumpFolderNames:
+            dump_name = folder.value
             stem = dump_name.lower()
             dump_norm = self.normalize_name(dump_name)
             prefixes.append((dump_norm, stem))
-            scraper_norm = self.normalize_name(scraper)
+            scraper_norm = self.normalize_name(folder.name)
             if scraper_norm != dump_norm:
                 prefixes.append((scraper_norm, stem))
         prefixes.sort(key=lambda item: len(item[0]), reverse=True)
@@ -96,11 +102,17 @@ class StagedDatasetPacker:
             return
 
         groups = self.group_files_by_scraper(to_pack)
+        misc_files = groups.get("misc", [])
         Logger.info(
             "Packing %s staged files into %s per-scraper zip archives",
             len(to_pack),
             len(groups),
         )
+        if misc_files:
+            Logger.info(
+                "Staged files with no scraper match packed into misc: %s",
+                misc_files,
+            )
 
         for stem, filenames in groups.items():
             zip_path = os.path.join(dataset_path, f"{stem}.zip")
