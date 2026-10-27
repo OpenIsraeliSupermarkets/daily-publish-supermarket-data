@@ -17,6 +17,7 @@ from managers.quality_indicators import (
     collect_scrape_problem_filenames,
     collect_scrape_run_parameters,
     compute_re_download,
+    compute_selected_not_seen,
     compute_improvement_priorities,
     compute_parser_quality,
     compute_pipeline_health,
@@ -44,6 +45,7 @@ def _scraper_status(
     files_requested: list[str] | None = None,
     when_date: datetime | None = None,
     save_decisions: dict[str, str] | None = None,
+    collected_files: list[str] | None = None,
 ) -> dict:
     saw_links = saw_links or {}
     events = [
@@ -57,6 +59,15 @@ def _scraper_status(
         }
         for name in saw_files
     ]
+    events.extend(
+        {
+            "task_id": task_id,
+            "status": "collected",
+            "system_timestamp": started_at.isoformat(),
+            "file_name": name,
+        }
+        for name in collected_files or []
+    )
     decisions = save_decisions or {}
     events.extend(
         {
@@ -562,6 +573,7 @@ def _published_health(**overrides):
             "scrapers_with_no_data": 0,
         },
         "parser": {"parse_success_rate": 0.99},
+        "selected_not_seen": {"total_files": 0, "by_chain": []},
     }
     health.update(overrides)
     return health
@@ -581,6 +593,7 @@ def test_assess_published_health_passes_at_threshold():
         "attempted_download_success_rate",
         "scrapers_with_no_data",
         "parse_success_rate",
+        "selected_not_seen",
     ]
 
 
@@ -596,6 +609,78 @@ def test_assess_published_health_fails_when_a_rate_is_under_threshold():
     failed = [check["name"] for check in assessment["checks"] if not check["ok"]]
     assert assessment["ok"] is False
     assert failed == ["parse_success_rate"]
+
+
+def test_compute_selected_not_seen_is_the_day_set_difference(status_dirs):
+    morning = datetime(2026, 10, 26, 8, 13, 0)
+    evening = datetime(2026, 10, 26, 15, 6, 0)
+    bareket_file = DumpFolderNames["BAREKET"].value.lower()
+    seen = "PriceSeen.xml"
+    missed = "PriceMissed.xml"
+    failed = "PriceFailed.xml"
+    morning_status = _scraper_status(
+        "scrape-morning",
+        morning,
+        saw_files=[seen, missed],
+        downloaded_files=[seen],
+        collected_files=[seen, missed],
+    )
+    evening_status = _scraper_status(
+        "scrape-evening",
+        evening,
+        saw_files=[seen, failed],
+        downloaded_files=[seen],
+        failed_downloads=[(failed, "404")],
+        collected_files=[seen, failed],
+    )
+    morning_status["events"].extend(evening_status["events"])
+    morning_status["global_status"].extend(evening_status["global_status"])
+    _write_json(
+        os.path.join(status_dirs["scraping"], f"{bareket_file}.json"),
+        morning_status,
+    )
+    _write_json(
+        os.path.join(status_dirs["converting"], "bareket_price_file.json"),
+        _parser_status(
+            "parse-1",
+            morning,
+            processed=[(seen, 4)],
+            failed=[failed],
+        ),
+    )
+
+    result = compute_selected_not_seen(
+        status_dirs["scraping"],
+        status_dirs["converting"],
+        ["BAREKET"],
+        ["PRICE_FILE"],
+    )
+
+    assert result["total_files"] == 1
+    assert result["by_chain"] == [
+        {
+            "chain": bareket_file,
+            "enum": "BAREKET",
+            "selected": 3,
+            "parser_saw": 2,
+            "file_count": 1,
+            "files": ["PriceMissed"],
+        }
+    ]
+
+
+def test_assess_published_health_fails_when_selected_not_seen_is_over_max():
+    assessment = assess_published_health(
+        _published_health(
+            selected_not_seen={
+                "total_files": 2,
+                "by_chain": [{"chain": "shufersal", "file_count": 2, "files": []}],
+            }
+        )
+    )
+    failed = [check["name"] for check in assessment["checks"] if not check["ok"]]
+    assert assessment["ok"] is False
+    assert failed == ["selected_not_seen"]
 
 
 def test_assess_published_health_fails_when_a_rate_is_missing():
@@ -1066,6 +1151,7 @@ def test_write_quality_indicators_creates_files(status_dirs):
     assert "computed_at" in scraper_payload
     assert "iterations" in parser_payload
     assert len(scraper_payload["iterations"]) >= 1
+    assert health_payload["selected_not_seen"]["total_files"] == 0
     assert "overall_healthy" in health_payload
     assert "scraper" in health_payload
     assert "parser" in health_payload

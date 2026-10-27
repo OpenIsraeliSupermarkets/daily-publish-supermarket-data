@@ -32,7 +32,7 @@ from scripts.kaggle_quality_issues import (  # noqa: E402
 def _format_check(check: Dict[str, Any]) -> str:
     value = check["value"]
     shown = "missing" if value is None else value
-    if check["name"] == "scrapers_with_no_data":
+    if check.get("op") == "max":
         relation = "<=" if check["ok"] else ">"
     else:
         relation = ">=" if check["ok"] else "<"
@@ -50,6 +50,25 @@ def _improvement_lines(health: Dict[str, Any], limit: int = 5) -> List[str]:
             chain = item.get("chain") or item.get("enum") or stage
             why = item.get("why") or item.get("issue") or ""
             lines.append(f"- {chain}: {why}")
+    return lines
+
+
+def _selected_not_seen_lines(health: Dict[str, Any], limit: int = 5) -> List[str]:
+    lines: List[str] = []
+    block = health.get("selected_not_seen") or {}
+    for row in block.get("by_chain") or []:
+        if len(lines) >= limit:
+            return lines
+        names = row.get("files") or []
+        preview = ", ".join(names[:3])
+        extra = len(names) - min(len(names), 3)
+        suffix = f" (+{extra} more)" if extra else ""
+        chain = row.get("chain") or row.get("enum") or "chain"
+        count = row.get("file_count", len(names))
+        lines.append(
+            f"- {chain}: {count} selected files with no parser record"
+            f" ({preview}{suffix})"
+        )
     return lines
 
 
@@ -96,7 +115,10 @@ def check_published_health(cache: Path) -> int:
     print(f"computed_at {assessment.get('computed_at')}")
     for check in assessment["checks"]:
         print(_format_check(check))
-    notes = _improvement_lines(health) if not assessment["ok"] else []
+    notes: List[str] = []
+    if not assessment["ok"]:
+        notes.extend(_improvement_lines(health))
+        notes.extend(_selected_not_seen_lines(health))
     for line in notes:
         print(line)
     _write_step_summary(assessment, notes)

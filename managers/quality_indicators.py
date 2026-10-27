@@ -1141,6 +1141,9 @@ def enrich_issue_candidates_with_filename_patterns(
     return candidates
 
 
+_PARSER_SAW_STATUSES = frozenset({"processed", "skipped", "failed"})
+
+
 def _load_health_thresholds() -> Dict[str, float]:
     return {
         "scraper_download_success_rate_min": float(
@@ -1152,7 +1155,66 @@ def _load_health_thresholds() -> Dict[str, float]:
         "scraper_no_data_scrapers_max": float(
             os.environ.get("QUALITY_SCRAPER_MAX_NO_DATA_SCRAPERS", "0")
         ),
+        "selected_not_seen_max": float(
+            os.environ.get("QUALITY_MAX_SELECTED_NOT_SEEN", "0")
+        ),
     }
+
+
+def compute_selected_not_seen(
+    scraping_status_folder: str,
+    converting_status_folder: str,
+    enabled_scrapers: List[str],
+    enabled_file_types: List[str],
+) -> Dict[str, Any]:
+    """Files the scraper selected that the parser has no record of, for the day.
+
+    Selected is every ``collected`` event. Parser-saw is every processed,
+    skipped, or failed event. All tasks in the status folders are one set;
+    runs are not split into two-hour iterations. Names are normalized.
+    """
+    by_chain: List[Dict[str, Any]] = []
+    total = 0
+    for scraper in enabled_scrapers:
+        stem = _dump_stem(scraper)
+        scraper_raw = _load_status_json(
+            os.path.join(scraping_status_folder, f"{stem}.json")
+        )
+        selected: Set[str] = set()
+        for event in (scraper_raw or {}).get("events") or []:
+            if event.get("status") != "collected" or not event.get("file_name"):
+                continue
+            selected.add(normalize_filename(event["file_name"]))
+
+        parser_saw: Set[str] = set()
+        for file_type in enabled_file_types:
+            parser_key = f"{scraper}_{file_type}".lower()
+            parser_raw = _load_status_json(
+                os.path.join(converting_status_folder, f"{parser_key}.json")
+            )
+            for event in (parser_raw or {}).get("events") or []:
+                if event.get("status") not in _PARSER_SAW_STATUSES:
+                    continue
+                if event.get("file_name"):
+                    parser_saw.add(normalize_filename(event["file_name"]))
+
+        gap = sorted(selected - parser_saw)
+        if not gap:
+            continue
+        total += len(gap)
+        by_chain.append(
+            {
+                "chain": stem,
+                "enum": scraper,
+                "selected": len(selected),
+                "parser_saw": len(parser_saw),
+                "file_count": len(gap),
+                "files": gap,
+            }
+        )
+
+    by_chain.sort(key=lambda row: (-row["file_count"], row["chain"]))
+    return {"total_files": total, "by_chain": by_chain}
 
 
 def _aggregate_scraper_health_metrics(scraper_quality: Dict[str, Any]) -> Dict[str, Any]:
@@ -1232,6 +1294,7 @@ def compute_pipeline_health(
     scraper_quality: Dict[str, Any],
     parser_quality: Dict[str, Any],
     thresholds: Optional[Dict[str, float]] = None,
+    selected_not_seen: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Derive overall scrape/parse health indicators and threshold checks."""
     thresholds = thresholds or _load_health_thresholds()
@@ -1239,6 +1302,17 @@ def compute_pipeline_health(
     parser = _aggregate_parser_health_metrics(
         parser_quality, scraper["total_downloaded"]
     )
+    if selected_not_seen is None:
+        selected_not_seen = {"total_files": 0, "by_chain": []}
+    seen_max = thresholds.get("selected_not_seen_max", 0)
+    seen_failures: List[str] = []
+    if selected_not_seen.get("total_files", 0) > seen_max:
+        seen_failures.append("selected_not_seen")
+    selected_not_seen = {
+        **selected_not_seen,
+        "healthy": not seen_failures,
+        "below_threshold": seen_failures,
+    }
 
     scraper_failures: List[str] = []
     if (
@@ -1266,7 +1340,10 @@ def compute_pipeline_health(
         "improvements": improvements,
         "scraper": scraper,
         "parser": parser,
-        "overall_healthy": scraper["healthy"] and parser["healthy"],
+        "selected_not_seen": selected_not_seen,
+        "overall_healthy": (
+            scraper["healthy"] and parser["healthy"] and not seen_failures
+        ),
     }
 
 
@@ -1288,25 +1365,40 @@ def assess_published_health(
     no_data_max = thresholds["scraper_no_data_scrapers_max"]
     parse_rate = parser.get("parse_success_rate")
     parse_min = thresholds["parser_parse_success_rate_min"]
+    seen_block = health.get("selected_not_seen")
+    seen_count = (
+        seen_block.get("total_files") if isinstance(seen_block, dict) else None
+    )
+    seen_max = thresholds.get("selected_not_seen_max", 0)
 
     checks = [
         {
             "name": "attempted_download_success_rate",
             "value": download_rate,
             "threshold": download_min,
+            "op": "min",
             "ok": download_rate is not None and download_rate >= download_min,
         },
         {
             "name": "scrapers_with_no_data",
             "value": no_data,
             "threshold": no_data_max,
+            "op": "max",
             "ok": no_data is not None and no_data <= no_data_max,
         },
         {
             "name": "parse_success_rate",
             "value": parse_rate,
             "threshold": parse_min,
+            "op": "min",
             "ok": parse_rate is not None and parse_rate >= parse_min,
+        },
+        {
+            "name": "selected_not_seen",
+            "value": seen_count,
+            "threshold": seen_max,
+            "op": "max",
+            "ok": seen_count is not None and seen_count <= seen_max,
         },
     ]
     return {
@@ -1407,11 +1499,21 @@ def write_quality_indicators(
         enabled_scrapers,
         enabled_file_types,
     )
+    selected_not_seen = compute_selected_not_seen(
+        scraping_status_folder,
+        converting_status_folder,
+        enabled_scrapers,
+        enabled_file_types,
+    )
 
     scraper_path = os.path.join(quality_folder, SCRAPER_QUALITY_FILENAME)
     parser_path = os.path.join(quality_folder, PARSER_QUALITY_FILENAME)
 
-    pipeline_health = compute_pipeline_health(scraper_quality, parser_quality)
+    pipeline_health = compute_pipeline_health(
+        scraper_quality,
+        parser_quality,
+        selected_not_seen=selected_not_seen,
+    )
     health_path = os.path.join(quality_folder, PIPELINE_HEALTH_FILENAME)
 
     with open(scraper_path, "w", encoding="utf-8") as handle:

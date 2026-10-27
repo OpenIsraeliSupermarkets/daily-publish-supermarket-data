@@ -17,6 +17,9 @@ on:
       scraper_no_data_scrapers_max:
         description: Maximum scrapers with no data in one iteration
         default: '0'
+      selected_not_seen_max:
+        description: Maximum files selected for download with no parser record, across the whole day
+        default: '0'
 
 permissions:
   contents: read
@@ -45,4 +48,5 @@ jobs:
           QUALITY_SCRAPER_MIN_DOWNLOAD_SUCCESS_RATE: ${{ github.event.inputs.scraper_download_success_rate_min || '0.95' }}
           QUALITY_PARSER_MIN_PARSE_SUCCESS_RATE: ${{ github.event.inputs.parser_parse_success_rate_min || '0.98' }}
           QUALITY_SCRAPER_MAX_NO_DATA_SCRAPERS: ${{ github.event.inputs.scraper_no_data_scrapers_max || '0' }}
+          QUALITY_MAX_SELECTED_NOT_SEEN: ${{ github.event.inputs.selected_not_seen_max || '0' }}
         run: python scripts/kaggle_quality_gate.py
