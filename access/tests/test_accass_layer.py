@@ -38,11 +38,22 @@ class TestAccessLayer(unittest.TestCase):
             long_term_database_connector=self.long_term_db,
         )
 
+    def test_list_chains_keeps_scrapers_hidden_by_stability_filter(self):
+        """Stability filtering must not remove a chain from the catalog."""
+        with patch.object(
+            ScraperFactory, "all_scrapers_name", return_value=["BAREKET"]
+        ):
+            result = self.access_layer.list_all_available_chains()
+        self.assertIn("VICTORY_NEW_SOURCE", result.list_of_chains)
+        self.assertIn("HET_COHEN_NEW_SOURCE", result.list_of_chains)
+        self.assertIn("MAHSANI_ASHUK_NEW_SOURCE", result.list_of_chains)
+        self.assertNotIn("VICTORY", result.list_of_chains)
+
     def test_list_all_available_chains(self):
         """Test listing all available chains."""
-        # Mock the ScraperFactory.all_scrapers_name method
+        # Mock the ScraperFactory.all_listed_scrappers method
         with patch.object(
-            ScraperFactory, "all_scrapers_name", return_value=["shufersal", "rami_levy"]
+            ScraperFactory, "all_listed_scrappers", return_value=["shufersal", "rami_levy"]
         ):
             result = self.access_layer.list_all_available_chains()
             self.assertIsInstance(result, AvailableChains)
@@ -89,7 +100,7 @@ class TestAccessLayer(unittest.TestCase):
     def test_list_files_invalid_chain(self):
         """Test that list_files validates chain parameter."""
         with patch.object(
-            ScraperFactory, "all_scrapers_name", return_value=["shufersal", "rami_levy"]
+            ScraperFactory, "all_listed_scrappers", return_value=["shufersal", "rami_levy"]
         ):
             with self.assertRaises(ValueError) as context:
                 self.access_layer.list_files(chain="invalid_chain")
@@ -99,7 +110,7 @@ class TestAccessLayer(unittest.TestCase):
         """Test that list_files validates file_type parameter."""
         # Instead of trying to patch the Enum, mock the access layer's validation behavior
         with patch.object(
-            ScraperFactory, "all_scrapers_name", return_value=["shufersal"]
+            ScraperFactory, "all_listed_scrappers", return_value=["shufersal"]
         ):
 
             # Mock that file_type is not in FileTypesFilters.__members__
@@ -117,7 +128,7 @@ class TestAccessLayer(unittest.TestCase):
     def test_list_files_valid_chain_no_file_type(self):
         """Test list_files with valid chain and no file_type."""
         with patch.object(
-            ScraperFactory, "all_scrapers_name", return_value=["shufersal"]
+            ScraperFactory, "all_listed_scrappers", return_value=["shufersal"]
         ):
             mock_docs = [
                 {"response": {"files_to_process": ["file1.xml", "file2.xml"]}},
@@ -146,7 +157,7 @@ class TestAccessLayer(unittest.TestCase):
     def test_list_files_valid_chain_with_file_type(self, _):
         """Test list_files with valid chain and file_type."""
         with patch.object(
-            ScraperFactory, "all_scrapers_name", return_value=["shufersal"]
+            ScraperFactory, "all_listed_scrappers", return_value=["shufersal"]
         ):
             # Simulate that "PRICES" is a valid file type by ensuring __contains__ returns True
             mock_docs = [
@@ -168,8 +179,8 @@ class TestAccessLayer(unittest.TestCase):
                 if not chain:
                     raise ValueError("'chain' parameter is required")
 
-                if chain not in ScraperFactory.all_scrapers_name():
-                    chains = ScraperFactory.all_scrapers_name()
+                if chain not in ScraperFactory.all_listed_scrappers():
+                    chains = ScraperFactory.all_listed_scrappers()
                     raise ValueError(
                         f"chain '{chain}' is not a valid chain, valid chains are: {','.join(chains)}"  # pylint: disable=line-too-long
                     )
@@ -229,7 +240,7 @@ class TestAccessLayer(unittest.TestCase):
         """Test that get_file_content validates chain parameter."""
         with patch.object(ScraperFactory, "get", return_value=None):
             with patch.object(
-                ScraperFactory, "all_scrapers_name", return_value=["shufersal"]
+                ScraperFactory, "all_listed_scrappers", return_value=["shufersal"]
             ):
                 with self.assertRaises(ValueError) as context:
                     self.access_layer.get_file_content(
@@ -239,8 +250,9 @@ class TestAccessLayer(unittest.TestCase):
 
     def test_get_file_content_invalid_file_pattern(self):
         """Test that get_file_content validates file pattern."""
-        scraper_mock = MagicMock()
-        with patch.object(ScraperFactory, "get", return_value=scraper_mock):
+        with patch.object(
+            ScraperFactory, "all_listed_scrappers", return_value=["shufersal"]
+        ):
             with patch.object(
                 FileTypesFilters, "get_type_from_file", return_value=None
             ):
@@ -257,14 +269,15 @@ class TestAccessLayer(unittest.TestCase):
         # Test function until it calls get_destinations_content which is where it's failing
 
         # Arrange
-        scraper_mock = MagicMock()
         file_type_mock = MagicMock()
         file_type_mock.name = "PRICES"
 
         # Mock the FileContent object to avoid the error with the actual implementation
         mock_file_content = FileContent(rows=[])
 
-        with patch.object(ScraperFactory, "get", return_value=scraper_mock):
+        with patch.object(
+            ScraperFactory, "all_listed_scrappers", return_value=["shufersal"]
+        ):
             with patch.object(
                 FileTypesFilters, "get_type_from_file", return_value=file_type_mock
             ):

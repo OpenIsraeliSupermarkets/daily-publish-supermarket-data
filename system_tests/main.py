@@ -46,7 +46,7 @@ async def run_validations():
                 os.getenv("KAGGLE_DATASET_REMOTE_NAME"),
                 (
                     os.getenv("ENABLED_SCRAPERS")
-                    or ",".join(ScraperFactory.all_scrapers_name())
+                    or ",".join(ScraperFactory.all_listed_scrappers())
                 ).split(","),
                 os.getenv("MONGODB_URI"),
                 file_per_run=int(os.getenv("LIMIT")) if os.getenv("LIMIT") else None,
