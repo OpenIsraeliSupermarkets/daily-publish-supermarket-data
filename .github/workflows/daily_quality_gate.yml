@@ -1,0 +1,48 @@
+name: Daily quality gate
+
+# Reads the published Kaggle quality JSON (dataset root only) and fails when an
+# indicator is under its threshold. Scheduled after the 21:17 UTC publish.
+
+on:
+  schedule:
+    - cron: '17 5 * * *'
+  workflow_dispatch:
+    inputs:
+      scraper_download_success_rate_min:
+        description: Minimum attempted download success rate
+        default: '0.95'
+      parser_parse_success_rate_min:
+        description: Minimum parse success rate
+        default: '0.98'
+      scraper_no_data_scrapers_max:
+        description: Maximum scrapers with no data in one iteration
+        default: '0'
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check published quality indicators
+        env:
+          KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+          KAGGLE_DATASET_REMOTE_NAME: erlichsefi/israeli-supermarkets-2024
+          QUALITY_SCRAPER_MIN_DOWNLOAD_SUCCESS_RATE: ${{ github.event.inputs.scraper_download_success_rate_min || '0.95' }}
+          QUALITY_PARSER_MIN_PARSE_SUCCESS_RATE: ${{ github.event.inputs.parser_parse_success_rate_min || '0.98' }}
+          QUALITY_SCRAPER_MAX_NO_DATA_SCRAPERS: ${{ github.event.inputs.scraper_no_data_scrapers_max || '0' }}
+        run: python scripts/kaggle_quality_gate.py

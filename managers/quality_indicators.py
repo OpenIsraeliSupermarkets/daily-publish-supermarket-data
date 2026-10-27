@@ -1270,6 +1270,53 @@ def compute_pipeline_health(
     }
 
 
+def assess_published_health(
+    health: Dict[str, Any],
+    thresholds: Optional[Dict[str, float]] = None,
+) -> Dict[str, Any]:
+    """Compare published pipeline-health rates to the quality thresholds.
+
+    Same comparisons as ``compute_pipeline_health``. A missing rate fails.
+    """
+    thresholds = thresholds or _load_health_thresholds()
+    scraper = health.get("scraper") if isinstance(health.get("scraper"), dict) else {}
+    parser = health.get("parser") if isinstance(health.get("parser"), dict) else {}
+
+    download_rate = scraper.get("attempted_download_success_rate")
+    download_min = thresholds["scraper_download_success_rate_min"]
+    no_data = scraper.get("scrapers_with_no_data")
+    no_data_max = thresholds["scraper_no_data_scrapers_max"]
+    parse_rate = parser.get("parse_success_rate")
+    parse_min = thresholds["parser_parse_success_rate_min"]
+
+    checks = [
+        {
+            "name": "attempted_download_success_rate",
+            "value": download_rate,
+            "threshold": download_min,
+            "ok": download_rate is not None and download_rate >= download_min,
+        },
+        {
+            "name": "scrapers_with_no_data",
+            "value": no_data,
+            "threshold": no_data_max,
+            "ok": no_data is not None and no_data <= no_data_max,
+        },
+        {
+            "name": "parse_success_rate",
+            "value": parse_rate,
+            "threshold": parse_min,
+            "ok": parse_rate is not None and parse_rate >= parse_min,
+        },
+    ]
+    return {
+        "computed_at": health.get("computed_at"),
+        "thresholds": thresholds,
+        "checks": checks,
+        "ok": all(check["ok"] for check in checks),
+    }
+
+
 def _strip_extensions(file_name: str) -> str:
     return file_name.replace(".aspx", "").replace(".xml", "").replace(".gz", "")
 

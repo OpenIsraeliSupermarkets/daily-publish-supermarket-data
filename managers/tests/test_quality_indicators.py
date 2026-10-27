@@ -11,6 +11,7 @@ from managers.quality_indicators import (
     PARSER_QUALITY_FILENAME,
     PIPELINE_HEALTH_FILENAME,
     SCRAPER_QUALITY_FILENAME,
+    assess_published_health,
     collect_parse_problem_filenames,
     collect_parse_run_parameters,
     collect_scrape_problem_filenames,
@@ -551,6 +552,56 @@ def test_parser_quality_ignores_downloads_that_were_not_requeued(status_dirs):
     )
 
 
+
+
+def _published_health(**overrides):
+    health = {
+        "computed_at": "2026-10-27T04:26:09+02:00",
+        "scraper": {
+            "attempted_download_success_rate": 0.99,
+            "scrapers_with_no_data": 0,
+        },
+        "parser": {"parse_success_rate": 0.99},
+    }
+    health.update(overrides)
+    return health
+
+
+def test_assess_published_health_passes_at_threshold():
+    assessment = assess_published_health(
+        _published_health(),
+        thresholds={
+            "scraper_download_success_rate_min": 0.95,
+            "parser_parse_success_rate_min": 0.98,
+            "scraper_no_data_scrapers_max": 0,
+        },
+    )
+    assert assessment["ok"] is True
+    assert [check["name"] for check in assessment["checks"]] == [
+        "attempted_download_success_rate",
+        "scrapers_with_no_data",
+        "parse_success_rate",
+    ]
+
+
+def test_assess_published_health_fails_when_a_rate_is_under_threshold():
+    assessment = assess_published_health(
+        _published_health(parser={"parse_success_rate": 0.90}),
+        thresholds={
+            "scraper_download_success_rate_min": 0.95,
+            "parser_parse_success_rate_min": 0.98,
+            "scraper_no_data_scrapers_max": 0,
+        },
+    )
+    failed = [check["name"] for check in assessment["checks"] if not check["ok"]]
+    assert assessment["ok"] is False
+    assert failed == ["parse_success_rate"]
+
+
+def test_assess_published_health_fails_when_a_rate_is_missing():
+    assessment = assess_published_health({"scraper": {}, "parser": {}})
+    assert assessment["ok"] is False
+    assert all(check["value"] is None for check in assessment["checks"])
 
 
 def test_compute_pipeline_health_flags_unhealthy_parser():
