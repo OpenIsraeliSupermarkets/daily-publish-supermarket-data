@@ -17,7 +17,7 @@ from managers.quality_indicators import (
     collect_scrape_problem_filenames,
     collect_scrape_run_parameters,
     compute_re_download,
-    compute_selected_not_seen,
+    compute_unparsed_downloads,
     compute_improvement_priorities,
     compute_parser_quality,
     compute_pipeline_health,
@@ -631,7 +631,7 @@ def _published_health(**overrides):
             "scrapers_with_no_data": 0,
         },
         "parser": {"parse_success_rate": 0.99},
-        "selected_not_seen": {"total_files": 0, "by_chain": []},
+        "unparsed_downloads": {"total_files": 0, "by_chain": []},
     }
     health.update(overrides)
     return health
@@ -651,7 +651,7 @@ def test_assess_published_health_passes_at_threshold():
         "attempted_download_success_rate",
         "scrapers_with_no_data",
         "parse_success_rate",
-        "selected_not_seen",
+        "unparsed_downloads",
     ]
 
 
@@ -669,7 +669,7 @@ def test_assess_published_health_fails_when_a_rate_is_under_threshold():
     assert failed == ["parse_success_rate"]
 
 
-def test_compute_selected_not_seen_is_the_day_set_difference(status_dirs):
+def test_compute_unparsed_downloads_is_the_day_set_difference(status_dirs):
     morning = datetime(2026, 10, 26, 8, 13, 0)
     evening = datetime(2026, 10, 26, 15, 6, 0)
     bareket_file = DumpFolderNames["BAREKET"].value.lower()
@@ -707,7 +707,7 @@ def test_compute_selected_not_seen_is_the_day_set_difference(status_dirs):
         ),
     )
 
-    result = compute_selected_not_seen(
+    result = compute_unparsed_downloads(
         status_dirs["scraping"],
         status_dirs["converting"],
         ["BAREKET"],
@@ -719,7 +719,7 @@ def test_compute_selected_not_seen_is_the_day_set_difference(status_dirs):
         {
             "chain": bareket_file,
             "enum": "BAREKET",
-            "selected": 3,
+            "selected": 2,
             "parser_saw": 2,
             "file_count": 1,
             "files": ["PriceMissed"],
@@ -727,10 +727,10 @@ def test_compute_selected_not_seen_is_the_day_set_difference(status_dirs):
     ]
 
 
-def test_assess_published_health_fails_when_selected_not_seen_is_over_max():
+def test_assess_published_health_fails_when_unparsed_downloads_is_over_max():
     assessment = assess_published_health(
         _published_health(
-            selected_not_seen={
+            unparsed_downloads={
                 "total_files": 2,
                 "by_chain": [{"chain": "shufersal", "file_count": 2, "files": []}],
             }
@@ -738,7 +738,7 @@ def test_assess_published_health_fails_when_selected_not_seen_is_over_max():
     )
     failed = [check["name"] for check in assessment["checks"] if not check["ok"]]
     assert assessment["ok"] is False
-    assert failed == ["selected_not_seen"]
+    assert failed == ["unparsed_downloads"]
 
 
 def test_assess_published_health_fails_when_a_rate_is_missing():
@@ -1209,7 +1209,7 @@ def test_write_quality_indicators_creates_files(status_dirs):
     assert "computed_at" in scraper_payload
     assert "iterations" in parser_payload
     assert len(scraper_payload["iterations"]) >= 1
-    assert health_payload["selected_not_seen"]["total_files"] == 0
+    assert health_payload["unparsed_downloads"]["total_files"] == 0
     assert "overall_healthy" in health_payload
     assert "scraper" in health_payload
     assert "parser" in health_payload
@@ -1259,3 +1259,48 @@ def test_no_data_counts_scrapers_empty_for_the_whole_window():
 
     # BAREKET downloaded files earlier in the day, so only WOLT has no data.
     assert health["scraper"]["scrapers_with_no_data"] == 1
+
+
+def test_unparsed_downloads_skips_files_whose_download_failed(status_dirs):
+    morning = datetime(2026, 10, 26, 8, 13, 0)
+    evening = datetime(2026, 10, 26, 15, 6, 0)
+    bareket_file = DumpFolderNames["BAREKET"].value.lower()
+    gone = "PriceGone.xml"
+    retried = "PriceRetried.xml"
+    morning_status = _scraper_status(
+        "scrape-morning",
+        morning,
+        saw_files=[gone, retried],
+        downloaded_files=[],
+        failed_downloads=[(gone, "404"), (retried, "timeout")],
+        collected_files=[gone, retried],
+    )
+    evening_status = _scraper_status(
+        "scrape-evening",
+        evening,
+        saw_files=[retried],
+        downloaded_files=[retried],
+        collected_files=[retried],
+    )
+    morning_status["events"].extend(evening_status["events"])
+    morning_status["global_status"].extend(evening_status["global_status"])
+    _write_json(
+        os.path.join(status_dirs["scraping"], f"{bareket_file}.json"),
+        morning_status,
+    )
+    _write_json(
+        os.path.join(status_dirs["converting"], "bareket_price_file.json"),
+        _parser_status("parse-1", morning, processed=[]),
+    )
+
+    result = compute_unparsed_downloads(
+        status_dirs["scraping"],
+        status_dirs["converting"],
+        ["BAREKET"],
+        ["PRICE_FILE"],
+    )
+
+    # The 404 never downloaded, so it is not a parse gap. The retried file did
+    # download in the evening and the parser has no record of it.
+    assert result["total_files"] == 1
+    assert result["by_chain"][0]["files"] == ["PriceRetried"]

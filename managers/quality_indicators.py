@@ -1146,21 +1146,23 @@ def _load_health_thresholds() -> Dict[str, float]:
         "scraper_no_data_scrapers_max": float(
             os.environ.get("QUALITY_SCRAPER_MAX_NO_DATA_SCRAPERS", "0")
         ),
-        "selected_not_seen_max": float(
-            os.environ.get("QUALITY_MAX_SELECTED_NOT_SEEN", "0")
+        "unparsed_downloads_max": float(
+            os.environ.get("QUALITY_MAX_UNPARSED_DOWNLOADS", "0")
         ),
     }
 
 
-def compute_selected_not_seen(
+def compute_unparsed_downloads(
     scraping_status_folder: str,
     converting_status_folder: str,
     enabled_scrapers: List[str],
     enabled_file_types: List[str],
 ) -> Dict[str, Any]:
-    """Files the scraper selected that the parser has no record of, for the day.
+    """Files the scraper picked that never reached the parser, for the day.
 
-    Selected is every ``collected`` event. Parser-saw is every processed,
+    Picked is every ``collected`` event. A file whose every download attempt
+    failed is left out: it is already counted in the download success rate,
+    and the parser was never meant to see it. Parser-saw is every processed,
     skipped, or failed event. All tasks in the status folders are one set.
     Names are normalized.
     """
@@ -1172,10 +1174,22 @@ def compute_selected_not_seen(
             os.path.join(scraping_status_folder, f"{stem}.json")
         )
         selected: Set[str] = set()
+        download_ok: Set[str] = set()
+        download_failed: Set[str] = set()
         for event in (scraper_raw or {}).get("events") or []:
-            if event.get("status") != "collected" or not event.get("file_name"):
+            if not event.get("file_name"):
                 continue
-            selected.add(normalize_filename(event["file_name"]))
+            name = normalize_filename(event["file_name"])
+            if event.get("status") == "collected":
+                selected.add(name)
+            elif event.get("status") == "downloaded":
+                if event.get("downloaded_successfully") and event.get(
+                    "extracted_successfully"
+                ):
+                    download_ok.add(name)
+                else:
+                    download_failed.add(name)
+        selected -= download_failed - download_ok
 
         parser_saw: Set[str] = set()
         for file_type in enabled_file_types:
@@ -1298,7 +1312,7 @@ def compute_pipeline_health(
     scraper_quality: Dict[str, Any],
     parser_quality: Dict[str, Any],
     thresholds: Optional[Dict[str, float]] = None,
-    selected_not_seen: Optional[Dict[str, Any]] = None,
+    unparsed_downloads: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Derive overall scrape/parse health indicators and threshold checks."""
     thresholds = thresholds or _load_health_thresholds()
@@ -1306,14 +1320,14 @@ def compute_pipeline_health(
     parser = _aggregate_parser_health_metrics(
         parser_quality, scraper["total_downloaded"]
     )
-    if selected_not_seen is None:
-        selected_not_seen = {"total_files": 0, "by_chain": []}
-    seen_max = thresholds.get("selected_not_seen_max", 0)
+    if unparsed_downloads is None:
+        unparsed_downloads = {"total_files": 0, "by_chain": []}
+    seen_max = thresholds.get("unparsed_downloads_max", 0)
     seen_failures: List[str] = []
-    if selected_not_seen.get("total_files", 0) > seen_max:
-        seen_failures.append("selected_not_seen")
-    selected_not_seen = {
-        **selected_not_seen,
+    if unparsed_downloads.get("total_files", 0) > seen_max:
+        seen_failures.append("unparsed_downloads")
+    unparsed_downloads = {
+        **unparsed_downloads,
         "healthy": not seen_failures,
         "below_threshold": seen_failures,
     }
@@ -1344,7 +1358,7 @@ def compute_pipeline_health(
         "improvements": improvements,
         "scraper": scraper,
         "parser": parser,
-        "selected_not_seen": selected_not_seen,
+        "unparsed_downloads": unparsed_downloads,
         "overall_healthy": (
             scraper["healthy"] and parser["healthy"] and not seen_failures
         ),
@@ -1369,11 +1383,11 @@ def assess_published_health(
     no_data_max = thresholds["scraper_no_data_scrapers_max"]
     parse_rate = parser.get("parse_success_rate")
     parse_min = thresholds["parser_parse_success_rate_min"]
-    seen_block = health.get("selected_not_seen")
+    seen_block = health.get("unparsed_downloads")
     seen_count = (
         seen_block.get("total_files") if isinstance(seen_block, dict) else None
     )
-    seen_max = thresholds.get("selected_not_seen_max", 0)
+    seen_max = thresholds.get("unparsed_downloads_max", 0)
 
     checks = [
         {
@@ -1398,7 +1412,7 @@ def assess_published_health(
             "ok": parse_rate is not None and parse_rate >= parse_min,
         },
         {
-            "name": "selected_not_seen",
+            "name": "unparsed_downloads",
             "value": seen_count,
             "threshold": seen_max,
             "op": "max",
@@ -1503,7 +1517,7 @@ def write_quality_indicators(
         enabled_scrapers,
         enabled_file_types,
     )
-    selected_not_seen = compute_selected_not_seen(
+    unparsed_downloads = compute_unparsed_downloads(
         scraping_status_folder,
         converting_status_folder,
         enabled_scrapers,
@@ -1516,7 +1530,7 @@ def write_quality_indicators(
     pipeline_health = compute_pipeline_health(
         scraper_quality,
         parser_quality,
-        selected_not_seen=selected_not_seen,
+        unparsed_downloads=unparsed_downloads,
     )
     health_path = os.path.join(quality_folder, PIPELINE_HEALTH_FILENAME)
 

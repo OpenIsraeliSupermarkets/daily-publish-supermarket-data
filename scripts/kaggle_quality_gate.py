@@ -53,9 +53,9 @@ def _improvement_lines(health: Dict[str, Any], limit: int = 5) -> List[str]:
     return lines
 
 
-def _selected_not_seen_lines(health: Dict[str, Any], limit: int = 5) -> List[str]:
+def _unparsed_downloads_lines(health: Dict[str, Any], limit: int = 5) -> List[str]:
     lines: List[str] = []
-    block = health.get("selected_not_seen") or {}
+    block = health.get("unparsed_downloads") or {}
     for row in block.get("by_chain") or []:
         if len(lines) >= limit:
             return lines
@@ -66,7 +66,7 @@ def _selected_not_seen_lines(health: Dict[str, Any], limit: int = 5) -> List[str
         chain = row.get("chain") or row.get("enum") or "chain"
         count = row.get("file_count", len(names))
         lines.append(
-            f"- {chain}: {count} selected files with no parser record"
+            f"- {chain}: {count} downloaded files with no parser record"
             f" ({preview}{suffix})"
         )
     return lines
@@ -118,7 +118,7 @@ def check_published_health(cache: Path) -> int:
     notes: List[str] = []
     if not assessment["ok"]:
         notes.extend(_improvement_lines(health))
-        notes.extend(_selected_not_seen_lines(health))
+        notes.extend(_unparsed_downloads_lines(health))
     for line in notes:
         print(line)
     _write_step_summary(assessment, notes)
