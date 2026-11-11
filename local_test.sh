@@ -103,6 +103,32 @@ container_exit_code() {
     docker inspect --format='{{.State.ExitCode}}' "$1" 2>/dev/null
 }
 
+# Run the same script as the daily quality gate (scripts/quality_gate.sh).
+# The test scrapes only a few files (LIMIT, two chains), so rate and coverage
+# floors are 0. What must hold: every indicator was computed, no downloaded
+# file was lost before the parser, and no parsed file is missing from the
+# output CSVs. Usage: run_quality_gate [docker args...] -- [gate args...]
+run_quality_gate() {
+    local docker_args=()
+    while [ $# -gt 0 ] && [ "$1" != "--" ]; do
+        docker_args+=("$1")
+        shift
+    done
+    [ "$1" == "--" ] && shift
+    docker run --rm "${docker_args[@]}" \
+        -e QUALITY_SCRAPER_MIN_DOWNLOAD_SUCCESS_RATE=0 \
+        -e QUALITY_PARSER_MIN_PARSE_SUCCESS_RATE=0 \
+        -e QUALITY_SCRAPER_MAX_NO_DATA_SCRAPERS=${QUALITY_SCRAPER_MAX_NO_DATA_SCRAPERS:-2} \
+        -e QUALITY_MIN_END_TO_END_COVERAGE=0 \
+        -e QUALITY_MAX_UNPARSED_DOWNLOADS=0 \
+        -e QUALITY_MAX_NOT_IN_CSV=0 \
+        erlichsefi/data-fetcher:${IMAGE_TAG} ./scripts/quality_gate.sh "$@"
+    if [ $? -ne 0 ]; then
+        echo -e "\033[31mQuality indicators failed. Exiting.\033[0m"
+        return 1
+    fi
+}
+
 # Run the data processor for one OPERATION and watch Docker's health status of
 # the container while it runs: it must never turn unhealthy, and with
 # require_healthy=true it must report healthy at least once (#129).
@@ -205,26 +231,8 @@ if [ "$TEST_MODE" == "production" ]; then
     echo "Step 8.2: Scrape operation completed successfully"
 
     echo "Step 8.2.1: Checking the quality indicators aggregated locally, before publishing"
-    # Same script as the daily quality gate, but on the quality folder this run
-    # just wrote instead of the published Kaggle copy. The test scrapes only a
-    # few files (LIMIT, two chains), so rate and coverage floors are 0. What
-    # must hold: every indicator was computed, no downloaded file was lost
-    # before the parser, and no parsed file is missing from the output CSVs.
-    docker run --rm \
-        -v "${APP_DATA_PATH}/quality:/quality:ro" \
-        -e QUALITY_SCRAPER_MIN_DOWNLOAD_SUCCESS_RATE=0 \
-        -e QUALITY_PARSER_MIN_PARSE_SUCCESS_RATE=0 \
-        -e QUALITY_SCRAPER_MAX_NO_DATA_SCRAPERS=${QUALITY_SCRAPER_MAX_NO_DATA_SCRAPERS:-2} \
-        -e QUALITY_MIN_END_TO_END_COVERAGE=0 \
-        -e QUALITY_MAX_UNPARSED_DOWNLOADS=0 \
-        -e QUALITY_MAX_NOT_IN_CSV=0 \
-        erlichsefi/data-fetcher:${IMAGE_TAG} ./scripts/quality_gate.sh --cache-dir /quality
+    run_quality_gate -v "${APP_DATA_PATH}/quality:/quality:ro" -- --cache-dir /quality || exit 1
 
-    if [ $? -ne 0 ]; then
-        echo -e "\033[31mLocal quality indicators failed. Exiting.\033[0m"
-        exit 1
-    fi
-    
     echo "Step 8.3: Running PUBLISHING operation (publishing,clean_all_source_data)"
     export OPERATION="publishing,clean_all_source_data"
     run_data_processor_watching_health false
@@ -256,6 +264,13 @@ else
 
     check_container_health "raw-data-api" || exit 1
     check_container_health "data-fetcher" || exit 1
+
+    echo "Step 8.3: Checking the quality indicators the loop just published"
+    # The loop publishes and then cleans the local quality folder within the
+    # wait above, so check the copy it uploaded to the test dataset.
+    run_quality_gate \
+        -e KAGGLE_API_TOKEN=${KAGGLE_API_TOKEN} \
+        -e KAGGLE_DATASET_REMOTE_NAME=${KAGGLE_DATASET_REMOTE_NAME} || exit 1
 
 fi
 
