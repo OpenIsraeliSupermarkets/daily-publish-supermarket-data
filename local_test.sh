@@ -203,6 +203,27 @@ if [ "$TEST_MODE" == "production" ]; then
     fi
     
     echo "Step 8.2: Scrape operation completed successfully"
+
+    echo "Step 8.2.1: Checking the quality indicators aggregated locally, before publishing"
+    # Same script as the daily quality gate, but on the quality folder this run
+    # just wrote instead of the published Kaggle copy. The test scrapes only a
+    # few files (LIMIT, two chains), so rate and coverage floors are 0. What
+    # must hold: every indicator was computed, no downloaded file was lost
+    # before the parser, and no parsed file is missing from the output CSVs.
+    docker run --rm \
+        -v "${APP_DATA_PATH}/quality:/quality:ro" \
+        -e QUALITY_SCRAPER_MIN_DOWNLOAD_SUCCESS_RATE=0 \
+        -e QUALITY_PARSER_MIN_PARSE_SUCCESS_RATE=0 \
+        -e QUALITY_SCRAPER_MAX_NO_DATA_SCRAPERS=${QUALITY_SCRAPER_MAX_NO_DATA_SCRAPERS:-2} \
+        -e QUALITY_MIN_END_TO_END_COVERAGE=0 \
+        -e QUALITY_MAX_UNPARSED_DOWNLOADS=0 \
+        -e QUALITY_MAX_NOT_IN_CSV=0 \
+        erlichsefi/data-fetcher:${IMAGE_TAG} ./scripts/quality_gate.sh --cache-dir /quality
+
+    if [ $? -ne 0 ]; then
+        echo -e "\033[31mLocal quality indicators failed. Exiting.\033[0m"
+        exit 1
+    fi
     
     echo "Step 8.3: Running PUBLISHING operation (publishing,clean_all_source_data)"
     export OPERATION="publishing,clean_all_source_data"
@@ -303,27 +324,6 @@ docker run \
 
 if [ $? -ne 0 ]; then
     echo -e "\033[31mSystem tests failed. Exiting.\033[0m"
-    exit 1
-fi
-
-echo "Step 10.1: Checking the published quality indicators (same script as the daily quality gate)"
-# The test publishes only a few files (LIMIT, two chains), so rates and coverage
-# are not meaningful here and their floors are 0. What must hold: every
-# indicator was computed and published, no downloaded file was lost before the
-# parser, and no parsed file is missing from the published CSVs.
-docker run \
-    -e KAGGLE_API_TOKEN=${KAGGLE_API_TOKEN} \
-    -e KAGGLE_DATASET_REMOTE_NAME=${KAGGLE_DATASET_REMOTE_NAME} \
-    -e QUALITY_SCRAPER_MIN_DOWNLOAD_SUCCESS_RATE=0 \
-    -e QUALITY_PARSER_MIN_PARSE_SUCCESS_RATE=0 \
-    -e QUALITY_SCRAPER_MAX_NO_DATA_SCRAPERS=${QUALITY_SCRAPER_MAX_NO_DATA_SCRAPERS:-2} \
-    -e QUALITY_MIN_END_TO_END_COVERAGE=0 \
-    -e QUALITY_MAX_UNPARSED_DOWNLOADS=0 \
-    -e QUALITY_MAX_NOT_IN_CSV=0 \
-    supermarket-testing ./scripts/quality_gate.sh
-
-if [ $? -ne 0 ]; then
-    echo -e "\033[31mPublished quality indicators failed. Exiting.\033[0m"
     exit 1
 fi
 
