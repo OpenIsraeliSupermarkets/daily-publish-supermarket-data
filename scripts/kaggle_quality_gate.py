@@ -24,7 +24,7 @@ from managers.quality_indicators import (  # noqa: E402
     assess_published_health,
 )
 from scripts.kaggle_quality_issues import (  # noqa: E402
-    KAGGLE_DATASET_HANDLE,
+    dataset_from_env,
     download_quality_json,
 )
 
@@ -155,7 +155,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--dataset",
-        default=os.environ.get("KAGGLE_DATASET_REMOTE_NAME", KAGGLE_DATASET_HANDLE),
+        default=dataset_from_env(),
+        help="Kaggle dataset handle (default: $KAGGLE_DATASET_REMOTE_NAME)",
     )
     parser.add_argument(
         "--cache-dir",
@@ -166,6 +167,8 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     if args.cache_dir:
         cache = Path(args.cache_dir)
+    elif not args.dataset:
+        parser.error("set KAGGLE_DATASET_REMOTE_NAME or pass --dataset")
     else:
         cache = Path(tempfile.mkdtemp(prefix="kaggle-quality-gate-"))
         download_quality_json(cache, dataset=args.dataset)

@@ -71,3 +71,16 @@ def parse_timestamp(value: Any) -> Optional[datetime]:
     if parsed.tzinfo is None:
         parsed = TZ.localize(parsed)
     return parsed
+
+
+def same_task(event_task_id: str, task_id: Optional[str]) -> bool:
+    """True when ``task_id`` is unset (the whole status file) or matches."""
+    return task_id is None or event_task_id == task_id
+
+
+def normalize_timestamp(value: Optional[datetime]) -> Optional[datetime]:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return TZ.localize(value)
+    return value.astimezone(TZ)

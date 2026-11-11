@@ -26,6 +26,14 @@ Forbidden: `kagglehub.dataset_download(handle)` with no `path`, any `.csv` / `.z
 
 ## Script
 
+The dataset and the issue repos come from the environment, not the code:
+
+```bash
+export KAGGLE_DATASET_REMOTE_NAME=erlichsefi/israeli-supermarkets-2024
+export QUALITY_ISSUES_SCRAPERS_REPO=OpenIsraeliSupermarkets/israeli-supermarket-scarpers
+export QUALITY_ISSUES_PARSERS_REPO=OpenIsraeliSupermarkets/israeli-supermarket-parsers
+```
+
 ```bash
 python scripts/kaggle_quality_issues.py plan
 python scripts/kaggle_quality_issues.py apply --dry-run

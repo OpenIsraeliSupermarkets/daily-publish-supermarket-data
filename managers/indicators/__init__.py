@@ -32,21 +32,38 @@ INDICATORS: List[Indicator] = [
 
 
 def load_thresholds() -> Dict[str, float]:
-    """Every indicator's threshold, from its env var or its default."""
-    return {ind.threshold_key: ind.threshold_from_env() for ind in INDICATORS}
+    """The thresholds set in the environment, by threshold key.
+
+    ``scripts/quality_gate.sh`` sets every one. Anywhere else, an unset
+    threshold means that indicator is published but not judged.
+    """
+    thresholds = {}
+    for indicator in INDICATORS:
+        value = indicator.threshold_from_env()
+        if value is not None:
+            thresholds[indicator.threshold_key] = value
+    return thresholds
 
 
 def failures_by_section(
     health: Dict[str, Any], thresholds: Dict[str, float]
-) -> Dict[str, List[str]]:
-    """Failed indicator labels per section, for sections present in ``health``."""
-    failures: Dict[str, List[str]] = {}
+) -> Dict[str, Optional[List[str]]]:
+    """Failed indicator labels per section present in ``health``.
+
+    A section none of whose indicators has a threshold maps to None: it was
+    not judged.
+    """
+    failures: Dict[str, Optional[List[str]]] = {}
     for indicator in INDICATORS:
         if not isinstance(health.get(indicator.section), dict):
             continue
-        failures.setdefault(indicator.section, [])
+        failures.setdefault(indicator.section, None)
+        if indicator.threshold_key not in thresholds:
+            continue
+        failed = failures[indicator.section] or []
         if not indicator.check(health, thresholds)["ok"]:
-            failures[indicator.section].append(indicator.label)
+            failed.append(indicator.label)
+        failures[indicator.section] = failed
     return failures
 
 

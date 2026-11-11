@@ -246,7 +246,6 @@ class EndToEndCoverageRate(Indicator):
     section = EndToEndCoverage.section
     threshold_key = "end_to_end_coverage_rate_min"
     env_var = "QUALITY_MIN_END_TO_END_COVERAGE"
-    default = 0.99
     op = "min"
 
     def section_value(self, section):
@@ -260,7 +259,6 @@ class NotInCsv(Indicator):
     section = EndToEndCoverage.section
     threshold_key = "not_in_csv_max"
     env_var = "QUALITY_MAX_NOT_IN_CSV"
-    default = 0.0
     op = "max"
 
     def section_value(self, section):

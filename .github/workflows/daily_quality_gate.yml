@@ -10,22 +10,16 @@ on:
     inputs:
       scraper_download_success_rate_min:
         description: Minimum attempted download success rate
-        default: '0.95'
       parser_parse_success_rate_min:
         description: Minimum parse success rate
-        default: '0.98'
       scraper_no_data_scrapers_max:
         description: Maximum scrapers with no downloaded files in the status window
-        default: '0'
       unparsed_downloads_max:
         description: Maximum downloaded files with no parser record, across the whole day (failed downloads excluded)
-        default: '0'
       end_to_end_coverage_min:
         description: Minimum share of files seen on the sites whose data reached the published CSVs
-        default: '0.99'
       not_in_csv_max:
         description: Maximum files parsed with rows but missing from the published CSVs
-        default: '0'
 
 permissions:
   contents: read
@@ -48,14 +42,15 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Check published quality indicators
+        # Thresholds default in scripts/quality_gate.sh; a dispatch input overrides one.
         env:
           KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
           # Repository variable; the fallback keeps the gate working before it is set.
           KAGGLE_DATASET_REMOTE_NAME: ${{ vars.KAGGLE_DATASET_REMOTE_NAME || 'erlichsefi/israeli-supermarkets-2024' }}
-          QUALITY_SCRAPER_MIN_DOWNLOAD_SUCCESS_RATE: ${{ github.event.inputs.scraper_download_success_rate_min || '0.95' }}
-          QUALITY_PARSER_MIN_PARSE_SUCCESS_RATE: ${{ github.event.inputs.parser_parse_success_rate_min || '0.98' }}
-          QUALITY_SCRAPER_MAX_NO_DATA_SCRAPERS: ${{ github.event.inputs.scraper_no_data_scrapers_max || '0' }}
-          QUALITY_MAX_UNPARSED_DOWNLOADS: ${{ github.event.inputs.unparsed_downloads_max || '0' }}
-          QUALITY_MIN_END_TO_END_COVERAGE: ${{ github.event.inputs.end_to_end_coverage_min || '0.99' }}
-          QUALITY_MAX_NOT_IN_CSV: ${{ github.event.inputs.not_in_csv_max || '0' }}
+          QUALITY_SCRAPER_MIN_DOWNLOAD_SUCCESS_RATE: ${{ github.event.inputs.scraper_download_success_rate_min }}
+          QUALITY_PARSER_MIN_PARSE_SUCCESS_RATE: ${{ github.event.inputs.parser_parse_success_rate_min }}
+          QUALITY_SCRAPER_MAX_NO_DATA_SCRAPERS: ${{ github.event.inputs.scraper_no_data_scrapers_max }}
+          QUALITY_MAX_UNPARSED_DOWNLOADS: ${{ github.event.inputs.unparsed_downloads_max }}
+          QUALITY_MIN_END_TO_END_COVERAGE: ${{ github.event.inputs.end_to_end_coverage_min }}
+          QUALITY_MAX_NOT_IN_CSV: ${{ github.event.inputs.not_in_csv_max }}
         run: ./scripts/quality_gate.sh

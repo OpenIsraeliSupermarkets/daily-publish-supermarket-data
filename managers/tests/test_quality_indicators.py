@@ -623,6 +623,16 @@ def test_parser_quality_ignores_downloads_that_were_not_requeued(status_dirs):
 
 
 
+GATE_THRESHOLDS = {
+    "scraper_download_success_rate_min": 0.95,
+    "parser_parse_success_rate_min": 0.98,
+    "scraper_no_data_scrapers_max": 0,
+    "unparsed_downloads_max": 0,
+    "end_to_end_coverage_rate_min": 0.99,
+    "not_in_csv_max": 0,
+}
+
+
 def _published_health(**overrides):
     health = {
         "computed_at": "2026-10-27T04:26:09+02:00",
@@ -641,11 +651,7 @@ def _published_health(**overrides):
 def test_assess_published_health_passes_at_threshold():
     assessment = assess_published_health(
         _published_health(),
-        thresholds={
-            "scraper_download_success_rate_min": 0.95,
-            "parser_parse_success_rate_min": 0.98,
-            "scraper_no_data_scrapers_max": 0,
-        },
+        thresholds=GATE_THRESHOLDS,
     )
     assert assessment["ok"] is True
     assert [check["name"] for check in assessment["checks"]] == [
@@ -661,11 +667,7 @@ def test_assess_published_health_passes_at_threshold():
 def test_assess_published_health_fails_when_a_rate_is_under_threshold():
     assessment = assess_published_health(
         _published_health(parser={"parse_success_rate": 0.90}),
-        thresholds={
-            "scraper_download_success_rate_min": 0.95,
-            "parser_parse_success_rate_min": 0.98,
-            "scraper_no_data_scrapers_max": 0,
-        },
+        thresholds=GATE_THRESHOLDS,
     )
     failed = [check["name"] for check in assessment["checks"] if not check["ok"]]
     assert assessment["ok"] is False
@@ -737,7 +739,8 @@ def test_assess_published_health_fails_when_unparsed_downloads_is_over_max():
                 "total_files": 2,
                 "by_chain": [{"chain": "shufersal", "file_count": 2, "files": []}],
             }
-        )
+        ),
+        thresholds=GATE_THRESHOLDS,
     )
     failed = [check["name"] for check in assessment["checks"] if not check["ok"]]
     assert assessment["ok"] is False
@@ -781,11 +784,7 @@ def test_compute_pipeline_health_flags_unhealthy_parser():
     health = compute_pipeline_health(
         scraper_quality,
         parser_quality,
-        thresholds={
-            "scraper_download_success_rate_min": 0.95,
-            "parser_parse_success_rate_min": 0.98,
-            "scraper_no_data_scrapers_max": 0,
-        },
+        thresholds=GATE_THRESHOLDS,
     )
 
     assert health["scraper"]["healthy"] is True
@@ -977,7 +976,7 @@ def test_select_quality_issue_candidates_groups_parsers_and_skips_small_gaps():
     candidates = select_quality_issue_candidates(improvements, parse_min_files=50)
     assert len(candidates["scraping"]) == 1
     assert candidates["scraping"][0]["fingerprint"] == "scrapers|shufersal|download_failures"
-    assert candidates["scraping"][0]["repo"].endswith("israeli-supermarket-scarpers")
+    assert candidates["scraping"][0]["stage"] == "scraping"
     assert [row["chain"] for row in candidates["parsing"]] == ["supersapir"]
     assert candidates["parsing"][0]["total_files"] == 885
     assert candidates["parsing"][0]["fingerprint"] == "parsers|supersapir|parse_gaps"
