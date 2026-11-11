@@ -50,7 +50,8 @@ jobs:
       - name: Check published quality indicators
         env:
           KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
-          KAGGLE_DATASET_REMOTE_NAME: erlichsefi/israeli-supermarkets-2024
+          # Repository variable; the fallback keeps the gate working before it is set.
+          KAGGLE_DATASET_REMOTE_NAME: ${{ vars.KAGGLE_DATASET_REMOTE_NAME || 'erlichsefi/israeli-supermarkets-2024' }}
           QUALITY_SCRAPER_MIN_DOWNLOAD_SUCCESS_RATE: ${{ github.event.inputs.scraper_download_success_rate_min || '0.95' }}
           QUALITY_PARSER_MIN_PARSE_SUCCESS_RATE: ${{ github.event.inputs.parser_parse_success_rate_min || '0.98' }}
           QUALITY_SCRAPER_MAX_NO_DATA_SCRAPERS: ${{ github.event.inputs.scraper_no_data_scrapers_max || '0' }}
