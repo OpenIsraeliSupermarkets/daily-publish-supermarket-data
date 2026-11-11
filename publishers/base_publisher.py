@@ -185,6 +185,7 @@ class BaseSupermarketDataPublisher:
             converting_status_folder=self.converting_status_folder,
             enabled_scrapers=self.enabled_scrapers,
             enabled_file_types=self.enabled_file_types,
+            outputs_folder=self.outputs_folder,
         )
 
     def _download_from_long_term_database(self):

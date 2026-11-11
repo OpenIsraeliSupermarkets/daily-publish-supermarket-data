@@ -306,5 +306,26 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+echo "Step 10.1: Checking the published quality indicators (same script as the daily quality gate)"
+# The test publishes only a few files (LIMIT, two chains), so rates and coverage
+# are not meaningful here and their floors are 0. What must hold: every
+# indicator was computed and published, no downloaded file was lost before the
+# parser, and no parsed file is missing from the published CSVs.
+docker run \
+    -e KAGGLE_API_TOKEN=${KAGGLE_API_TOKEN} \
+    -e KAGGLE_DATASET_REMOTE_NAME=${KAGGLE_DATASET_REMOTE_NAME} \
+    -e QUALITY_SCRAPER_MIN_DOWNLOAD_SUCCESS_RATE=0 \
+    -e QUALITY_PARSER_MIN_PARSE_SUCCESS_RATE=0 \
+    -e QUALITY_SCRAPER_MAX_NO_DATA_SCRAPERS=${QUALITY_SCRAPER_MAX_NO_DATA_SCRAPERS:-2} \
+    -e QUALITY_MIN_END_TO_END_COVERAGE=0 \
+    -e QUALITY_MAX_UNPARSED_DOWNLOADS=0 \
+    -e QUALITY_MAX_NOT_IN_CSV=0 \
+    supermarket-testing ./scripts/quality_gate.sh
+
+if [ $? -ne 0 ]; then
+    echo -e "\033[31mPublished quality indicators failed. Exiting.\033[0m"
+    exit 1
+fi
+
 echo "Step 11: Stopping all containers"
 docker compose stop

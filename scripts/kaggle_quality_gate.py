@@ -72,6 +72,26 @@ def _unparsed_downloads_lines(health: Dict[str, Any], limit: int = 5) -> List[st
     return lines
 
 
+def _coverage_lines(health: Dict[str, Any], limit: int = 5) -> List[str]:
+    """Chains with the lowest end-to-end coverage, with where files stopped."""
+    lines: List[str] = []
+    block = health.get("end_to_end_coverage") or {}
+    for row in block.get("by_chain") or []:
+        if len(lines) >= limit:
+            break
+        lost = row.get("lost_files_sample") or {}
+        if not lost:
+            continue
+        buckets = row.get("buckets") or {}
+        where = ", ".join(f"{bucket} {buckets.get(bucket, 0)}" for bucket in lost)
+        chain = row.get("chain") or row.get("enum") or "chain"
+        lines.append(
+            f"- {chain}: coverage {row.get('coverage_rate')}"
+            f" ({row.get('covered')}/{row.get('expected')}); lost: {where}"
+        )
+    return lines
+
+
 def _write_step_summary(assessment: Dict[str, Any], notes: List[str]) -> None:
     path = os.environ.get("GITHUB_STEP_SUMMARY")
     if not path:
@@ -119,6 +139,7 @@ def check_published_health(cache: Path) -> int:
     if not assessment["ok"]:
         notes.extend(_improvement_lines(health))
         notes.extend(_unparsed_downloads_lines(health))
+        notes.extend(_coverage_lines(health))
     for line in notes:
         print(line)
     _write_step_summary(assessment, notes)

@@ -20,6 +20,12 @@ on:
       unparsed_downloads_max:
         description: Maximum downloaded files with no parser record, across the whole day (failed downloads excluded)
         default: '0'
+      end_to_end_coverage_min:
+        description: Minimum share of files seen on the sites whose data reached the published CSVs
+        default: '0.99'
+      not_in_csv_max:
+        description: Maximum files parsed with rows but missing from the published CSVs
+        default: '0'
 
 permissions:
   contents: read
@@ -49,4 +55,6 @@ jobs:
           QUALITY_PARSER_MIN_PARSE_SUCCESS_RATE: ${{ github.event.inputs.parser_parse_success_rate_min || '0.98' }}
           QUALITY_SCRAPER_MAX_NO_DATA_SCRAPERS: ${{ github.event.inputs.scraper_no_data_scrapers_max || '0' }}
           QUALITY_MAX_UNPARSED_DOWNLOADS: ${{ github.event.inputs.unparsed_downloads_max || '0' }}
-        run: python scripts/kaggle_quality_gate.py
+          QUALITY_MIN_END_TO_END_COVERAGE: ${{ github.event.inputs.end_to_end_coverage_min || '0.99' }}
+          QUALITY_MAX_NOT_IN_CSV: ${{ github.event.inputs.not_in_csv_max || '0' }}
+        run: ./scripts/quality_gate.sh

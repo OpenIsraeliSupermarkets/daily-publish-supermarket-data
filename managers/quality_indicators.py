@@ -1149,6 +1149,10 @@ def _load_health_thresholds() -> Dict[str, float]:
         "unparsed_downloads_max": float(
             os.environ.get("QUALITY_MAX_UNPARSED_DOWNLOADS", "0")
         ),
+        "end_to_end_coverage_rate_min": float(
+            os.environ.get("QUALITY_MIN_END_TO_END_COVERAGE", "0.99")
+        ),
+        "not_in_csv_max": float(os.environ.get("QUALITY_MAX_NOT_IN_CSV", "0")),
     }
 
 
@@ -1313,8 +1317,13 @@ def compute_pipeline_health(
     parser_quality: Dict[str, Any],
     thresholds: Optional[Dict[str, float]] = None,
     unparsed_downloads: Optional[Dict[str, Any]] = None,
+    end_to_end_coverage: Optional[Dict[str, Any]] = None,
+    download_published_lag: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Derive overall scrape/parse health indicators and threshold checks."""
+    """Derive overall scrape/parse health indicators and threshold checks.
+
+    ``download_published_lag`` is reported only; it has no threshold yet.
+    """
     thresholds = thresholds or _load_health_thresholds()
     scraper = _aggregate_scraper_health_metrics(scraper_quality)
     parser = _aggregate_parser_health_metrics(
@@ -1331,6 +1340,21 @@ def compute_pipeline_health(
         "healthy": not seen_failures,
         "below_threshold": seen_failures,
     }
+
+    coverage_failures: List[str] = []
+    if end_to_end_coverage is not None:
+        if end_to_end_coverage.get("coverage_rate", 1.0) < thresholds.get(
+            "end_to_end_coverage_rate_min", 0
+        ):
+            coverage_failures.append("end_to_end_coverage_rate")
+        not_in_csv = (end_to_end_coverage.get("buckets") or {}).get("not_in_csv", 0)
+        if not_in_csv > thresholds.get("not_in_csv_max", 0):
+            coverage_failures.append("not_in_csv")
+        end_to_end_coverage = {
+            **end_to_end_coverage,
+            "healthy": not coverage_failures,
+            "below_threshold": coverage_failures,
+        }
 
     scraper_failures: List[str] = []
     if (
@@ -1359,8 +1383,13 @@ def compute_pipeline_health(
         "scraper": scraper,
         "parser": parser,
         "unparsed_downloads": unparsed_downloads,
+        "end_to_end_coverage": end_to_end_coverage,
+        "download_published_lag": download_published_lag,
         "overall_healthy": (
-            scraper["healthy"] and parser["healthy"] and not seen_failures
+            scraper["healthy"]
+            and parser["healthy"]
+            and not seen_failures
+            and not coverage_failures
         ),
     }
 
@@ -1388,6 +1417,15 @@ def assess_published_health(
         seen_block.get("total_files") if isinstance(seen_block, dict) else None
     )
     seen_max = thresholds.get("unparsed_downloads_max", 0)
+    coverage_block = health.get("end_to_end_coverage")
+    if isinstance(coverage_block, dict):
+        coverage_rate = coverage_block.get("coverage_rate")
+        not_in_csv = (coverage_block.get("buckets") or {}).get("not_in_csv", 0)
+    else:
+        coverage_rate = None
+        not_in_csv = None
+    coverage_min = thresholds.get("end_to_end_coverage_rate_min", 0)
+    not_in_csv_max = thresholds.get("not_in_csv_max", 0)
 
     checks = [
         {
@@ -1417,6 +1455,20 @@ def assess_published_health(
             "threshold": seen_max,
             "op": "max",
             "ok": seen_count is not None and seen_count <= seen_max,
+        },
+        {
+            "name": "end_to_end_coverage_rate",
+            "value": coverage_rate,
+            "threshold": coverage_min,
+            "op": "min",
+            "ok": coverage_rate is not None and coverage_rate >= coverage_min,
+        },
+        {
+            "name": "not_in_csv",
+            "value": not_in_csv,
+            "threshold": not_in_csv_max,
+            "op": "max",
+            "ok": not_in_csv is not None and not_in_csv <= not_in_csv_max,
         },
     ]
     return {
@@ -1497,8 +1549,19 @@ def write_quality_indicators(
     converting_status_folder: str,
     enabled_scrapers: List[str],
     enabled_file_types: List[str],
+    outputs_folder: Optional[str] = None,
 ) -> None:
-    """Recompute and persist quality indicator JSON files."""
+    """Recompute and persist quality indicator JSON files.
+
+    With ``outputs_folder``, also measures end-to-end coverage against the
+    ``file_name`` column of the output CSVs.
+    """
+    # pylint: disable=import-outside-toplevel,cyclic-import
+    from managers.coverage_indicators import (
+        compute_download_published_lag,
+        compute_end_to_end_coverage,
+    )
+
     if not os.path.isdir(scraping_status_folder):
         Logger.info(
             "Skipping quality indicators: scraping status folder missing (%s)",
@@ -1527,10 +1590,25 @@ def write_quality_indicators(
     scraper_path = os.path.join(quality_folder, SCRAPER_QUALITY_FILENAME)
     parser_path = os.path.join(quality_folder, PARSER_QUALITY_FILENAME)
 
+    end_to_end_coverage = None
+    if outputs_folder is not None:
+        end_to_end_coverage = compute_end_to_end_coverage(
+            scraping_status_folder,
+            converting_status_folder,
+            outputs_folder,
+            enabled_scrapers,
+            enabled_file_types,
+        )
+    download_published_lag = compute_download_published_lag(
+        scraping_status_folder, enabled_scrapers
+    )
+
     pipeline_health = compute_pipeline_health(
         scraper_quality,
         parser_quality,
         unparsed_downloads=unparsed_downloads,
+        end_to_end_coverage=end_to_end_coverage,
+        download_published_lag=download_published_lag,
     )
     health_path = os.path.join(quality_folder, PIPELINE_HEALTH_FILENAME)
 

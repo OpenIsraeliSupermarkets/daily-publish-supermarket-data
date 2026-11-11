@@ -15,6 +15,8 @@ def _pin_thresholds(monkeypatch) -> None:
     monkeypatch.setenv("QUALITY_PARSER_MIN_PARSE_SUCCESS_RATE", "0.98")
     monkeypatch.setenv("QUALITY_SCRAPER_MAX_NO_DATA_SCRAPERS", "0")
     monkeypatch.setenv("QUALITY_MAX_UNPARSED_DOWNLOADS", "0")
+    monkeypatch.setenv("QUALITY_MIN_END_TO_END_COVERAGE", "0.9")
+    monkeypatch.setenv("QUALITY_MAX_NOT_IN_CSV", "0")
 
 
 def test_gate_passes_cached_health(tmp_path, capsys, monkeypatch):
@@ -29,6 +31,10 @@ def test_gate_passes_cached_health(tmp_path, capsys, monkeypatch):
             },
             "parser": {"parse_success_rate": 0.99},
             "unparsed_downloads": {"total_files": 0, "by_chain": []},
+            "end_to_end_coverage": {
+                "coverage_rate": 0.95,
+                "buckets": {"published": 95, "download_failed": 5},
+            },
         },
     )
     assert main(["--cache-dir", str(tmp_path)]) == 0

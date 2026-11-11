@@ -632,6 +632,7 @@ def _published_health(**overrides):
         },
         "parser": {"parse_success_rate": 0.99},
         "unparsed_downloads": {"total_files": 0, "by_chain": []},
+        "end_to_end_coverage": {"coverage_rate": 1.0, "buckets": {"published": 3}},
     }
     health.update(overrides)
     return health
@@ -652,6 +653,8 @@ def test_assess_published_health_passes_at_threshold():
         "scrapers_with_no_data",
         "parse_success_rate",
         "unparsed_downloads",
+        "end_to_end_coverage_rate",
+        "not_in_csv",
     ]
 
 
