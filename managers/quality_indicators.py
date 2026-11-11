@@ -9,7 +9,6 @@ from collections import defaultdict
 from datetime import datetime
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
-import pytz
 
 from il_supermarket_parsers import ParserStatusOutput
 from il_supermarket_parsers.utils.status.parser_status_contract import (
@@ -27,8 +26,22 @@ from il_supermarket_scarper import (
     ScraperStatusOutput,
     StartedStatus,
 )
-from il_supermarket_scarper.utils.files.save_policy import SaveDecision, should_persist
 
+from managers.indicators import (
+    DownloadPublishedLag,
+    EndToEndCoverage,
+    UnparsedDownloads,
+    assess,
+    failures_by_section,
+    load_thresholds,
+)
+from managers.indicators.status_files import (
+    TZ,
+    dump_stem,
+    load_status_json,
+    normalize_filename,
+    queued_for_parse,
+)
 from utils import Logger, now
 
 SCRAPER_QUALITY_FILENAME = "scraper_quality.json"
@@ -44,7 +57,10 @@ KAGGLE_QUALITY_JSON_FILES = frozenset(
 SCRAPERS_GITHUB_REPO = "OpenIsraeliSupermarkets/israeli-supermarket-scarpers"
 PARSERS_GITHUB_REPO = "OpenIsraeliSupermarkets/israeli-supermarket-parsers"
 KAGGLE_DATASET_HANDLE = "erlichsefi/israeli-supermarkets-2024"
-_TZ = pytz.timezone("Asia/Jerusalem")
+_TZ = TZ
+_dump_stem = dump_stem
+_load_status_json = load_status_json
+_save_decision_queued_for_parse = queued_for_parse
 
 
 def _same_task(event_task_id: str, task_id: Optional[str]) -> bool:
@@ -58,16 +74,6 @@ def _normalize_timestamp(value: Optional[datetime]) -> Optional[datetime]:
     if value.tzinfo is None:
         return _TZ.localize(value)
     return value.astimezone(_TZ)
-
-
-def normalize_filename(file_name: str) -> str:
-    """Normalize a supermarket dump filename for cross-status comparison."""
-    return (
-        file_name.replace(".aspx", "")
-        .replace(".xml", "")
-        .replace(".gz", "")
-        .replace("NULL", "")
-    )
 
 
 _DUMP_FILENAME_RE = re.compile(
@@ -152,13 +158,6 @@ def generalize_filename_patterns(
     return patterns
 
 
-def _load_status_json(path: str) -> Optional[dict]:
-    if not os.path.isfile(path):
-        return None
-    with open(path, "r", encoding="utf-8") as handle:
-        return json.load(handle)
-
-
 def _task_ids_from_scraper(status: ScraperStatusOutput) -> List[str]:
     task_ids: Set[str] = set()
     for event in status.global_status:
@@ -223,22 +222,6 @@ def _scraper_downloaded_files(
         if event.downloaded_successfully and event.extracted_successfully:
             downloaded.add(normalize_filename(event.file_name))
     return downloaded
-
-
-def _save_decision_queued_for_parse(save_decision: Optional[str]) -> bool:
-    """True when this scrape row was handed to the parser.
-
-    ``rewrote_same`` and ``stale_older`` are stored on the scrape task but the
-    bytes are not sent again. A missing or unknown decision still counts: older
-    status files did not record one.
-    """
-    if not save_decision:
-        return True
-    try:
-        decision = SaveDecision(str(save_decision))
-    except ValueError:
-        return True
-    return should_persist(decision)
 
 
 def _scraper_files_queued_for_parse(
@@ -649,13 +632,6 @@ def compute_parser_quality(
             }
         ],
     }
-
-
-def _dump_stem(scraper: str) -> str:
-    try:
-        return DumpFolderNames[scraper].value.lower()
-    except (KeyError, ValueError):
-        return scraper.lower().replace("_", "")
 
 
 def _split_parser_key(parser_key: str) -> Tuple[str, str]:
@@ -1132,28 +1108,8 @@ def enrich_issue_candidates_with_filename_patterns(
     return candidates
 
 
-_PARSER_SAW_STATUSES = frozenset({"processed", "skipped", "failed"})
-
-
 def _load_health_thresholds() -> Dict[str, float]:
-    return {
-        "scraper_download_success_rate_min": float(
-            os.environ.get("QUALITY_SCRAPER_MIN_DOWNLOAD_SUCCESS_RATE", "0.95")
-        ),
-        "parser_parse_success_rate_min": float(
-            os.environ.get("QUALITY_PARSER_MIN_PARSE_SUCCESS_RATE", "0.98")
-        ),
-        "scraper_no_data_scrapers_max": float(
-            os.environ.get("QUALITY_SCRAPER_MAX_NO_DATA_SCRAPERS", "0")
-        ),
-        "unparsed_downloads_max": float(
-            os.environ.get("QUALITY_MAX_UNPARSED_DOWNLOADS", "0")
-        ),
-        "end_to_end_coverage_rate_min": float(
-            os.environ.get("QUALITY_MIN_END_TO_END_COVERAGE", "0.99")
-        ),
-        "not_in_csv_max": float(os.environ.get("QUALITY_MAX_NOT_IN_CSV", "0")),
-    }
+    return load_thresholds()
 
 
 def compute_unparsed_downloads(
@@ -1162,68 +1118,13 @@ def compute_unparsed_downloads(
     enabled_scrapers: List[str],
     enabled_file_types: List[str],
 ) -> Dict[str, Any]:
-    """Files the scraper picked that never reached the parser, for the day.
-
-    Picked is every ``collected`` event. A file whose every download attempt
-    failed is left out: it is already counted in the download success rate,
-    and the parser was never meant to see it. Parser-saw is every processed,
-    skipped, or failed event. All tasks in the status folders are one set.
-    Names are normalized.
-    """
-    by_chain: List[Dict[str, Any]] = []
-    total = 0
-    for scraper in enabled_scrapers:
-        stem = _dump_stem(scraper)
-        scraper_raw = _load_status_json(
-            os.path.join(scraping_status_folder, f"{stem}.json")
-        )
-        selected: Set[str] = set()
-        download_ok: Set[str] = set()
-        download_failed: Set[str] = set()
-        for event in (scraper_raw or {}).get("events") or []:
-            if not event.get("file_name"):
-                continue
-            name = normalize_filename(event["file_name"])
-            if event.get("status") == "collected":
-                selected.add(name)
-            elif event.get("status") == "downloaded":
-                if event.get("downloaded_successfully") and event.get(
-                    "extracted_successfully"
-                ):
-                    download_ok.add(name)
-                else:
-                    download_failed.add(name)
-        selected -= download_failed - download_ok
-
-        parser_saw: Set[str] = set()
-        for file_type in enabled_file_types:
-            parser_key = f"{scraper}_{file_type}".lower()
-            parser_raw = _load_status_json(
-                os.path.join(converting_status_folder, f"{parser_key}.json")
-            )
-            for event in (parser_raw or {}).get("events") or []:
-                if event.get("status") not in _PARSER_SAW_STATUSES:
-                    continue
-                if event.get("file_name"):
-                    parser_saw.add(normalize_filename(event["file_name"]))
-
-        gap = sorted(selected - parser_saw)
-        if not gap:
-            continue
-        total += len(gap)
-        by_chain.append(
-            {
-                "chain": stem,
-                "enum": scraper,
-                "selected": len(selected),
-                "parser_saw": len(parser_saw),
-                "file_count": len(gap),
-                "files": gap,
-            }
-        )
-
-    by_chain.sort(key=lambda row: (-row["file_count"], row["chain"]))
-    return {"total_files": total, "by_chain": by_chain}
+    """See :meth:`UnparsedDownloads.compute`."""
+    return UnparsedDownloads.compute(
+        scraping_status_folder,
+        converting_status_folder,
+        enabled_scrapers,
+        enabled_file_types,
+    )
 
 
 def _aggregate_scraper_health_metrics(scraper_quality: Dict[str, Any]) -> Dict[str, Any]:
@@ -1331,48 +1232,17 @@ def compute_pipeline_health(
     )
     if unparsed_downloads is None:
         unparsed_downloads = {"total_files": 0, "by_chain": []}
-    seen_max = thresholds.get("unparsed_downloads_max", 0)
-    seen_failures: List[str] = []
-    if unparsed_downloads.get("total_files", 0) > seen_max:
-        seen_failures.append("unparsed_downloads")
-    unparsed_downloads = {
-        **unparsed_downloads,
-        "healthy": not seen_failures,
-        "below_threshold": seen_failures,
+
+    sections: Dict[str, Any] = {
+        "scraper": scraper,
+        "parser": parser,
+        UnparsedDownloads.section: dict(unparsed_downloads),
     }
-
-    coverage_failures: List[str] = []
     if end_to_end_coverage is not None:
-        if end_to_end_coverage.get("coverage_rate", 1.0) < thresholds.get(
-            "end_to_end_coverage_rate_min", 0
-        ):
-            coverage_failures.append("end_to_end_coverage_rate")
-        not_in_csv = (end_to_end_coverage.get("buckets") or {}).get("not_in_csv", 0)
-        if not_in_csv > thresholds.get("not_in_csv_max", 0):
-            coverage_failures.append("not_in_csv")
-        end_to_end_coverage = {
-            **end_to_end_coverage,
-            "healthy": not coverage_failures,
-            "below_threshold": coverage_failures,
-        }
-
-    scraper_failures: List[str] = []
-    if (
-        scraper["attempted_download_success_rate"]
-        < thresholds["scraper_download_success_rate_min"]
-    ):
-        scraper_failures.append("download_success_rate")
-    if scraper["scrapers_with_no_data"] > thresholds["scraper_no_data_scrapers_max"]:
-        scraper_failures.append("scrapers_with_no_data")
-
-    parser_failures: List[str] = []
-    if parser["parse_success_rate"] < thresholds["parser_parse_success_rate_min"]:
-        parser_failures.append("parse_success_rate")
-
-    scraper["healthy"] = not scraper_failures
-    scraper["below_threshold"] = scraper_failures
-    parser["healthy"] = not parser_failures
-    parser["below_threshold"] = parser_failures
+        sections[EndToEndCoverage.section] = dict(end_to_end_coverage)
+    for name, failed in failures_by_section(sections, thresholds).items():
+        sections[name]["healthy"] = not failed
+        sections[name]["below_threshold"] = failed
 
     improvements = compute_improvement_priorities(scraper_quality, parser_quality)
 
@@ -1380,17 +1250,12 @@ def compute_pipeline_health(
         "computed_at": now().isoformat(),
         "thresholds": thresholds,
         "improvements": improvements,
-        "scraper": scraper,
-        "parser": parser,
-        "unparsed_downloads": unparsed_downloads,
-        "end_to_end_coverage": end_to_end_coverage,
-        "download_published_lag": download_published_lag,
-        "overall_healthy": (
-            scraper["healthy"]
-            and parser["healthy"]
-            and not seen_failures
-            and not coverage_failures
-        ),
+        "scraper": sections["scraper"],
+        "parser": sections["parser"],
+        UnparsedDownloads.section: sections[UnparsedDownloads.section],
+        EndToEndCoverage.section: sections.get(EndToEndCoverage.section),
+        DownloadPublishedLag.section: download_published_lag,
+        "overall_healthy": all(section["healthy"] for section in sections.values()),
     }
 
 
@@ -1398,79 +1263,12 @@ def assess_published_health(
     health: Dict[str, Any],
     thresholds: Optional[Dict[str, float]] = None,
 ) -> Dict[str, Any]:
-    """Compare published pipeline-health rates to the quality thresholds.
+    """Compare a published ``pipeline_health.json`` to the quality thresholds.
 
-    Same comparisons as ``compute_pipeline_health``. A missing rate fails.
+    One check per registered indicator. A missing value fails.
     """
     thresholds = thresholds or _load_health_thresholds()
-    scraper = health.get("scraper") if isinstance(health.get("scraper"), dict) else {}
-    parser = health.get("parser") if isinstance(health.get("parser"), dict) else {}
-
-    download_rate = scraper.get("attempted_download_success_rate")
-    download_min = thresholds["scraper_download_success_rate_min"]
-    no_data = scraper.get("scrapers_with_no_data")
-    no_data_max = thresholds["scraper_no_data_scrapers_max"]
-    parse_rate = parser.get("parse_success_rate")
-    parse_min = thresholds["parser_parse_success_rate_min"]
-    seen_block = health.get("unparsed_downloads")
-    seen_count = (
-        seen_block.get("total_files") if isinstance(seen_block, dict) else None
-    )
-    seen_max = thresholds.get("unparsed_downloads_max", 0)
-    coverage_block = health.get("end_to_end_coverage")
-    if isinstance(coverage_block, dict):
-        coverage_rate = coverage_block.get("coverage_rate")
-        not_in_csv = (coverage_block.get("buckets") or {}).get("not_in_csv", 0)
-    else:
-        coverage_rate = None
-        not_in_csv = None
-    coverage_min = thresholds.get("end_to_end_coverage_rate_min", 0)
-    not_in_csv_max = thresholds.get("not_in_csv_max", 0)
-
-    checks = [
-        {
-            "name": "attempted_download_success_rate",
-            "value": download_rate,
-            "threshold": download_min,
-            "op": "min",
-            "ok": download_rate is not None and download_rate >= download_min,
-        },
-        {
-            "name": "scrapers_with_no_data",
-            "value": no_data,
-            "threshold": no_data_max,
-            "op": "max",
-            "ok": no_data is not None and no_data <= no_data_max,
-        },
-        {
-            "name": "parse_success_rate",
-            "value": parse_rate,
-            "threshold": parse_min,
-            "op": "min",
-            "ok": parse_rate is not None and parse_rate >= parse_min,
-        },
-        {
-            "name": "unparsed_downloads",
-            "value": seen_count,
-            "threshold": seen_max,
-            "op": "max",
-            "ok": seen_count is not None and seen_count <= seen_max,
-        },
-        {
-            "name": "end_to_end_coverage_rate",
-            "value": coverage_rate,
-            "threshold": coverage_min,
-            "op": "min",
-            "ok": coverage_rate is not None and coverage_rate >= coverage_min,
-        },
-        {
-            "name": "not_in_csv",
-            "value": not_in_csv,
-            "threshold": not_in_csv_max,
-            "op": "max",
-            "ok": not_in_csv is not None and not_in_csv <= not_in_csv_max,
-        },
-    ]
+    checks = assess(health, thresholds)
     return {
         "computed_at": health.get("computed_at"),
         "thresholds": thresholds,
@@ -1556,11 +1354,6 @@ def write_quality_indicators(
     With ``outputs_folder``, also measures end-to-end coverage against the
     ``file_name`` column of the output CSVs.
     """
-    # pylint: disable=import-outside-toplevel,cyclic-import
-    from managers.coverage_indicators import (
-        compute_download_published_lag,
-        compute_end_to_end_coverage,
-    )
 
     if not os.path.isdir(scraping_status_folder):
         Logger.info(
@@ -1592,14 +1385,14 @@ def write_quality_indicators(
 
     end_to_end_coverage = None
     if outputs_folder is not None:
-        end_to_end_coverage = compute_end_to_end_coverage(
+        end_to_end_coverage = EndToEndCoverage.compute(
             scraping_status_folder,
             converting_status_folder,
             outputs_folder,
             enabled_scrapers,
             enabled_file_types,
         )
-    download_published_lag = compute_download_published_lag(
+    download_published_lag = DownloadPublishedLag.compute(
         scraping_status_folder, enabled_scrapers
     )
 

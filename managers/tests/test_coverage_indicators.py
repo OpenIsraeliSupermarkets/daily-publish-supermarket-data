@@ -8,11 +8,8 @@ import pytest
 
 from il_supermarket_scarper import DumpFolderNames
 
-from managers.coverage_indicators import (
-    compute_download_published_lag,
-    compute_end_to_end_coverage,
-    file_name_timestamp,
-)
+from managers.indicators import DownloadPublishedLag, EndToEndCoverage
+from managers.indicators.file_names import file_name_timestamp
 from managers.quality_indicators import assess_published_health, compute_pipeline_health
 
 STEM = DumpFolderNames["BAREKET"].value.lower()
@@ -130,7 +127,7 @@ def _scenario(dirs):
 def test_coverage_buckets_every_seen_file_by_where_it_stopped(dirs):
     _scenario(dirs)
 
-    result = compute_end_to_end_coverage(
+    result = EndToEndCoverage.compute(
         dirs["scraping"], dirs["converting"], dirs["outputs"], ["BAREKET"], TYPES
     )
 
@@ -162,7 +159,7 @@ def test_coverage_buckets_every_seen_file_by_where_it_stopped(dirs):
 
 def test_coverage_check_fails_on_any_not_in_csv_file(dirs):
     _scenario(dirs)
-    coverage = compute_end_to_end_coverage(
+    coverage = EndToEndCoverage.compute(
         dirs["scraping"], dirs["converting"], dirs["outputs"], ["BAREKET"], TYPES
     )
     thresholds = {
@@ -236,7 +233,7 @@ def test_download_published_lag_per_chain(dirs):
         },
     )
 
-    lag = compute_download_published_lag(dirs["scraping"], ["BAREKET"])
+    lag = DownloadPublishedLag.compute(dirs["scraping"], ["BAREKET"])
 
     assert lag["files"] == 2
     assert lag["p50_hours"] == 2.0
