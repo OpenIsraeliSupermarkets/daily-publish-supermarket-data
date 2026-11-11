@@ -1228,3 +1228,34 @@ def test_write_quality_indicators_skips_missing_scraping_folder(tmp_path):
         ["PRICE_FILE"],
     )
     assert not quality.exists()
+
+
+def test_no_data_counts_scrapers_empty_for_the_whole_window():
+    def scraper(downloaded):
+        return {"saw": downloaded, "downloaded": downloaded, "saw_not_downloaded": []}
+
+    scraper_quality = {
+        "iterations": [
+            {
+                "scrapers_with_no_data": 0,
+                "scrapers": {"BAREKET": scraper(86), "WOLT": scraper(0)},
+            },
+            {
+                "scrapers_with_no_data": 2,
+                "scrapers": {"BAREKET": scraper(0), "WOLT": scraper(0)},
+            },
+        ]
+    }
+
+    health = compute_pipeline_health(
+        scraper_quality,
+        {"iterations": []},
+        thresholds={
+            "scraper_download_success_rate_min": 0.95,
+            "parser_parse_success_rate_min": 0.98,
+            "scraper_no_data_scrapers_max": 0,
+        },
+    )
+
+    # BAREKET downloaded files earlier in the day, so only WOLT has no data.
+    assert health["scraper"]["scrapers_with_no_data"] == 1

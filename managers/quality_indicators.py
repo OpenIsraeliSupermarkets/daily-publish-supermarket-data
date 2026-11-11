@@ -1215,12 +1215,16 @@ def _aggregate_scraper_health_metrics(scraper_quality: Dict[str, Any]) -> Dict[s
     skipped_by_limit = 0
     skipped_by_filter = 0
     max_no_data_scrapers = 0
+    downloaded_by_scraper: Dict[str, int] = {}
 
     for iteration in scraper_quality.get("iterations", []):
         max_no_data_scrapers = max(
             max_no_data_scrapers, iteration.get("scrapers_with_no_data", 0)
         )
-        for scraper_metrics in iteration.get("scrapers", {}).values():
+        for scraper, scraper_metrics in iteration.get("scrapers", {}).items():
+            downloaded_by_scraper[scraper] = downloaded_by_scraper.get(
+                scraper, 0
+            ) + scraper_metrics.get("downloaded", 0)
             total_saw += scraper_metrics.get("saw", 0)
             total_downloaded += scraper_metrics.get("downloaded", 0)
             for entry in scraper_metrics.get("saw_not_downloaded", []):
@@ -1231,6 +1235,15 @@ def _aggregate_scraper_health_metrics(scraper_quality: Dict[str, Any]) -> Dict[s
                     skipped_by_limit += 1
                 elif reason == "skipped_by_filter":
                     skipped_by_filter += 1
+
+    # A scraper has no data only when it downloaded nothing in the whole window,
+    # not when one run of the day came back empty.
+    if downloaded_by_scraper:
+        no_data_scrapers = sum(
+            1 for downloaded in downloaded_by_scraper.values() if downloaded == 0
+        )
+    else:
+        no_data_scrapers = max_no_data_scrapers
 
     download_success_rate = (
         total_downloaded / total_saw if total_saw > 0 else 1.0
@@ -1246,7 +1259,7 @@ def _aggregate_scraper_health_metrics(scraper_quality: Dict[str, Any]) -> Dict[s
         "total_download_failed": download_failed,
         "total_skipped_by_limit": skipped_by_limit,
         "total_skipped_by_filter": skipped_by_filter,
-        "scrapers_with_no_data": max_no_data_scrapers,
+        "scrapers_with_no_data": no_data_scrapers,
         "download_success_rate": round(download_success_rate, 4),
         "attempted_download_success_rate": round(
             attempted_download_success_rate, 4
