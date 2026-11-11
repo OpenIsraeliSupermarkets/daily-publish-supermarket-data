@@ -26,6 +26,14 @@ Forbidden: `kagglehub.dataset_download(handle)` with no `path`, any `.csv` / `.z
 
 ## Script
 
+The dataset and the issue repos come from the environment, not the code:
+
+```bash
+export KAGGLE_DATASET_REMOTE_NAME=erlichsefi/israeli-supermarkets-2024
+export QUALITY_ISSUES_SCRAPERS_REPO=OpenIsraeliSupermarkets/israeli-supermarket-scarpers
+export QUALITY_ISSUES_PARSERS_REPO=OpenIsraeliSupermarkets/israeli-supermarket-parsers
+```
+
 ```bash
 python scripts/kaggle_quality_issues.py plan
 python scripts/kaggle_quality_issues.py apply --dry-run
@@ -49,7 +57,7 @@ Voice: **when I scrape/parse this site with these parameters, I saw these files,
 Collect not-downloaded filenames for that chain from `scraper_quality.json`:
 
 - `download_failures` → every `download_failed` name
-- `saw_but_not_downloaded` / `no_data` → latest-iteration names that were not downloaded (`skipped_by_limit` excluded)
+- `saw_but_not_downloaded` / `no_data` → names seen in the status window that were not downloaded (`skipped_by_limit` excluded)
 
 Title: `[scrape] {chain}: {pattern} failed to download`
 

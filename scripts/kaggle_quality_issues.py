@@ -25,7 +25,6 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from managers.quality_indicators import (  # noqa: E402
-    KAGGLE_DATASET_HANDLE,
     KAGGLE_QUALITY_JSON_FILES,
     PARSER_QUALITY_FILENAME,
     PIPELINE_HEALTH_FILENAME,
@@ -35,9 +34,29 @@ from managers.quality_indicators import (  # noqa: E402
     select_quality_issue_candidates,
 )
 
-KAGGLE_DATASET_PAGE = (
-    "https://www.kaggle.com/datasets/erlichsefi/israeli-supermarkets-2024"
-)
+# Where each stage's issues are filed. Set in the environment, not in code.
+ISSUE_REPO_ENV = {
+    "scraping": "QUALITY_ISSUES_SCRAPERS_REPO",
+    "parsing": "QUALITY_ISSUES_PARSERS_REPO",
+}
+
+
+def kaggle_dataset_page(dataset: str) -> str:
+    return f"https://www.kaggle.com/datasets/{dataset}"
+
+
+def dataset_from_env() -> Optional[str]:
+    """The Kaggle dataset handle, from ``KAGGLE_DATASET_REMOTE_NAME``."""
+    return os.environ.get("KAGGLE_DATASET_REMOTE_NAME") or None
+
+
+def issue_repo(stage: str) -> str:
+    """The GitHub repo an issue for this stage is filed in."""
+    env_var = ISSUE_REPO_ENV[stage]
+    repo = os.environ.get(env_var)
+    if not repo:
+        raise SystemExit(f"{env_var} is not set; it names the repo for {stage} issues")
+    return repo
 
 
 def _assert_allowed_quality_path(path: str) -> str:
@@ -55,7 +74,7 @@ def _assert_allowed_quality_path(path: str) -> str:
 
 def download_quality_json(
     dest_dir: Path,
-    dataset: str = KAGGLE_DATASET_HANDLE,
+    dataset: str,
     files: Optional[List[str]] = None,
 ) -> Dict[str, Path]:
     """Fetch only the published quality JSON files into dest_dir."""
@@ -87,6 +106,7 @@ def _load_json(path: Path) -> Dict[str, Any]:
 def build_issue_plan(
     quality_dir: Path,
     parse_min_files: int = 50,
+    dataset: Optional[str] = None,
 ) -> Dict[str, Any]:
     scraper_quality = _load_json(quality_dir / SCRAPER_QUALITY_FILENAME)
     parser_quality = _load_json(quality_dir / PARSER_QUALITY_FILENAME)
@@ -104,8 +124,8 @@ def build_issue_plan(
         candidates, scraper_quality, parser_quality
     )
     return {
-        "dataset": KAGGLE_DATASET_HANDLE,
-        "kaggle_page": KAGGLE_DATASET_PAGE,
+        "dataset": dataset,
+        "kaggle_page": kaggle_dataset_page(dataset) if dataset else None,
         "computed_at": health.get("computed_at")
         or scraper_quality.get("computed_at"),
         "overall_healthy": health.get("overall_healthy"),
@@ -262,7 +282,7 @@ def _scrape_issue_body(plan: Dict[str, Any], item: Dict[str, Any]) -> str:
         [
             "## Evidence",
             "",
-            f"- Dataset: [{KAGGLE_DATASET_HANDLE}]({KAGGLE_DATASET_PAGE}?select={SCRAPER_QUALITY_FILENAME})",
+            f"- Dataset: [{plan.get('dataset')}]({plan.get('kaggle_page')}?select={SCRAPER_QUALITY_FILENAME})",
             f"- Computed at: `{plan.get('computed_at')}`",
             f"- Latest saw/downloaded: {item.get('latest_saw')}/{item.get('latest_downloaded')}",
             "",
@@ -319,7 +339,7 @@ def _parse_issue_body(plan: Dict[str, Any], item: Dict[str, Any]) -> str:
         [
             "## Evidence",
             "",
-            f"- Dataset: [{KAGGLE_DATASET_HANDLE}]({KAGGLE_DATASET_PAGE}?select={PARSER_QUALITY_FILENAME})",
+            f"- Dataset: [{plan.get('dataset')}]({plan.get('kaggle_page')}?select={PARSER_QUALITY_FILENAME})",
             f"- Computed at: `{plan.get('computed_at')}`",
             f"- Total files: {item.get('total_files')}",
             "",
@@ -459,7 +479,7 @@ def apply_issue_plan(plan: Dict[str, Any], dry_run: bool = False) -> List[str]:
         body = _scrape_issue_body(plan, item)
         urls.append(
             _create_or_update(
-                item["repo"],
+                issue_repo(item.get("stage", "scraping")),
                 title,
                 body,
                 _fingerprint_marker(item["fingerprint"]),
@@ -471,7 +491,7 @@ def apply_issue_plan(plan: Dict[str, Any], dry_run: bool = False) -> List[str]:
         body = _parse_issue_body(plan, item)
         urls.append(
             _create_or_update(
-                item["repo"],
+                issue_repo(item.get("stage", "scraping")),
                 title,
                 body,
                 _fingerprint_marker(item["fingerprint"]),
@@ -486,7 +506,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("command", choices=("plan", "apply"))
     parser.add_argument(
         "--dataset",
-        default=os.environ.get("KAGGLE_DATASET_REMOTE_NAME", KAGGLE_DATASET_HANDLE),
+        default=dataset_from_env(),
+        help="Kaggle dataset handle (default: $KAGGLE_DATASET_REMOTE_NAME)",
     )
     parser.add_argument(
         "--parse-min-files",
@@ -500,6 +521,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Reuse a directory of already-downloaded quality JSON files",
     )
     args = parser.parse_args(argv)
+    needs_download = not args.cache_dir or any(
+        not (Path(args.cache_dir) / name).is_file() for name in KAGGLE_QUALITY_JSON_FILES
+    )
+    if needs_download and not args.dataset:
+        parser.error("set KAGGLE_DATASET_REMOTE_NAME or pass --dataset")
 
     cache = Path(args.cache_dir) if args.cache_dir else Path(tempfile.mkdtemp(prefix="kaggle-quality-"))
     if args.cache_dir:
@@ -509,7 +535,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     else:
         download_quality_json(cache, dataset=args.dataset)
 
-    plan = build_issue_plan(cache, parse_min_files=args.parse_min_files)
+    plan = build_issue_plan(
+        cache, parse_min_files=args.parse_min_files, dataset=args.dataset
+    )
     if args.command == "plan":
         json.dump(plan, sys.stdout, indent=2, default=str)
         sys.stdout.write("\n")
