@@ -216,6 +216,24 @@ fi
 echo "Step 7: Starting background services (MongoDB and API)"
 docker compose up -d mongodb api
 
+# The data processor pings MongoDB once at start-up and exits if it is not up,
+# so wait until it answers. On failure print its logs, which CI otherwise loses.
+echo "Step 7.1: Waiting for MongoDB to accept connections"
+mongo_ready=false
+for _ in $(seq 1 60); do
+    if docker exec raw-data-mongodb mongosh --quiet --eval "db.adminCommand('ping').ok" >/dev/null 2>&1; then
+        mongo_ready=true
+        break
+    fi
+    sleep 2
+done
+if [ "$mongo_ready" != "true" ]; then
+    echo -e "\033[31mMongoDB did not accept connections within 120 seconds. Its logs:\033[0m"
+    docker ps -a --filter name=raw-data-mongodb
+    docker logs --tail 100 raw-data-mongodb
+    exit 1
+fi
+
 echo "Step 8: Starting data processor"
 
 if [ "$TEST_MODE" == "production" ]; then
