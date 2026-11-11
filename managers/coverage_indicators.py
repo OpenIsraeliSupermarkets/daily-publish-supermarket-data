@@ -9,15 +9,15 @@ stopped.
 from __future__ import annotations
 
 import os
-import re
 from collections import Counter, defaultdict
 from datetime import datetime
 from statistics import median
-from typing import Any, Dict, Iterable, List, Optional, Set
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 import pandas as pd
 
 from il_supermarket_scarper import FileTypesFilters
+from il_supermarket_scarper.engines.engine import Engine
 
 from managers.quality_indicators import (
     _TZ,
@@ -56,37 +56,46 @@ LOST = (
     NOT_IN_CSV,
 )
 
-_FILE_NAME_TIMESTAMP_RE = re.compile(
-    r"-(?P<date>20\d{6})-?(?P<hour>\d{2})(?P<minute>\d{2})(?P<second>\d{2})?(?!\d)"
-)
-_FILE_NAME_DATE_RE = re.compile(r"-(?P<date>20\d{6})")
 _SAMPLE_FILES = 20
+
+
+def _file_name_date_match(file_name: str) -> Optional[Tuple[str, str]]:
+    """(YYYYMMDD, time digits) from a dump file name, or None.
+
+    Uses the scraper's own file-name date patterns, the ones its date filters
+    use, so both sides read a name the same way. ``-YYYYMMDD-HHMMSS`` is tried
+    first because the other pattern also matches its date alone.
+    """
+    match = Engine._DATE_PATTERN_2.search(  # pylint: disable=protected-access
+        file_name
+    ) or Engine._DATE_PATTERN_1.search(  # pylint: disable=protected-access
+        file_name
+    )
+    if not match:
+        return None
+    return match.group(1), match.group(2) or ""
 
 
 def file_name_timestamp(file_name: str) -> Optional[datetime]:
     """Publish time written in a dump file name, in Asia/Jerusalem.
 
-    Handles ``-YYYYMMDD-HHMMSS``, ``-YYYYMMDD-HHMM`` and ``-YYYYMMDDHHMM``.
+    Handles ``-YYYYMMDD-HHMMSS``, ``-YYYYMMDDHHMM`` and a bare ``-YYYYMMDD``
+    (midnight).
     """
-    match = _FILE_NAME_TIMESTAMP_RE.search(file_name)
-    if not match:
+    found = _file_name_date_match(file_name)
+    if not found:
         return None
+    date, time = found
     try:
-        parsed = datetime.strptime(
-            match.group("date")
-            + match.group("hour")
-            + match.group("minute")
-            + (match.group("second") or "00"),
-            "%Y%m%d%H%M%S",
-        )
+        parsed = datetime.strptime(date + time.ljust(6, "0")[:6], "%Y%m%d%H%M%S")
     except ValueError:
         return None
     return _TZ.localize(parsed)
 
 
 def _file_name_date(file_name: str) -> Optional[str]:
-    match = _FILE_NAME_DATE_RE.search(file_name)
-    return match.group("date") if match else None
+    found = _file_name_date_match(file_name)
+    return found[0] if found else None
 
 
 def _parse_timestamp(value: Any) -> Optional[datetime]:
