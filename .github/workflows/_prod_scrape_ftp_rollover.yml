@@ -17,6 +17,4 @@ jobs:
       kaggle_dataset_remote_name: "erlichsefi/israeli-supermarkets-2024"
       operation: "scraping,converting,clean_dump_files"
       enabled_scrapers: "RAMI_LEVY,YOHANANOF"
-      # Same pin as _prod_scrape.yml (decision 142); move both together.
-      image_tag: "v0.0.11"
     secrets: inherit
