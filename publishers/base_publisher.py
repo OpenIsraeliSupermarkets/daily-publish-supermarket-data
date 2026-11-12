@@ -179,6 +179,13 @@ class BaseSupermarketDataPublisher:
         task.start()
         task.join()
         Logger.info("Converting task is done")
+        self._write_quality_indicators()
+
+    def _write_quality_indicators(self):
+        """
+        Recompute the quality indicators (pipeline_health.json and friends)
+        from the status files and output CSVs on disk.
+        """
         write_quality_indicators(
             quality_folder=self.quality_folder,
             scraping_status_folder=self.scraping_status_folder,
@@ -227,6 +234,9 @@ class BaseSupermarketDataPublisher:
         Upload the data to the long-term database (Kaggle by default).
         """
         Logger.info("Starting the long term database task")
+        # Recompute with this release's code: the scrape job may run an older
+        # pinned image (decision 142), and its indicators would be published as-is.
+        self._write_quality_indicators()
         database = LongTermDatasetManager(
             long_term_db_target=self.long_term_db_target,
             enabled_scrapers=self.enabled_scrapers,
