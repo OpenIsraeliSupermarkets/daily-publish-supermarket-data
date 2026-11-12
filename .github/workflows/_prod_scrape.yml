@@ -24,8 +24,6 @@ jobs:
     with:
       kaggle_dataset_remote_name: "erlichsefi/israeli-supermarkets-2024"
       operation: "scraping,converting,clean_dump_files"
-      # Pinned before the streaming change (#117) until the memory caps land (#141, #142).
-      image_tag: "v0.0.11"
     secrets: inherit
 
   # GitHub starts the cron only ~3 times a day (#173), so a successful run
