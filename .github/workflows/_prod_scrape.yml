@@ -8,6 +8,16 @@ on:
     - cron: '17 */3 * * *'
   workflow_dispatch:
 
+# One scrape at a time and at most one waiting, so the cron fallback and the
+# chain below never pile up (#173).
+concurrency:
+  group: prod-scrape
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: write
+
 jobs:
   call-workflow:
     uses: OpenIsraeliSupermarkets/daily-publish-supermarket-data/.github/workflows/template.yml@main
@@ -17,3 +27,17 @@ jobs:
       # Pinned before the streaming change (#117) until the memory caps land (#141, #142).
       image_tag: "v0.0.11"
     secrets: inherit
+
+  # GitHub starts the cron only ~3 times a day (#173), so a successful run
+  # starts the next one right away. A failed run does not, so a broken image
+  # can't loop; the cron picks the chain up again. Stop it with the repository
+  # variable PROD_SCRAPE_CHAIN=false.
+  chain-next:
+    needs: call-workflow
+    if: success() && vars.PROD_SCRAPE_CHAIN != 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch the next scrape iteration
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run _prod_scrape.yml --repo "${{ github.repository }}" --ref main
