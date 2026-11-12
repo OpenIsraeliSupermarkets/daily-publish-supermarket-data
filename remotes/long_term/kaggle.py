@@ -28,6 +28,89 @@ except Exception as e:
     KAGGLEHUB_AVAILABLE = e
 
 
+def _env_int(name, default):
+    try:
+        return int(os.getenv(name, default))
+    except (TypeError, ValueError):
+        return default
+
+
+def _env_float(name, default):
+    try:
+        return float(os.getenv(name, default))
+    except (TypeError, ValueError):
+        return default
+
+
+# Kaggle throttles per account. CI system tests share the prod account, so a
+# few back-to-back runs can push the prod publish into 429s (#167).
+KAGGLE_RETRY_ATTEMPTS = _env_int("KAGGLE_RETRY_ATTEMPTS", 6)
+KAGGLE_RETRY_BASE_DELAY = _env_float("KAGGLE_RETRY_BASE_DELAY", 30.0)
+KAGGLE_RETRY_MAX_DELAY = _env_float("KAGGLE_RETRY_MAX_DELAY", 300.0)
+
+
+def _http_status(exc):
+    response = getattr(exc, "response", None)
+    return getattr(response, "status_code", None)
+
+
+def is_rate_limited(exc):
+    """True if exc is Kaggle's HTTP 429 Too Many Requests."""
+    if _http_status(exc) == 429:
+        return True
+    text = str(exc).lower()
+    return "429" in text and "too many requests" in text
+
+
+def _retry_after_seconds(exc):
+    response = getattr(exc, "response", None)
+    headers = getattr(response, "headers", None) or {}
+    try:
+        value = headers.get("Retry-After")
+    except AttributeError:
+        return None
+    try:
+        return max(0.0, float(value)) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def retry_on_rate_limit(
+    fn,
+    what,
+    attempts=None,
+    base_delay=None,
+    max_delay=None,
+    sleep=None,
+):
+    """Call fn(), retrying with exponential backoff while Kaggle answers 429.
+
+    Other errors are raised on the first try. After the last attempt the
+    original 429 error is raised.
+    """
+    attempts = KAGGLE_RETRY_ATTEMPTS if attempts is None else attempts
+    base_delay = KAGGLE_RETRY_BASE_DELAY if base_delay is None else base_delay
+    max_delay = KAGGLE_RETRY_MAX_DELAY if max_delay is None else max_delay
+    sleep = time.sleep if sleep is None else sleep
+    attempts = max(1, attempts)
+    for attempt in range(1, attempts + 1):
+        try:
+            return fn()
+        except Exception as e:  # pylint: disable=broad-except
+            if not is_rate_limited(e) or attempt == attempts:
+                raise
+            delay = _retry_after_seconds(e)
+            if delay is None:
+                delay = base_delay * (2 ** (attempt - 1))
+            delay = min(delay, max_delay)
+            Logger.warning(
+                f"Kaggle rate limit (429) on {what}, attempt {attempt}/{attempts}; "
+                f"retrying in {delay:.0f}s"
+            )
+            sleep(delay)
+    return None  # unreachable
+
+
 class KaggleUploader(LongTermDatabaseUploader):
     """Handles uploading and managing datasets on Kaggle.
 
@@ -55,16 +138,23 @@ class KaggleUploader(LongTermDatabaseUploader):
 
         Logger.info(f"Kaggle dataset handle: {self.dataset_remote_name}")
 
+    def _dataset_download(self, path=None):
+        """kagglehub.dataset_download with retry on 429."""
+        kwargs = {"force_download": True}
+        if path is not None:
+            kwargs["path"] = path
+        what = f"download {path or 'dataset'}"
+        return retry_on_rate_limit(
+            lambda: kagglehub.dataset_download(self.dataset_remote_name, **kwargs),
+            what,
+        )
+
     def _sync_n_load_index(self):
         """Sync the index of the dataset."""
         try:
             index_local = os.path.join(self.dataset_path, "index.json")
             if not os.path.exists(index_local):
-                downloaded = kagglehub.dataset_download(
-                    self.dataset_remote_name,
-                    path="index.json",
-                    force_download=True,
-                )
+                downloaded = self._dataset_download("index.json")
                 os.makedirs(self.dataset_path, exist_ok=True)
                 shutil.copy2(downloaded, index_local)
             else:
@@ -106,21 +196,20 @@ class KaggleUploader(LongTermDatabaseUploader):
             message (str): Version notes for the upload
         """
         os.makedirs(self.dataset_path, exist_ok=True)
-        kagglehub.dataset_upload(
-            self.dataset_remote_name,
-            self.dataset_path,
-            version_notes=message,
+        retry_on_rate_limit(
+            lambda: kagglehub.dataset_upload(
+                self.dataset_remote_name,
+                self.dataset_path,
+                version_notes=message,
+            ),
+            "upload",
         )
         time.sleep(3)  # wait for kaggle to process the request.
 
     def fetch_file(self, file_name, dest_dir):
         """Download a dataset file from Kaggle into dest_dir."""
         os.makedirs(dest_dir, exist_ok=True)
-        downloaded = kagglehub.dataset_download(
-            self.dataset_remote_name,
-            path=file_name,
-            force_download=True,
-        )
+        downloaded = self._dataset_download(file_name)
         local_path = (
             downloaded
             if os.path.isfile(downloaded)
@@ -213,11 +302,7 @@ class KaggleUploader(LongTermDatabaseUploader):
         """
         tmp_dir = tempfile.mkdtemp()
         try:
-            downloaded = kagglehub.dataset_download(
-                self.dataset_remote_name,
-                path=file_name,
-                force_download=True,
-            )
+            downloaded = self._dataset_download(file_name)
             local_path = (
                 downloaded
                 if os.path.isfile(downloaded)
@@ -241,9 +326,6 @@ class KaggleUploader(LongTermDatabaseUploader):
     def download(self):
         """Download the data from the remote dataset."""
         shutil.rmtree(self.dataset_path, ignore_errors=True)
-        downloaded = kagglehub.dataset_download(
-            self.dataset_remote_name,
-            force_download=True,
-        )
+        downloaded = self._dataset_download()
         shutil.copytree(downloaded, self.dataset_path, dirs_exist_ok=True)
         return self.dataset_path
