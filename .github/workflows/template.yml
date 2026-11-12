@@ -22,6 +22,10 @@ on:
       image_tag:
         type: string
         default: ''
+      # Comma-separated scraper names (e.g. 'RAMI_LEVY,YOHANANOF') instead of the ENABLED_SCRAPERS secret.
+      enabled_scrapers:
+        type: string
+        default: ''
 jobs:
   build:
 
@@ -44,7 +48,7 @@ jobs:
 
     - name: Adding env variables
       run: |
-        echo "ENABLED_SCRAPERS=${{ secrets.ENABLED_SCRAPERS }}" >> $GITHUB_ENV
+        echo "ENABLED_SCRAPERS=${{ inputs.enabled_scrapers || secrets.ENABLED_SCRAPERS }}" >> $GITHUB_ENV
         echo "ENABLED_FILE_TYPES=${{ secrets.ENABLED_FILE_TYPES }}" >> $GITHUB_ENV
         echo "LIMIT=${{ secrets.LIMIT }}" >> $GITHUB_ENV
         echo "APP_DATA_PATH=${{ runner.workspace }}/app_data" >> $GITHUB_ENV

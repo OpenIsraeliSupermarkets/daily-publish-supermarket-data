@@ -4,4 +4,4 @@
 
 **Why:** from v0.0.12, prod scrape runs on home-server lose a multiprocessing Manager mid-run (unbounded in-memory queues under the 4G limit). They then hang for hours (run 40109084395) or get killed (run 4189, exit 137), which blocks the single prod runner.
 
-**Until:** a release that includes #141 (back to the disk pipeline, decision 141) is published. Then remove `image_tag` from `_prod_scrape.yml`. Removing it earlier would run the latest release, which still streams.
+**Until:** a release that includes #141 (back to the disk pipeline, decision 141) is published. Then remove `image_tag` from `_prod_scrape.yml` and `_prod_scrape_ftp_rollover.yml` (decision 165). Removing it earlier would run the latest release, which still streams.

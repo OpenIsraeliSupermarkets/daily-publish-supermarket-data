@@ -1,0 +1,22 @@
+name: Production | Scrape Cerberus FTP before rollover
+
+# The Cerberus FTP (url.retail.publishedprices.co.il) removes the previous
+# day's files at about 01:13 Israel time (#165). The main scrape runs only a
+# few times a day, so the evening files of Rami Levy and Yohananof were left
+# to an after-midnight run that could not fetch them in time.
+# 20:30 UTC is 22:30 Israel time in winter and 23:30 in summer.
+on:
+  schedule:
+    - cron: '30 20 * * *'
+  workflow_dispatch:
+
+jobs:
+  call-workflow:
+    uses: OpenIsraeliSupermarkets/daily-publish-supermarket-data/.github/workflows/template.yml@main
+    with:
+      kaggle_dataset_remote_name: "erlichsefi/israeli-supermarkets-2024"
+      operation: "scraping,converting,clean_dump_files"
+      enabled_scrapers: "RAMI_LEVY,YOHANANOF"
+      # Same pin as _prod_scrape.yml (decision 142); move both together.
+      image_tag: "v0.0.11"
+    secrets: inherit
