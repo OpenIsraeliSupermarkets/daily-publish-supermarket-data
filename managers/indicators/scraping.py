@@ -9,7 +9,6 @@ class AttemptedDownloadSuccessRate(Indicator):
     """downloaded / (downloaded + failed), each file counted once a day."""
 
     name = "attempted_download_success_rate"
-    failure_label = "download_success_rate"
     section = "scraper"
     threshold_key = "scraper_download_success_rate_min"
     env_var = "QUALITY_SCRAPER_MIN_DOWNLOAD_SUCCESS_RATE"
@@ -80,10 +79,6 @@ def scraper_section(scraper_quality: Dict[str, Any]) -> Dict[str, Any]:
                 elif reason == "skipped_by_filter":
                     skipped_by_filter += 1
 
-    download_success_rate = (
-        total_downloaded / total_saw if total_saw > 0 else 1.0
-    )
-
     return {
         "total_saw": total_saw,
         "total_downloaded": total_downloaded,
@@ -93,7 +88,6 @@ def scraper_section(scraper_quality: Dict[str, Any]) -> Dict[str, Any]:
         "scrapers_with_no_data": ScrapersWithNoData.compute(
             downloaded_by_scraper, max_no_data_scrapers
         ),
-        "download_success_rate": round(download_success_rate, 4),
         "attempted_download_success_rate": AttemptedDownloadSuccessRate.compute(
             total_downloaded, download_failed
         ),

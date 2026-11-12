@@ -824,10 +824,10 @@ def test_compute_pipeline_health_flags_unhealthy_scraper():
         },
     )
 
-    assert health["scraper"]["download_success_rate"] == 0.8
+    assert "download_success_rate" not in health["scraper"]
     assert health["scraper"]["attempted_download_success_rate"] == 0.8
     assert health["scraper"]["healthy"] is False
-    assert "download_success_rate" in health["scraper"]["below_threshold"]
+    assert "attempted_download_success_rate" in health["scraper"]["below_threshold"]
     assert health["overall_healthy"] is False
     assert health["improvements"]["scraping"][0]["enum"] == "BAREKET"
     assert health["improvements"]["scraping"][0]["chain"] == "bareket"
@@ -863,7 +863,7 @@ def test_compute_pipeline_health_ignores_filter_skips():
         },
     )
 
-    assert health["scraper"]["download_success_rate"] == 0.1
+    assert health["scraper"]["total_skipped_by_filter"] == 90
     assert health["scraper"]["attempted_download_success_rate"] == 1.0
     assert health["scraper"]["healthy"] is True
     assert health["improvements"]["scraping"] == []
