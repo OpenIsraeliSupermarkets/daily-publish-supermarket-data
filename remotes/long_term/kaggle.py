@@ -9,6 +9,7 @@ import os
 import re
 import pytz
 from utils import Logger
+from utils.retry import retry_on_429
 import shutil
 import json
 import tempfile
@@ -35,7 +36,15 @@ class KaggleUploader(LongTermDatabaseUploader):
     and check update status of datasets.
     """
 
-    def __init__(self, dataset_remote_name, when, dataset_path=None):
+    def __init__(
+        self,
+        dataset_remote_name,
+        when,
+        dataset_path=None,
+        retry_attempts=6,
+        retry_base_delay=30.0,
+        retry_max_delay=300.0,
+    ):
         """Initialize the Kaggle uploader.
 
         Args:
@@ -43,28 +52,54 @@ class KaggleUploader(LongTermDatabaseUploader):
             when (datetime): Timestamp for the dataset
             dataset_path (str, optional): Local path for staging files.
                 Defaults to the dataset name part of the handle.
+            retry_attempts (int, optional): Attempts per Kaggle call when it
+                answers 429 Too Many Requests. Kaggle throttles per account,
+                and CI shares the prod account (#167).
+            retry_base_delay (float, optional): First wait in seconds; it
+                doubles per attempt unless Kaggle sends Retry-After.
+            retry_max_delay (float, optional): Cap on a single wait, seconds.
         """
         if dataset_path is None:
             dataset_path = dataset_remote_name.split("/")[-1]
         super().__init__(dataset_path, when)
         self.dataset_remote_name = dataset_remote_name
         self.when = when
+        self.retry_attempts = retry_attempts
+        self.retry_base_delay = retry_base_delay
+        self.retry_max_delay = retry_max_delay
 
         if KAGGLEHUB_AVAILABLE is not None:
             raise ImportError("Failed to import kagglehub: \n%s" % KAGGLEHUB_AVAILABLE)
 
         Logger.info(f"Kaggle dataset handle: {self.dataset_remote_name}")
 
+    def _retry_on_rate_limit(self, fn, what):
+        """Call fn(), retrying Kaggle 429s with this uploader's retry settings."""
+        return retry_on_429(
+            fn,
+            what,
+            attempts=self.retry_attempts,
+            base_delay=self.retry_base_delay,
+            max_delay=self.retry_max_delay,
+        )
+
+    def _dataset_download(self, path=None):
+        """kagglehub.dataset_download with retry on 429."""
+        kwargs = {"force_download": True}
+        if path is not None:
+            kwargs["path"] = path
+        what = f"download {path or 'dataset'}"
+        return self._retry_on_rate_limit(
+            lambda: kagglehub.dataset_download(self.dataset_remote_name, **kwargs),
+            what,
+        )
+
     def _sync_n_load_index(self):
         """Sync the index of the dataset."""
         try:
             index_local = os.path.join(self.dataset_path, "index.json")
             if not os.path.exists(index_local):
-                downloaded = kagglehub.dataset_download(
-                    self.dataset_remote_name,
-                    path="index.json",
-                    force_download=True,
-                )
+                downloaded = self._dataset_download("index.json")
                 os.makedirs(self.dataset_path, exist_ok=True)
                 shutil.copy2(downloaded, index_local)
             else:
@@ -106,21 +141,20 @@ class KaggleUploader(LongTermDatabaseUploader):
             message (str): Version notes for the upload
         """
         os.makedirs(self.dataset_path, exist_ok=True)
-        kagglehub.dataset_upload(
-            self.dataset_remote_name,
-            self.dataset_path,
-            version_notes=message,
+        self._retry_on_rate_limit(
+            lambda: kagglehub.dataset_upload(
+                self.dataset_remote_name,
+                self.dataset_path,
+                version_notes=message,
+            ),
+            "upload",
         )
         time.sleep(3)  # wait for kaggle to process the request.
 
     def fetch_file(self, file_name, dest_dir):
         """Download a dataset file from Kaggle into dest_dir."""
         os.makedirs(dest_dir, exist_ok=True)
-        downloaded = kagglehub.dataset_download(
-            self.dataset_remote_name,
-            path=file_name,
-            force_download=True,
-        )
+        downloaded = self._dataset_download(file_name)
         local_path = (
             downloaded
             if os.path.isfile(downloaded)
@@ -213,11 +247,7 @@ class KaggleUploader(LongTermDatabaseUploader):
         """
         tmp_dir = tempfile.mkdtemp()
         try:
-            downloaded = kagglehub.dataset_download(
-                self.dataset_remote_name,
-                path=file_name,
-                force_download=True,
-            )
+            downloaded = self._dataset_download(file_name)
             local_path = (
                 downloaded
                 if os.path.isfile(downloaded)
@@ -241,9 +271,6 @@ class KaggleUploader(LongTermDatabaseUploader):
     def download(self):
         """Download the data from the remote dataset."""
         shutil.rmtree(self.dataset_path, ignore_errors=True)
-        downloaded = kagglehub.dataset_download(
-            self.dataset_remote_name,
-            force_download=True,
-        )
+        downloaded = self._dataset_download()
         shutil.copytree(downloaded, self.dataset_path, dirs_exist_ok=True)
         return self.dataset_path
