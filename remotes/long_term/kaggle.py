@@ -9,7 +9,7 @@ import os
 import re
 import pytz
 from utils import Logger
-from utils.retry import env_float, env_int, retry_on_429
+from utils.retry import retry_on_429
 import shutil
 import json
 import tempfile
@@ -29,24 +29,6 @@ except Exception as e:
     KAGGLEHUB_AVAILABLE = e
 
 
-# Kaggle throttles per account. CI system tests share the prod account, so a
-# few back-to-back runs can push the prod publish into 429s (#167).
-KAGGLE_RETRY_ATTEMPTS = env_int("KAGGLE_RETRY_ATTEMPTS", 6)
-KAGGLE_RETRY_BASE_DELAY = env_float("KAGGLE_RETRY_BASE_DELAY", 30.0)
-KAGGLE_RETRY_MAX_DELAY = env_float("KAGGLE_RETRY_MAX_DELAY", 300.0)
-
-
-def retry_on_rate_limit(fn, what):
-    """Call fn(), retrying Kaggle 429s with the KAGGLE_RETRY_* settings."""
-    return retry_on_429(
-        fn,
-        what,
-        attempts=KAGGLE_RETRY_ATTEMPTS,
-        base_delay=KAGGLE_RETRY_BASE_DELAY,
-        max_delay=KAGGLE_RETRY_MAX_DELAY,
-    )
-
-
 class KaggleUploader(LongTermDatabaseUploader):
     """Handles uploading and managing datasets on Kaggle.
 
@@ -54,7 +36,15 @@ class KaggleUploader(LongTermDatabaseUploader):
     and check update status of datasets.
     """
 
-    def __init__(self, dataset_remote_name, when, dataset_path=None):
+    def __init__(
+        self,
+        dataset_remote_name,
+        when,
+        dataset_path=None,
+        retry_attempts=6,
+        retry_base_delay=30.0,
+        retry_max_delay=300.0,
+    ):
         """Initialize the Kaggle uploader.
 
         Args:
@@ -62,17 +52,36 @@ class KaggleUploader(LongTermDatabaseUploader):
             when (datetime): Timestamp for the dataset
             dataset_path (str, optional): Local path for staging files.
                 Defaults to the dataset name part of the handle.
+            retry_attempts (int, optional): Attempts per Kaggle call when it
+                answers 429 Too Many Requests. Kaggle throttles per account,
+                and CI shares the prod account (#167).
+            retry_base_delay (float, optional): First wait in seconds; it
+                doubles per attempt unless Kaggle sends Retry-After.
+            retry_max_delay (float, optional): Cap on a single wait, seconds.
         """
         if dataset_path is None:
             dataset_path = dataset_remote_name.split("/")[-1]
         super().__init__(dataset_path, when)
         self.dataset_remote_name = dataset_remote_name
         self.when = when
+        self.retry_attempts = retry_attempts
+        self.retry_base_delay = retry_base_delay
+        self.retry_max_delay = retry_max_delay
 
         if KAGGLEHUB_AVAILABLE is not None:
             raise ImportError("Failed to import kagglehub: \n%s" % KAGGLEHUB_AVAILABLE)
 
         Logger.info(f"Kaggle dataset handle: {self.dataset_remote_name}")
+
+    def _retry_on_rate_limit(self, fn, what):
+        """Call fn(), retrying Kaggle 429s with this uploader's retry settings."""
+        return retry_on_429(
+            fn,
+            what,
+            attempts=self.retry_attempts,
+            base_delay=self.retry_base_delay,
+            max_delay=self.retry_max_delay,
+        )
 
     def _dataset_download(self, path=None):
         """kagglehub.dataset_download with retry on 429."""
@@ -80,7 +89,7 @@ class KaggleUploader(LongTermDatabaseUploader):
         if path is not None:
             kwargs["path"] = path
         what = f"download {path or 'dataset'}"
-        return retry_on_rate_limit(
+        return self._retry_on_rate_limit(
             lambda: kagglehub.dataset_download(self.dataset_remote_name, **kwargs),
             what,
         )
@@ -132,7 +141,7 @@ class KaggleUploader(LongTermDatabaseUploader):
             message (str): Version notes for the upload
         """
         os.makedirs(self.dataset_path, exist_ok=True)
-        retry_on_rate_limit(
+        self._retry_on_rate_limit(
             lambda: kagglehub.dataset_upload(
                 self.dataset_remote_name,
                 self.dataset_path,

@@ -47,6 +47,7 @@ class TestKaggleUploaderRetries(unittest.TestCase):
             "owner/ds",
             datetime.now(),
             dataset_path=os.path.join(self.tmp.name, "ds"),
+            retry_attempts=4,
         )
 
     def _remote_file(self, name, content):
@@ -95,7 +96,7 @@ class TestKaggleUploaderRetries(unittest.TestCase):
             self.uploader.upload_to_dataset("notes")
         self.assertEqual(
             self.kagglehub.dataset_upload.call_count,
-            kaggle_module.KAGGLE_RETRY_ATTEMPTS,
+            self.uploader.retry_attempts,
         )
 
 

@@ -1,25 +1,8 @@
 """Retry helpers for remote APIs that rate-limit with HTTP 429 (#167)."""
 
-import os
 import time
 
 from utils.logging_config import Logger
-
-
-def env_int(name, default):
-    """Read an int env var, falling back to default when unset or invalid."""
-    try:
-        return int(os.getenv(name, default))
-    except (TypeError, ValueError):
-        return default
-
-
-def env_float(name, default):
-    """Read a float env var, falling back to default when unset or invalid."""
-    try:
-        return float(os.getenv(name, default))
-    except (TypeError, ValueError):
-        return default
 
 
 def _http_status(exc):
