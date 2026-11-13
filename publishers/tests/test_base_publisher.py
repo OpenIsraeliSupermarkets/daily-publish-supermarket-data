@@ -17,6 +17,7 @@ from tests.validation_utils import (
     validate_local_structure_deleted,
     scrapers_to_test,
 )
+from publishers import base_publisher
 from publishers.base_publisher import BaseSupermarketDataPublisher
 
 
@@ -314,3 +315,68 @@ def test_clean_all_source_data_integration():
         # Clean up anything that might remain
         if os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
+
+
+def test_upload_to_kaggle_recomputes_quality_before_compose(monkeypatch):
+    """Publishing rewrites the quality indicators before composing the dataset.
+
+    The prod scrape job runs a pinned older image (decision 142), so the
+    indicators it wrote must not be published as they are.
+    """
+    calls = []
+
+    class FakeLongTermDatasetManager:
+        """Records the order of the long-term manager calls."""
+
+        def __init__(self, **kwargs):
+            calls.append(("manager", kwargs["quality_folder"]))
+
+        def compose(self):
+            """Record the call."""
+            calls.append(("compose",))
+
+        def upload(self):
+            """Record the call."""
+            calls.append(("upload",))
+
+        def clean(self):
+            """Record the call."""
+            calls.append(("clean",))
+
+    def fake_write_quality_indicators(**kwargs):
+        """Record the folders the indicators are written with."""
+        calls.append(("quality", kwargs["quality_folder"], kwargs["outputs_folder"]))
+
+    monkeypatch.setattr(
+        base_publisher, "LongTermDatasetManager", FakeLongTermDatasetManager
+    )
+    monkeypatch.setattr(
+        base_publisher, "write_quality_indicators", fake_write_quality_indicators
+    )
+
+    temp_dir = tempfile.mkdtemp(prefix="test_kaggle_quality_")
+    try:
+        publisher = BaseSupermarketDataPublisher(
+            app_folder=temp_dir,
+            enabled_scrapers=["BAREKET"],
+            long_term_db_target=DummyFileStorage(
+                dataset_remote_path=os.path.join(temp_dir, "remote"),
+                dataset_path=os.path.join(temp_dir, "stage"),
+                when=now(),
+            ),
+        )
+        publisher._upload_to_kaggle()  # pylint: disable=protected-access
+
+        assert calls[0] == (
+            "quality",
+            publisher.quality_folder,
+            publisher.outputs_folder,
+        )
+        assert [call[0] for call in calls[1:]] == [
+            "manager",
+            "compose",
+            "upload",
+            "clean",
+        ]
+    finally:
+        shutil.rmtree(temp_dir)
