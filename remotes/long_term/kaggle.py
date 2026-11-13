@@ -9,6 +9,7 @@ import os
 import re
 import pytz
 from utils import Logger
+from utils.retry import env_float, env_int, retry_on_429
 import shutil
 import json
 import tempfile
@@ -28,87 +29,22 @@ except Exception as e:
     KAGGLEHUB_AVAILABLE = e
 
 
-def _env_int(name, default):
-    try:
-        return int(os.getenv(name, default))
-    except (TypeError, ValueError):
-        return default
-
-
-def _env_float(name, default):
-    try:
-        return float(os.getenv(name, default))
-    except (TypeError, ValueError):
-        return default
-
-
 # Kaggle throttles per account. CI system tests share the prod account, so a
 # few back-to-back runs can push the prod publish into 429s (#167).
-KAGGLE_RETRY_ATTEMPTS = _env_int("KAGGLE_RETRY_ATTEMPTS", 6)
-KAGGLE_RETRY_BASE_DELAY = _env_float("KAGGLE_RETRY_BASE_DELAY", 30.0)
-KAGGLE_RETRY_MAX_DELAY = _env_float("KAGGLE_RETRY_MAX_DELAY", 300.0)
+KAGGLE_RETRY_ATTEMPTS = env_int("KAGGLE_RETRY_ATTEMPTS", 6)
+KAGGLE_RETRY_BASE_DELAY = env_float("KAGGLE_RETRY_BASE_DELAY", 30.0)
+KAGGLE_RETRY_MAX_DELAY = env_float("KAGGLE_RETRY_MAX_DELAY", 300.0)
 
 
-def _http_status(exc):
-    response = getattr(exc, "response", None)
-    return getattr(response, "status_code", None)
-
-
-def is_rate_limited(exc):
-    """True if exc is Kaggle's HTTP 429 Too Many Requests."""
-    if _http_status(exc) == 429:
-        return True
-    text = str(exc).lower()
-    return "429" in text and "too many requests" in text
-
-
-def _retry_after_seconds(exc):
-    response = getattr(exc, "response", None)
-    headers = getattr(response, "headers", None) or {}
-    try:
-        value = headers.get("Retry-After")
-    except AttributeError:
-        return None
-    try:
-        return max(0.0, float(value)) if value is not None else None
-    except (TypeError, ValueError):
-        return None
-
-
-def retry_on_rate_limit(
-    fn,
-    what,
-    attempts=None,
-    base_delay=None,
-    max_delay=None,
-    sleep=None,
-):
-    """Call fn(), retrying with exponential backoff while Kaggle answers 429.
-
-    Other errors are raised on the first try. After the last attempt the
-    original 429 error is raised.
-    """
-    attempts = KAGGLE_RETRY_ATTEMPTS if attempts is None else attempts
-    base_delay = KAGGLE_RETRY_BASE_DELAY if base_delay is None else base_delay
-    max_delay = KAGGLE_RETRY_MAX_DELAY if max_delay is None else max_delay
-    sleep = time.sleep if sleep is None else sleep
-    attempts = max(1, attempts)
-    for attempt in range(1, attempts + 1):
-        try:
-            return fn()
-        except Exception as e:  # pylint: disable=broad-except
-            if not is_rate_limited(e) or attempt == attempts:
-                raise
-            delay = _retry_after_seconds(e)
-            if delay is None:
-                delay = base_delay * (2 ** (attempt - 1))
-            delay = min(delay, max_delay)
-            Logger.warning(
-                f"Kaggle rate limit (429) on {what}, attempt {attempt}/{attempts}; "
-                f"retrying in {delay:.0f}s"
-            )
-            sleep(delay)
-    return None  # unreachable
+def retry_on_rate_limit(fn, what):
+    """Call fn(), retrying Kaggle 429s with the KAGGLE_RETRY_* settings."""
+    return retry_on_429(
+        fn,
+        what,
+        attempts=KAGGLE_RETRY_ATTEMPTS,
+        base_delay=KAGGLE_RETRY_BASE_DELAY,
+        max_delay=KAGGLE_RETRY_MAX_DELAY,
+    )
 
 
 class KaggleUploader(LongTermDatabaseUploader):
