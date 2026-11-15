@@ -7,12 +7,15 @@ to the CSV rows we publish, and put in the bucket of where it stopped.
 
 from __future__ import annotations
 
+import csv
 import os
+import sys
 import time
 from collections import Counter
 from typing import Any, Dict, Iterable, List, Optional, Set
 
 import pandas as pd
+
 
 from il_supermarket_scarper import FileTypesFilters
 
@@ -58,6 +61,34 @@ LOST = (
 SAMPLE_FILES = 20
 
 
+def _csv_file_names(path: str) -> Optional[Set[str]]:
+    """Distinct raw ``file_name`` values of one CSV, or None when it has none.
+
+    Streams the file row by row with ``csv.reader``, so memory stays at about
+    one row however wide the rows are. pandas' tokenizer holds every field of
+    a 32k-64k row batch even with ``usecols``; with ~1 MB promo rows that was
+    the whole 8.7 GB file and the data-fetcher was OOM-killed (#182).
+    """
+    try:
+        handle = open(path, "r", encoding="utf-8", newline="")
+    except OSError:
+        return None
+    with handle:
+        reader = csv.reader(handle)
+        try:
+            header = next(reader)
+        except (StopIteration, csv.Error):
+            return None
+        if "file_name" not in header:
+            return None
+        index = header.index("file_name")
+        values: Set[str] = set()
+        for row in reader:
+            if len(row) > index:
+                values.add(row[index])
+        return values
+
+
 def published_file_names(outputs_folder: str) -> Set[str]:
     """Normalized source file names that have rows in the output CSVs.
 
@@ -69,6 +100,7 @@ def published_file_names(outputs_folder: str) -> Set[str]:
         return names
     started = time.monotonic()
     scanned = 0
+    csv.field_size_limit(sys.maxsize)
     for root, _, files in os.walk(outputs_folder):
         for csv_name in files:
             if not csv_name.endswith(".csv"):
@@ -83,19 +115,15 @@ def published_file_names(outputs_folder: str) -> Set[str]:
                 rss,
                 peak,
             )
-            try:
-                header = pd.read_csv(path, nrows=0)
-            except (pd.errors.EmptyDataError, pd.errors.ParserError, OSError):
+            values = _csv_file_names(path)
+            if not values:
                 continue
-            if "file_name" not in header.columns:
-                continue
-            for chunk in pd.read_csv(
-                path, usecols=["file_name"], dtype=str, chunksize=500_000
-            ):
-                names.update(
-                    normalize_filename(os.path.basename(value))
-                    for value in chunk["file_name"].dropna().unique()
-                )
+            # csv.reader gives an empty cell as "", which pandas' dropna dropped.
+            present = pd.Series(list(values), dtype="object").replace("", pd.NA)
+            names.update(
+                normalize_filename(os.path.basename(value))
+                for value in present.dropna()
+            )
             scanned += 1
     rss, peak = memory_mb()
     Logger.info(
