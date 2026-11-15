@@ -42,6 +42,7 @@ class BaseSupermarketDataPublisher:
         limit=None,
         when_date=None,
         re_download_unparsed=False,
+        file_name_regex=None,
     ):
         """
         Initialize the BaseSupermarketDataPublisher.
@@ -61,6 +62,9 @@ class BaseSupermarketDataPublisher:
             when_date: Date for which to scrape data
             re_download_unparsed: Ask the scraper to re-download files it
                 downloaded that the parser never resolved
+            file_name_regex: Scrape only files whose name matches this regex
+                (``re.search``). The CI perf comparison uses it to make main
+                download the same files as the PR (#186).
         """
         self.short_term_db_target = short_term_db_target
         self.long_term_db_target = long_term_db_target
@@ -84,6 +88,7 @@ class BaseSupermarketDataPublisher:
         )
         self.limit = limit
         self.re_download_unparsed = re_download_unparsed
+        self.file_name_regex = file_name_regex or None
         self.status_configuration = status_configuration or {"database_type": "json"}
         self.scraping_status_folder = os.path.join(app_folder, "scraping_status")
         self.converting_status_folder = os.path.join(app_folder, "converting_status")
@@ -133,6 +138,7 @@ class BaseSupermarketDataPublisher:
                 enabled_scrapers=self.enabled_scrapers,
                 files_types=self.enabled_file_types,
                 multiprocessing=self.number_of_scraping_processes,
+                file_name_regex=self.file_name_regex,
                 status_configuration={
                     **self.status_configuration,
                     "base_path": self.scraping_status_folder,
