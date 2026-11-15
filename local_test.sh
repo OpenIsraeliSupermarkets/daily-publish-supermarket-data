@@ -289,18 +289,8 @@ if [ "$TEST_MODE" == "production" ]; then
     echo "Step 8.2: Scrape operation completed successfully"
 
     if [ -n "$PERF_OUT" ]; then
-        # The files this run downloaded, so another run can scrape the same ones (#184).
-        python3 - "$APP_DATA_PATH/scraping_status" > "$PERF_OUT/files.txt" <<'PY'
-import glob, json, os, sys
-names = set()
-for path in glob.glob(os.path.join(sys.argv[1], "*.json")):
-    with open(path, encoding="utf-8") as handle:
-        for event in json.load(handle).get("events", []):
-            if event.get("status") == "downloaded" and event.get("downloaded_successfully"):
-                names.add(os.path.basename(event["file_name"]))
-print("\n".join(sorted(names)))
-PY
-        echo "Downloaded $(wc -l < "$PERF_OUT/files.txt") files (list in $PERF_OUT/files.txt)"
+        # By this script's folder: the main run calls it from main's checkout.
+        "$(dirname "$0")/perf_collect_files.sh" "$APP_DATA_PATH/scraping_status" "$PERF_OUT" || exit 1
     fi
 
     echo "Step 8.2.1: Checking the quality indicators aggregated locally, before publishing"
