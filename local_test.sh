@@ -129,17 +129,56 @@ run_quality_gate() {
     fi
 }
 
+# With PERF_OUT set, sample the container's cgroup every second while it runs
+# and write $PERF_OUT/<label>.json: peak memory (as docker stats counts it,
+# without inactive page cache), CPU-seconds and wall time (#184).
+sample_container_usage() {
+    local container_name=$1
+    local out=$2
+    local peak=0 cpu_usec=0 start
+    start=$(date +%s)
+    while [ "$(docker inspect -f '{{.State.Running}}' "$container_name" 2>/dev/null)" == "true" ]; do
+        # cgroup v2 first, then v1. CPU is printed in microseconds.
+        read -r mem cpu < <(docker exec "$container_name" sh -c '
+            c=/sys/fs/cgroup
+            if [ -f $c/memory.current ]; then
+                cur=$(cat $c/memory.current)
+                inactive=$(awk "/^inactive_file /{print \$2}" $c/memory.stat)
+                usage=$(awk "/^usage_usec /{print \$2}" $c/cpu.stat)
+            else
+                cur=$(cat $c/memory/memory.usage_in_bytes)
+                inactive=$(awk "/^total_inactive_file /{print \$2}" $c/memory/memory.stat)
+                usage=$(( $(cat $c/cpuacct/cpuacct.usage) / 1000 ))
+            fi
+            echo $((cur - inactive)) $usage' 2>/dev/null)
+        if [ -n "$mem" ]; then
+            [ "$mem" -gt "$peak" ] && peak=$mem
+            cpu_usec=$cpu
+        fi
+        sleep 1
+    done
+    echo "{\"peak_mem_mb\": $((peak / 1048576)), \"cpu_s\": $((cpu_usec / 1000000)), \"wall_s\": $(( $(date +%s) - start ))}" > "$out"
+}
+
 # Run the data processor for one OPERATION and watch Docker's health status of
 # the container while it runs: it must never turn unhealthy, and with
 # require_healthy=true it must report healthy at least once (#129).
+# With PERF_OUT set, also record its resource usage under the label $2.
 run_data_processor_watching_health() {
     local require_healthy=$1
+    local perf_label=$2
     local container_name="data-fetcher"
     local seen_healthy=false
+    local sampler_pid=""
 
     docker compose up -d data_processor || return 1
     docker logs -f "$container_name" &
     local logs_pid=$!
+    if [ -n "$PERF_OUT" ] && [ -n "$perf_label" ]; then
+        mkdir -p "$PERF_OUT"
+        sample_container_usage "$container_name" "$PERF_OUT/$perf_label.json" &
+        sampler_pid=$!
+    fi
 
     while [ "$(docker inspect -f '{{.State.Running}}' "$container_name" 2>/dev/null)" == "true" ]; do
         health_status=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_name")
@@ -158,6 +197,7 @@ run_data_processor_watching_health() {
         sleep 5
     done
     kill $logs_pid 2>/dev/null
+    [ -n "$sampler_pid" ] && wait "$sampler_pid"
 
     exit_code=$(docker inspect -f '{{.State.ExitCode}}' "$container_name")
     if [ "$exit_code" != "0" ]; then
@@ -239,7 +279,7 @@ echo "Step 8: Starting data processor"
 if [ "$TEST_MODE" == "production" ]; then
     echo "Step 8.1: Running SCRAPE operation (scraping,converting,clean_dump_files,api_update)"
     export OPERATION="scraping,converting,clean_dump_files,api_update"
-    run_data_processor_watching_health true
+    run_data_processor_watching_health true scrape
     
     if [ $? -ne 0 ] || [ "$(container_exit_code data-fetcher)" != "0" ]; then
         echo -e "\033[31mScrape operation failed. Exiting.\033[0m"
@@ -248,12 +288,27 @@ if [ "$TEST_MODE" == "production" ]; then
     
     echo "Step 8.2: Scrape operation completed successfully"
 
+    if [ -n "$PERF_OUT" ]; then
+        # The files this run downloaded, so another run can scrape the same ones (#184).
+        python3 - "$APP_DATA_PATH/scraping_status" > "$PERF_OUT/files.txt" <<'PY'
+import glob, json, os, sys
+names = set()
+for path in glob.glob(os.path.join(sys.argv[1], "*.json")):
+    with open(path, encoding="utf-8") as handle:
+        for event in json.load(handle).get("events", []):
+            if event.get("status") == "downloaded" and event.get("downloaded_successfully"):
+                names.add(os.path.basename(event["file_name"]))
+print("\n".join(sorted(names)))
+PY
+        echo "Downloaded $(wc -l < "$PERF_OUT/files.txt") files (list in $PERF_OUT/files.txt)"
+    fi
+
     echo "Step 8.2.1: Checking the quality indicators aggregated locally, before publishing"
     run_quality_gate -v "${APP_DATA_PATH}/quality:/quality:ro" -- --cache-dir /quality || exit 1
 
     echo "Step 8.3: Running PUBLISHING operation (publishing,clean_all_source_data)"
     export OPERATION="publishing,clean_all_source_data"
-    run_data_processor_watching_health false
+    run_data_processor_watching_health false publish
     
     if [ $? -ne 0 ] || [ "$(container_exit_code data-fetcher)" != "0" ]; then
         echo -e "\033[31mPublishing operation failed. Exiting.\033[0m"
@@ -335,6 +390,12 @@ check_container_health "raw-data-api" || exit 1
 
 if [ "$TEST_MODE" == "loop" ]; then
     check_container_health "data-fetcher" || exit 1
+fi
+
+if [ -n "$SKIP_SYSTEM_TESTS" ]; then
+    echo "Step 10: Skipped (SKIP_SYSTEM_TESTS is set)"
+    docker compose stop
+    exit 0
 fi
 
 echo "Step 10: Running system tests"

@@ -23,7 +23,8 @@ jobs:
       cancel-in-progress: false
     # A green run takes ~10 min; a hang (e.g. #116) must not hold the shared
     # runner for the default 6 h. The teardown step still runs on timeout.
-    timeout-minutes: 45
+    # Plus ~10 min for the main-vs-PR usage run (#184), with retries.
+    timeout-minutes: 90
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -53,11 +54,56 @@ jobs:
           # Same project name local_test.sh uses, so the teardown step finds its containers.
           echo "COMPOSE_PROJECT_NAME=publisher" >> $GITHUB_ENV
 
+      # PERF_OUT records the data-fetcher's peak memory and CPU per operation,
+      # and the files it scraped, for the main-vs-PR comparison below (#184).
       - name: Run system test with incremental mode
-        run: ./local_test.sh --incremental 
+        run: PERF_OUT="${{ runner.temp }}/perf/pr" ./local_test.sh --incremental
 
       - name: Run system test with persistent mode
         run: ./local_test.sh --persist
+
+      - name: Checkout main for the usage comparison
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: perf-base
+
+      # Run main's code through this PR's local_test.sh on exactly the files
+      # the PR run scraped, retrying when a site no longer lists one (#184).
+      - name: Run main on the same files
+        id: main-run
+        run: |
+          PR_OUT="${{ runner.temp }}/perf/pr"
+          MAIN_OUT="${{ runner.temp }}/perf/main"
+          if ! grep -q SCRAPE_FILE_NAME_REGEX perf-base/main.py; then
+            echo "::notice::main cannot scrape a fixed file list yet (#186); skipping the usage comparison"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            cat "$PR_OUT"/*.json
+            exit 0
+          fi
+          if [ ! -s "$PR_OUT/files.txt" ]; then
+            echo "::error::the PR run downloaded no files to compare on"
+            exit 1
+          fi
+          REGEX=$(python3 -c 'import os, re, sys; print("|".join(re.escape(os.path.splitext(n)[0]) for n in open(sys.argv[1]).read().split()))' "$PR_OUT/files.txt")
+          cd perf-base
+          for attempt in 1 2 3; do
+            echo "Main run, attempt $attempt"
+            rm -rf "$MAIN_OUT"
+            if PERF_OUT="$MAIN_OUT" SKIP_SYSTEM_TESTS=1 SCRAPE_FILE_NAME_REGEX="$REGEX" \
+                 COMPOSE_FILE="$GITHUB_WORKSPACE/docker-compose.yml:$GITHUB_WORKSPACE/docker-compose.ci.yml" \
+                 "$GITHUB_WORKSPACE/local_test.sh" --incremental \
+               && diff "$PR_OUT/files.txt" "$MAIN_OUT/files.txt"; then
+              exit 0
+            fi
+            echo "::warning::main run attempt $attempt failed or scraped different files"
+          done
+          echo "::error::main could not run on the same files as the PR after 3 attempts"
+          exit 1
+
+      - name: Compare main vs PR usage
+        if: steps.main-run.outputs.skip != 'true'
+        run: python3 scripts/compare_usage.py "${{ runner.temp }}/perf/main" "${{ runner.temp }}/perf/pr" "$GITHUB_STEP_SUMMARY"
 
       - name: Tear down containers
         if: always()
