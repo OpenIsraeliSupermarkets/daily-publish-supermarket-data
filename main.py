@@ -6,6 +6,7 @@ from remotes import (
 )
 from publishers import SupermarketDataPublisherInterface, SupermarketDataPublisher
 import os
+import sys
 import datetime
 from utils import now
 from utils import Logger, exit_cleanly_on_sigterm, use_forkserver
@@ -62,6 +63,19 @@ def processing_settings_from_env():
             "NUM_OF_PARSING_PROCESSES", num_of_processes
         ),
     }
+
+
+def run_operations_once(publisher, operations):
+    """Run OPERATION once and return the process exit code.
+
+    Non-zero when any operation failed, so `docker compose up --exit-code-from`
+    and the GitHub job fail instead of staying green (#122).
+    """
+    failed = publisher._execute_operations(operations)
+    if failed:
+        Logger.error(f"Exiting with code 1, failed operations: {','.join(failed)}")
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
@@ -154,7 +168,7 @@ if __name__ == "__main__":
     operations = os.environ.get("OPERATION", "")
     if operations != "":
         Logger.info(f"Executing operations: {operations}")
-        publisher._execute_operations(operations)
+        sys.exit(run_operations_once(publisher, operations))
     else:
         Logger.info(f"Running publisher")
         publisher.run(

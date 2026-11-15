@@ -59,7 +59,7 @@ class SupermarketDataPublisher(SupermarketDataPublisherInterface):
     def _execute_operations(self, operations):
         try:
             self.last_execution_time = self._now()
-            super().run(operations)
+            return super().run(operations)
         finally:
             self.executed_jobs += 1
             Logger.info(f"Done {operations}")
