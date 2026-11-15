@@ -23,7 +23,8 @@ jobs:
       cancel-in-progress: false
     # A green run takes ~10 min; a hang (e.g. #116) must not hold the shared
     # runner for the default 6 h. The teardown step still runs on timeout.
-    timeout-minutes: 45
+    # Plus ~10 min for the main-vs-PR usage run (#184).
+    timeout-minutes: 90
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -53,11 +54,28 @@ jobs:
           # Same project name local_test.sh uses, so the teardown step finds its containers.
           echo "COMPOSE_PROJECT_NAME=publisher" >> $GITHUB_ENV
 
+      # PERF_OUT records the data-fetcher's peak memory and CPU per operation,
+      # and the files it scraped, for the main-vs-PR comparison below (#184).
       - name: Run system test with incremental mode
-        run: ./local_test.sh --incremental 
+        run: ./perf_run.sh . "${{ runner.temp }}/perf/pr" && ./system_tests.sh
 
       - name: Run system test with persistent mode
-        run: ./local_test.sh --persist
+        run: ./local_test.sh --persist && ./system_tests.sh
+
+      - name: Checkout main for the usage comparison
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: perf-base
+
+      # main's code on exactly the files the PR run scraped (#184).
+      - name: Run main on the same files
+        id: main-run
+        run: ./perf_run.sh perf-base "${{ runner.temp }}/perf/main" "${{ runner.temp }}/perf/pr/files.txt"
+
+      - name: Compare main vs PR usage
+        if: steps.main-run.outputs.skip != 'true'
+        run: ./perf_compare.sh "${{ runner.temp }}/perf/main" "${{ runner.temp }}/perf/pr" "$GITHUB_STEP_SUMMARY"
 
       - name: Tear down containers
         if: always()

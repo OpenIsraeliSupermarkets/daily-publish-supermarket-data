@@ -1,6 +1,9 @@
 #!/bin/bash
 
 # Usage: ./local_test.sh [--incremental|--persist] [--no-cache]
+# Builds the images and runs the pipeline (steps 1-9), leaving mongodb and api
+# running. Then run ./system_tests.sh to validate them; the full test is
+#   ./local_test.sh --incremental && ./system_tests.sh
 # Arguments:
 #   --incremental: Run Full Production Flow (scrape then publish as separate executions) - default
 #   --persist: Run Loop/Persistent mode (runs continuously)
@@ -52,23 +55,8 @@ if [ -z "$TEST_MODE" ]; then
     BUILD_NO_CACHE=${BUILD_NO_CACHE:-N}
 fi
 
-echo "Step 1: Loading environment variables from .env.test if exists"
-if [ -f .env.test ]; then
-    export $(cat .env.test | xargs)
-fi
-
-echo "Step 2: Setting up test environment variables"
-# Step 10 joins the compose network by name, and compose derives that name from
-# the checkout folder. Pin it so the test works from any folder or worktree.
-export COMPOSE_PROJECT_NAME=publisher
-# Same overrides as the CI system test (see docker-compose.ci.yml).
-export COMPOSE_FILE=${COMPOSE_FILE:-docker-compose.yml:docker-compose.ci.yml}
-# limit the run time — keep in sync with tests.validation_utils.scrapers_to_test()
-export ENABLED_SCRAPERS=BAREKET,WOLT
-export LIMIT=10
-export OUTPUT_DESTINATION=mongo
-# -- should correspond to the number of times the data should be validated
-export NUM_OF_OCCASIONS=1
+# Steps 1-2: the test environment, shared with system_tests.sh.
+source "$(dirname "$0")/test_env.sh"
 
 
 # Function to check container health
@@ -129,17 +117,56 @@ run_quality_gate() {
     fi
 }
 
+# With PERF_OUT set, sample the container's cgroup every second while it runs
+# and write $PERF_OUT/<label>.json: peak memory (as docker stats counts it,
+# without inactive page cache), CPU-seconds and wall time (#184).
+sample_container_usage() {
+    local container_name=$1
+    local out=$2
+    local peak=0 cpu_usec=0 start
+    start=$(date +%s)
+    while [ "$(docker inspect -f '{{.State.Running}}' "$container_name" 2>/dev/null)" == "true" ]; do
+        # cgroup v2 first, then v1. CPU is printed in microseconds.
+        read -r mem cpu < <(docker exec "$container_name" sh -c '
+            c=/sys/fs/cgroup
+            if [ -f $c/memory.current ]; then
+                cur=$(cat $c/memory.current)
+                inactive=$(awk "/^inactive_file /{print \$2}" $c/memory.stat)
+                usage=$(awk "/^usage_usec /{print \$2}" $c/cpu.stat)
+            else
+                cur=$(cat $c/memory/memory.usage_in_bytes)
+                inactive=$(awk "/^total_inactive_file /{print \$2}" $c/memory/memory.stat)
+                usage=$(( $(cat $c/cpuacct/cpuacct.usage) / 1000 ))
+            fi
+            echo $((cur - inactive)) $usage' 2>/dev/null)
+        if [ -n "$mem" ]; then
+            [ "$mem" -gt "$peak" ] && peak=$mem
+            cpu_usec=$cpu
+        fi
+        sleep 1
+    done
+    echo "{\"peak_mem_mb\": $((peak / 1048576)), \"cpu_s\": $((cpu_usec / 1000000)), \"wall_s\": $(( $(date +%s) - start ))}" > "$out"
+}
+
 # Run the data processor for one OPERATION and watch Docker's health status of
 # the container while it runs: it must never turn unhealthy, and with
 # require_healthy=true it must report healthy at least once (#129).
+# With PERF_OUT set, also record its resource usage under the label $2.
 run_data_processor_watching_health() {
     local require_healthy=$1
+    local perf_label=$2
     local container_name="data-fetcher"
     local seen_healthy=false
+    local sampler_pid=""
 
     docker compose up -d data_processor || return 1
     docker logs -f "$container_name" &
     local logs_pid=$!
+    if [ -n "$PERF_OUT" ] && [ -n "$perf_label" ]; then
+        mkdir -p "$PERF_OUT"
+        sample_container_usage "$container_name" "$PERF_OUT/$perf_label.json" &
+        sampler_pid=$!
+    fi
 
     while [ "$(docker inspect -f '{{.State.Running}}' "$container_name" 2>/dev/null)" == "true" ]; do
         health_status=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_name")
@@ -158,6 +185,7 @@ run_data_processor_watching_health() {
         sleep 5
     done
     kill $logs_pid 2>/dev/null
+    [ -n "$sampler_pid" ] && wait "$sampler_pid"
 
     exit_code=$(docker inspect -f '{{.State.ExitCode}}' "$container_name")
     if [ "$exit_code" != "0" ]; then
@@ -239,7 +267,7 @@ echo "Step 8: Starting data processor"
 if [ "$TEST_MODE" == "production" ]; then
     echo "Step 8.1: Running SCRAPE operation (scraping,converting,clean_dump_files,api_update)"
     export OPERATION="scraping,converting,clean_dump_files,api_update"
-    run_data_processor_watching_health true
+    run_data_processor_watching_health true scrape
     
     if [ $? -ne 0 ] || [ "$(container_exit_code data-fetcher)" != "0" ]; then
         echo -e "\033[31mScrape operation failed. Exiting.\033[0m"
@@ -248,12 +276,17 @@ if [ "$TEST_MODE" == "production" ]; then
     
     echo "Step 8.2: Scrape operation completed successfully"
 
+    if [ -n "$PERF_OUT" ]; then
+        # By this script's folder: the main run calls it from main's checkout.
+        "$(dirname "$0")/perf_collect_files.sh" "$APP_DATA_PATH/scraping_status" "$PERF_OUT" || exit 1
+    fi
+
     echo "Step 8.2.1: Checking the quality indicators aggregated locally, before publishing"
     run_quality_gate -v "${APP_DATA_PATH}/quality:/quality:ro" -- --cache-dir /quality || exit 1
 
     echo "Step 8.3: Running PUBLISHING operation (publishing,clean_all_source_data)"
     export OPERATION="publishing,clean_all_source_data"
-    run_data_processor_watching_health false
+    run_data_processor_watching_health false publish
     
     if [ $? -ne 0 ] || [ "$(container_exit_code data-fetcher)" != "0" ]; then
         echo -e "\033[31mPublishing operation failed. Exiting.\033[0m"
@@ -337,28 +370,4 @@ if [ "$TEST_MODE" == "loop" ]; then
     check_container_health "data-fetcher" || exit 1
 fi
 
-echo "Step 10: Running system tests"
-
-docker build --target testing -t supermarket-testing .
-docker run \
-    --network=${COMPOSE_PROJECT_NAME}_mongo-network \
-    -e API_HOST=http://api:8000/ \
-    -e MONGODB_URI=mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@mongodb:${MONGO_PORT} \
-    -e API_TOKEN=${API_TOKEN} \
-    -e KAGGLE_API_TOKEN=${KAGGLE_API_TOKEN} \
-    -e KAGGLE_DATASET_REMOTE_NAME=${KAGGLE_DATASET_REMOTE_NAME} \
-    -e ENABLED_SCRAPERS=${ENABLED_SCRAPERS} \
-    -e ENABLED_FILE_TYPES=${ENABLED_FILE_TYPES} \
-    -e LIMIT=${LIMIT} \
-    -e NUM_OF_OCCASIONS=${NUM_OF_OCCASIONS} \
-    -e SUPABASE_KEY=${SUPABASE_KEY} \
-    -e SUPABASE_URL=${SUPABASE_URL} \
-    supermarket-testing
-
-if [ $? -ne 0 ]; then
-    echo -e "\033[31mSystem tests failed. Exiting.\033[0m"
-    exit 1
-fi
-
-echo "Step 11: Stopping all containers"
-docker compose stop
+echo "Done. mongodb and api are still running; run ./system_tests.sh to validate them."
