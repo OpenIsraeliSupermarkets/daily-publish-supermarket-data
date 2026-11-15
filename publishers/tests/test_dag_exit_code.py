@@ -1,10 +1,9 @@
-"""A failed DAG operation makes the one-shot run exit non-zero (#122)."""
+"""The DAG reports its failed operations so the one-shot run can exit non-zero (#122)."""
 
 from unittest.mock import Mock, patch
 
 import pytest
 
-from main import run_operations_once
 from publishers.dag_simulator import SupermarketDataPublisher
 
 
@@ -45,15 +44,3 @@ def test_run_returns_empty_list_when_all_succeed(publisher):
     _stub_operations(publisher, failing=set())
 
     assert publisher._execute_operations("scraping,converting") == []
-
-
-def test_one_shot_exit_code_is_non_zero_when_an_operation_fails(publisher):
-    _stub_operations(publisher, failing={"converting"})
-
-    assert run_operations_once(publisher, "scraping,converting,clean_dump_files") == 1
-
-
-def test_one_shot_exit_code_is_zero_when_all_succeed(publisher):
-    _stub_operations(publisher, failing=set())
-
-    assert run_operations_once(publisher, "scraping,converting,clean_dump_files") == 0

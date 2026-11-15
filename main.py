@@ -65,19 +65,6 @@ def processing_settings_from_env():
     }
 
 
-def run_operations_once(publisher, operations):
-    """Run OPERATION once and return the process exit code.
-
-    Non-zero when any operation failed, so `docker compose up --exit-code-from`
-    and the GitHub job fail instead of staying green (#122).
-    """
-    failed = publisher._execute_operations(operations)
-    if failed:
-        Logger.error(f"Exiting with code 1, failed operations: {','.join(failed)}")
-        return 1
-    return 0
-
-
 if __name__ == "__main__":
     exit_cleanly_on_sigterm()
     use_forkserver()
@@ -168,7 +155,10 @@ if __name__ == "__main__":
     operations = os.environ.get("OPERATION", "")
     if operations != "":
         Logger.info(f"Executing operations: {operations}")
-        sys.exit(run_operations_once(publisher, operations))
+        # Non-zero when any operation failed, so `docker compose up
+        # --exit-code-from` and the job fail instead of staying green (#122).
+        failed = publisher._execute_operations(operations)
+        sys.exit(1 if failed else 0)
     else:
         Logger.info(f"Running publisher")
         publisher.run(
