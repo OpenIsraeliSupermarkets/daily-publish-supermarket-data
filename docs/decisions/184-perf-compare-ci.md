@@ -5,8 +5,8 @@
 **How (`.github/workflows/system_test_pr.yml`):**
 - The PR's system test runs as before, with `PERF_OUT` set. `local_test.sh` then samples the `data-fetcher` container's cgroup every second while each operation runs. It records peak memory (counted the way `docker stats` counts it, without inactive page cache), CPU-seconds and wall time into `scrape.json` and `publish.json`. It also writes the list of files the scrape downloaded to `files.txt`.
 - main (the PR's base SHA) is then built and run through the PR's `local_test.sh`, with `SCRAPE_FILE_NAME_REGEX` (#186) set to exactly those files, so both sides process the same data.
-- If main can't scrape exactly the same files (a site stopped listing one, or the run failed), it retries up to 3 times and then fails the job (Sefi).
-- The steps are scripts next to `local_test.sh` (Sefi): `perf_collect_files.sh` (called by `local_test.sh` after the scrape), `perf_run_main.sh` and `perf_compare.sh`. `perf_compare.sh` fails when, for either operation, peak memory is up more than 15% and more than 50 MB, or CPU is up more than 20% and more than 10 s. A metric that wasn't measured also fails. The table goes to the job summary.
+- If main doesn't scrape exactly the same files (a site stopped listing one, or the run failed), the job fails. There are no retries (Sefi).
+- The steps are scripts next to `local_test.sh` (Sefi): `perf_collect_files.sh` (called by `local_test.sh` after the scrape), `perf_run.sh` (one run, used for both the PR and main, so the setup is written once) and `perf_compare.sh`. `perf_compare.sh` fails when, for either operation, peak memory is up more than 15% and more than 50 MB, or CPU is up more than 20% and more than 10 s. A metric that wasn't measured also fails. The table goes to the job summary.
 - The main run skips the step 10 system tests (`SKIP_SYSTEM_TESTS`): the PR run already validated the data, and this halves the Kaggle reads.
 
 **Not chosen:**

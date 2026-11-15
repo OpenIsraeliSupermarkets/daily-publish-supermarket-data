@@ -23,7 +23,7 @@ jobs:
       cancel-in-progress: false
     # A green run takes ~10 min; a hang (e.g. #116) must not hold the shared
     # runner for the default 6 h. The teardown step still runs on timeout.
-    # Plus ~10 min for the main-vs-PR usage run (#184), with retries.
+    # Plus ~10 min for the main-vs-PR usage run (#184).
     timeout-minutes: 90
     steps:
       - name: Checkout code
@@ -57,7 +57,7 @@ jobs:
       # PERF_OUT records the data-fetcher's peak memory and CPU per operation,
       # and the files it scraped, for the main-vs-PR comparison below (#184).
       - name: Run system test with incremental mode
-        run: PERF_OUT="${{ runner.temp }}/perf/pr" ./local_test.sh --incremental
+        run: ./perf_run.sh . "${{ runner.temp }}/perf/pr"
 
       - name: Run system test with persistent mode
         run: ./local_test.sh --persist
@@ -71,7 +71,7 @@ jobs:
       # main's code on exactly the files the PR run scraped (#184).
       - name: Run main on the same files
         id: main-run
-        run: ./perf_run_main.sh perf-base "${{ runner.temp }}/perf/pr" "${{ runner.temp }}/perf/main"
+        run: ./perf_run.sh perf-base "${{ runner.temp }}/perf/main" "${{ runner.temp }}/perf/pr/files.txt"
 
       - name: Compare main vs PR usage
         if: steps.main-run.outputs.skip != 'true'
