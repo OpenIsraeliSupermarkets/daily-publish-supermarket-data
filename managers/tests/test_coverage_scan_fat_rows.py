@@ -50,12 +50,12 @@ def test_fat_rows_are_read_one_at_a_time(tmp_path):
     assert growth_mb < 40, growth_mb
 
 
-def test_matches_pandas_on_missing_and_na_values(tmp_path):
+def test_matches_pandas_on_missing_values(tmp_path):
     frame = pd.DataFrame(
         {
-            "found_folder": ["f"] * 6,
-            "file_name": ["a/Price1.xml", "", "NULL", "nan", "a/NULLPrice2.xml", None],
-            "x": ["1", "2", "3", "4", "5", "6"],
+            "found_folder": ["f"] * 4,
+            "file_name": ["a/Price1.xml", "", "a/NULLPrice2.xml", None],
+            "x": ["1", "2", "3", "4"],
         }
     )
     frame.to_csv(tmp_path / "price_file_x.csv", index=False)

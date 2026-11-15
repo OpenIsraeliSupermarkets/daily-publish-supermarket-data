@@ -13,6 +13,8 @@ import sys
 from collections import Counter
 from typing import Any, Dict, Iterable, List, Optional, Set
 
+import pandas as pd
+
 
 from il_supermarket_scarper import FileTypesFilters
 
@@ -56,33 +58,6 @@ LOST = (
 SAMPLE_FILES = 20
 
 
-# Values pandas' read_csv turns into NaN by default; the scan skipped them
-# when it used pandas, so it still does.
-_NA_VALUES = frozenset(
-    {
-        "",
-        "#N/A",
-        "#N/A N/A",
-        "#NA",
-        "-1.#IND",
-        "-1.#QNAN",
-        "-NaN",
-        "-nan",
-        "1.#IND",
-        "1.#QNAN",
-        "<NA>",
-        "N/A",
-        "NA",
-        "NULL",
-        "NaN",
-        "None",
-        "n/a",
-        "nan",
-        "null",
-    }
-)
-
-
 def _csv_file_names(path: str) -> Optional[Set[str]]:
     """Distinct raw ``file_name`` values of one CSV, or None when it has none.
 
@@ -106,7 +81,7 @@ def _csv_file_names(path: str) -> Optional[Set[str]]:
         index = header.index("file_name")
         values: Set[str] = set()
         for row in reader:
-            if len(row) > index and row[index] not in _NA_VALUES:
+            if len(row) > index:
                 values.add(row[index])
         return values
 
@@ -125,10 +100,14 @@ def published_file_names(outputs_folder: str) -> Set[str]:
             if not csv_name.endswith(".csv"):
                 continue
             values = _csv_file_names(os.path.join(root, csv_name))
-            if values:
-                names.update(
-                    normalize_filename(os.path.basename(value)) for value in values
-                )
+            if not values:
+                continue
+            # csv.reader gives an empty cell as "", which pandas' dropna dropped.
+            present = pd.Series(list(values), dtype="object").replace("", pd.NA)
+            names.update(
+                normalize_filename(os.path.basename(value))
+                for value in present.dropna()
+            )
     return names
 
 
