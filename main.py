@@ -6,6 +6,7 @@ from remotes import (
 )
 from publishers import SupermarketDataPublisherInterface, SupermarketDataPublisher
 import os
+import sys
 import datetime
 from utils import now
 from utils import Logger, exit_cleanly_on_sigterm, use_forkserver
@@ -154,7 +155,10 @@ if __name__ == "__main__":
     operations = os.environ.get("OPERATION", "")
     if operations != "":
         Logger.info(f"Executing operations: {operations}")
-        publisher._execute_operations(operations)
+        # Non-zero when any operation failed, so `docker compose up
+        # --exit-code-from` and the job fail instead of staying green (#122).
+        failed = publisher._execute_operations(operations)
+        sys.exit(1 if failed else 0)
     else:
         Logger.info(f"Running publisher")
         publisher.run(

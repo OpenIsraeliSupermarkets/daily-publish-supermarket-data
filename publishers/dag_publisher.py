@@ -60,9 +60,14 @@ class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
 
         Args:
             operations: Comma-separated string of operations to execute
+
+        Returns:
+            list: The operations that raised, in order. A failed operation does
+            not stop the DAG; the remaining operations still run (#122).
         """
         Logger.info("Starting executing DAG = %s", operations)
         self._check_tz()
+        failed = []
 
         for operation in operations.split(","):
             Logger.info(f"DAG is {operations} starting the operation=%s", operation)
@@ -84,4 +89,12 @@ class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
                     operation, success=False, error=str(e)
                 )
                 Logger.error(f"Operation {operation} failed: {e}")
-                # raise  # Re-raise the exception to maintain original behavior
+                failed.append(operation)
+
+        if failed:
+            Logger.error(
+                "DAG %s finished with failed operations: %s",
+                operations,
+                ",".join(failed),
+            )
+        return failed
