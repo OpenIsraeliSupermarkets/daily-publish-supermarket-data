@@ -5,7 +5,7 @@
 # records the data-fetcher's usage and scraped files in OUT_DIR (#184).
 #
 # With FILES (the PR run's files.txt): scrapes exactly those files through
-# SCRAPE_FILE_NAME_REGEX (#186), skips the step-10 system tests, and fails if
+# SCRAPE_FILE_NAME_REGEX (#186), and fails if
 # the files it scraped differ. If CHECKOUT can't scrape a fixed file list yet,
 # exits 0 without running and writes skip=true to $GITHUB_OUTPUT.
 here=$(cd "$(dirname "$0")" && pwd)
@@ -32,7 +32,6 @@ if [ -n "$files" ]; then
         [ -n "$name" ] && printf '%s\n' "${name%.*}" | sed 's/[][\.*^$+?(){}|/]/\\&/g'
     done < "$files" | paste -sd '|')
     export SCRAPE_FILE_NAME_REGEX
-    export SKIP_SYSTEM_TESTS=1
 fi
 
 (cd "$checkout" && "$here/local_test.sh" --incremental) || exit 1

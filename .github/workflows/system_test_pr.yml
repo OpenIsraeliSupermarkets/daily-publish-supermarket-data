@@ -57,10 +57,10 @@ jobs:
       # PERF_OUT records the data-fetcher's peak memory and CPU per operation,
       # and the files it scraped, for the main-vs-PR comparison below (#184).
       - name: Run system test with incremental mode
-        run: ./perf_run.sh . "${{ runner.temp }}/perf/pr"
+        run: ./perf_run.sh . "${{ runner.temp }}/perf/pr" && ./system_tests.sh
 
       - name: Run system test with persistent mode
-        run: ./local_test.sh --persist
+        run: ./local_test.sh --persist && ./system_tests.sh
 
       - name: Checkout main for the usage comparison
         uses: actions/checkout@v3

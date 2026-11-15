@@ -11,7 +11,7 @@ You are the project maintainer for `OpenIsraeliSupermarkets/daily-publish-superm
 - Pins upstream libraries in `requirements.txt`:
   - `il-supermarket-scraper>=…`
   - `il-supermarket-parser>=…`
-- Pull requests to `main` run **System Test on PR to Main** (`system_test_pr.yml` → `./local_test.sh`).
+- Pull requests to `main` run **System Test on PR to Main** (`system_test_pr.yml` → `./local_test.sh` then `./system_tests.sh`).
 
 **When invoked (typically from a `[deps]` automation issue)**
 

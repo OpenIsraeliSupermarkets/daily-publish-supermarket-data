@@ -7,7 +7,7 @@
 - main (the PR's base SHA) is then built and run through the PR's `local_test.sh`, with `SCRAPE_FILE_NAME_REGEX` (#186) set to exactly those files, so both sides process the same data.
 - If main doesn't scrape exactly the same files (a site stopped listing one, or the run failed), the job fails. There are no retries (Sefi).
 - The steps are scripts next to `local_test.sh` (Sefi): `perf_collect_files.sh` (called by `local_test.sh` after the scrape), `perf_run.sh` (one run, used for both the PR and main, so the setup is written once) and `perf_compare.sh`. `perf_compare.sh` fails when, for either operation, peak memory is up more than 15% and more than 50 MB, or CPU is up more than 20% and more than 10 s. A metric that wasn't measured also fails. The table goes to the job summary.
-- The main run skips the step 10 system tests (`SKIP_SYSTEM_TESTS`): the PR run already validated the data, and this halves the Kaggle reads.
+- `local_test.sh` only runs the pipeline and leaves the stack up; `system_tests.sh` validates it (Sefi). The workflow runs `system_tests.sh` after the PR's runs but not after main's: the PR run already validated the data, and this halves the Kaggle reads. Both source `test_env.sh`.
 
 **Not chosen:**
 - Custom synthetic workloads: too much code (Sefi).

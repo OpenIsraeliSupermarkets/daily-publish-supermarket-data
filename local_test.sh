@@ -1,6 +1,9 @@
 #!/bin/bash
 
 # Usage: ./local_test.sh [--incremental|--persist] [--no-cache]
+# Builds the images and runs the pipeline (steps 1-9), leaving mongodb and api
+# running. Then run ./system_tests.sh to validate them; the full test is
+#   ./local_test.sh --incremental && ./system_tests.sh
 # Arguments:
 #   --incremental: Run Full Production Flow (scrape then publish as separate executions) - default
 #   --persist: Run Loop/Persistent mode (runs continuously)
@@ -52,23 +55,8 @@ if [ -z "$TEST_MODE" ]; then
     BUILD_NO_CACHE=${BUILD_NO_CACHE:-N}
 fi
 
-echo "Step 1: Loading environment variables from .env.test if exists"
-if [ -f .env.test ]; then
-    export $(cat .env.test | xargs)
-fi
-
-echo "Step 2: Setting up test environment variables"
-# Step 10 joins the compose network by name, and compose derives that name from
-# the checkout folder. Pin it so the test works from any folder or worktree.
-export COMPOSE_PROJECT_NAME=publisher
-# Same overrides as the CI system test (see docker-compose.ci.yml).
-export COMPOSE_FILE=${COMPOSE_FILE:-docker-compose.yml:docker-compose.ci.yml}
-# limit the run time — keep in sync with tests.validation_utils.scrapers_to_test()
-export ENABLED_SCRAPERS=BAREKET,WOLT
-export LIMIT=10
-export OUTPUT_DESTINATION=mongo
-# -- should correspond to the number of times the data should be validated
-export NUM_OF_OCCASIONS=1
+# Steps 1-2: the test environment, shared with system_tests.sh.
+source "$(dirname "$0")/test_env.sh"
 
 
 # Function to check container health
@@ -382,34 +370,4 @@ if [ "$TEST_MODE" == "loop" ]; then
     check_container_health "data-fetcher" || exit 1
 fi
 
-if [ -n "$SKIP_SYSTEM_TESTS" ]; then
-    echo "Step 10: Skipped (SKIP_SYSTEM_TESTS is set)"
-    docker compose stop
-    exit 0
-fi
-
-echo "Step 10: Running system tests"
-
-docker build --target testing -t supermarket-testing .
-docker run \
-    --network=${COMPOSE_PROJECT_NAME}_mongo-network \
-    -e API_HOST=http://api:8000/ \
-    -e MONGODB_URI=mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@mongodb:${MONGO_PORT} \
-    -e API_TOKEN=${API_TOKEN} \
-    -e KAGGLE_API_TOKEN=${KAGGLE_API_TOKEN} \
-    -e KAGGLE_DATASET_REMOTE_NAME=${KAGGLE_DATASET_REMOTE_NAME} \
-    -e ENABLED_SCRAPERS=${ENABLED_SCRAPERS} \
-    -e ENABLED_FILE_TYPES=${ENABLED_FILE_TYPES} \
-    -e LIMIT=${LIMIT} \
-    -e NUM_OF_OCCASIONS=${NUM_OF_OCCASIONS} \
-    -e SUPABASE_KEY=${SUPABASE_KEY} \
-    -e SUPABASE_URL=${SUPABASE_URL} \
-    supermarket-testing
-
-if [ $? -ne 0 ]; then
-    echo -e "\033[31mSystem tests failed. Exiting.\033[0m"
-    exit 1
-fi
-
-echo "Step 11: Stopping all containers"
-docker compose stop
+echo "Done. mongodb and api are still running; run ./system_tests.sh to validate them."
