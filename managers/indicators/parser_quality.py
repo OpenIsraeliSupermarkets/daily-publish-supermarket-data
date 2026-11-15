@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from datetime import datetime
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set
 
 from il_supermarket_parsers import ParserStatusOutput
 from il_supermarket_parsers.utils.status.parser_status_contract import (
@@ -109,6 +109,29 @@ def _filter_files_by_type(file_names: Iterable[str], file_type: str) -> Set[str]
     return filtered
 
 
+def _parser_metrics(
+    raw: Dict[str, Any],
+    scraper_status: Optional[ScraperStatusOutput],
+    file_type: str,
+    started_times: List[datetime],
+) -> Dict[str, Any]:
+    """One parser's metrics; appends its task start times to ``started_times``."""
+    status = ParserStatusOutput(**raw)
+    task_ids = _task_ids_from_parser(status)
+    for task_id in task_ids:
+        started_at = _task_started_at_parser(status, task_id)
+        if started_at is not None:
+            started_times.append(started_at)
+    return {
+        "task_id": _single_task_id(task_ids),
+        "zero_record_files": _parser_zero_record_file_names(status),
+        "downloaded_not_parsed": _parser_downloaded_not_parsed_file_names(
+            status, scraper_status, file_type
+        ),
+        "global_status": _started_global_status_from_raw(raw),
+    }
+
+
 def _compute_parser_quality(
     scraping_status_folder: str,
     converting_status_folder: str,
@@ -119,57 +142,47 @@ def _compute_parser_quality(
 
     A file queued by any scrape task and recorded by any parser task is resolved.
     Parser tasks are not paired to a single scrape run.
-    """
-    scraper_status_by_chain: Dict[str, ScraperStatusOutput] = {}
-    for scraper in enabled_scrapers:
-        status_path = os.path.join(
-            scraping_status_folder,
-            f"{DumpFolderNames[scraper].value.lower()}.json",
-        )
-        raw = _load_status_json(status_path)
-        if raw is not None:
-            scraper_status_by_chain[scraper] = ScraperStatusOutput(**raw)
 
-    parser_status: Dict[str, ParserStatusOutput] = {}
-    parser_raw: Dict[str, Dict[str, Any]] = {}
-    parser_key_parts: Dict[str, Tuple[str, str]] = {}
+    Chains are handled one at a time: a chain's scraper status and its parser
+    status files are loaded, reduced to metrics and released before the next
+    chain, so peak memory follows the largest chain (#177).
+    """
+    parsers_metrics: Dict[str, Dict[str, Any]] = {}
     started_times: List[datetime] = []
 
     for scraper in enabled_scrapers:
+        parser_keys = {}
         for file_type in enabled_file_types:
             parser_key = f"{scraper}_{file_type}".lower()
-            parser_key_parts[parser_key] = (scraper, file_type)
-            status_path = os.path.join(
-                converting_status_folder, f"{parser_key}.json"
-            )
-            raw = _load_status_json(status_path)
-            if raw is None:
-                continue
-
-            status = ParserStatusOutput(**raw)
-            parser_status[parser_key] = status
-            parser_raw[parser_key] = raw
-            for task_id in _task_ids_from_parser(status):
-                started_at = _task_started_at_parser(status, task_id)
-                if started_at is not None:
-                    started_times.append(started_at)
-
-    parsers_metrics: Dict[str, Dict[str, Any]] = {}
-    for parser_key, (scraper, file_type) in parser_key_parts.items():
-        if parser_key not in parser_status:
+            if os.path.isfile(
+                os.path.join(converting_status_folder, f"{parser_key}.json")
+            ):
+                parser_keys[file_type] = parser_key
+        if not parser_keys:
             continue
 
-        status = parser_status[parser_key]
-        parsers_metrics[parser_key] = {
-            "task_id": _single_task_id(_task_ids_from_parser(status)),
-            "zero_record_files": _parser_zero_record_file_names(status),
-            "downloaded_not_parsed": _parser_downloaded_not_parsed_file_names(
-                status,
-                scraper_status_by_chain.get(scraper),
-                file_type,
-            ),
-            "global_status": _started_global_status_from_raw(parser_raw.get(parser_key)),
-        }
+        scraper_raw = _load_status_json(
+            os.path.join(
+                scraping_status_folder,
+                f"{DumpFolderNames[scraper].value.lower()}.json",
+            )
+        )
+        scraper_status = (
+            ScraperStatusOutput(**scraper_raw) if scraper_raw is not None else None
+        )
+        del scraper_raw
+
+        for file_type, parser_key in parser_keys.items():
+            raw = _load_status_json(
+                os.path.join(converting_status_folder, f"{parser_key}.json")
+            )
+            if raw is None:
+                continue
+            parsers_metrics[parser_key] = _parser_metrics(
+                raw, scraper_status, file_type, started_times
+            )
+            del raw
+        del scraper_status
 
     if not parsers_metrics:
         return {"computed_at": now().isoformat(), "iterations": []}
@@ -184,7 +197,6 @@ def _compute_parser_quality(
             }
         ],
     }
-
 
 
 class ParserQuality:

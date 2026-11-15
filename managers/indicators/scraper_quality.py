@@ -274,14 +274,53 @@ def _single_task_id(task_ids: List[str]) -> Optional[str]:
     return task_ids[0] if len(task_ids) == 1 else None
 
 
+def _no_data_scraper_metrics() -> Dict[str, Any]:
+    return {
+        "task_id": None,
+        "saw": 0,
+        "downloaded": 0,
+        "no_data": True,
+        "saw_not_downloaded": [],
+        "global_status": [],
+    }
+
+
+def _scraper_metrics(
+    raw: Dict[str, Any], started_times: List[datetime]
+) -> Dict[str, Any]:
+    """One chain's scraper metrics; appends its task start times to ``started_times``."""
+    status = ScraperStatusOutput(**raw)
+    task_ids = _task_ids_from_scraper(status)
+    for task_id in task_ids:
+        started_at = _task_started_at_scraper(status, task_id)
+        if started_at is not None:
+            started_times.append(started_at)
+
+    saw_files = _scraper_saw_files(status)
+    downloaded_files = _scraper_downloaded_files(status)
+    return {
+        "task_id": _single_task_id(task_ids),
+        "saw": len(saw_files),
+        "downloaded": len(downloaded_files),
+        "no_data": len(downloaded_files) == 0,
+        "saw_not_downloaded": _scraper_saw_not_downloaded(status),
+        "global_status": _started_global_status_from_raw(raw),
+    }
+
+
 def _compute_scraper_quality(
     scraping_status_folder: str,
     enabled_scrapers: List[str],
 ) -> Dict[str, Any]:
-    """Build one scraper quality snapshot across every task in the status files."""
-    scraper_status: Dict[str, ScraperStatusOutput] = {}
-    scraper_raw: Dict[str, Dict[str, Any]] = {}
+    """Build one scraper quality snapshot across every task in the status files.
+
+    Chains are handled one at a time: each status file is loaded, reduced to
+    its metrics and released before the next one, so peak memory follows the
+    largest chain rather than the sum of all of them (#177).
+    """
+    scrapers_metrics: Dict[str, Dict[str, Any]] = {}
     started_times: List[datetime] = []
+    any_status = False
 
     for scraper in enabled_scrapers:
         status_path = os.path.join(
@@ -290,43 +329,14 @@ def _compute_scraper_quality(
         )
         raw = _load_status_json(status_path)
         if raw is None:
+            scrapers_metrics[scraper] = _no_data_scraper_metrics()
             continue
+        any_status = True
+        scrapers_metrics[scraper] = _scraper_metrics(raw, started_times)
+        del raw
 
-        status = ScraperStatusOutput(**raw)
-        scraper_status[scraper] = status
-        scraper_raw[scraper] = raw
-        for task_id in _task_ids_from_scraper(status):
-            started_at = _task_started_at_scraper(status, task_id)
-            if started_at is not None:
-                started_times.append(started_at)
-
-    if not scraper_status:
+    if not any_status:
         return {"computed_at": now().isoformat(), "iterations": []}
-
-    scrapers_metrics: Dict[str, Dict[str, Any]] = {}
-    for scraper in enabled_scrapers:
-        if scraper not in scraper_status:
-            scrapers_metrics[scraper] = {
-                "task_id": None,
-                "saw": 0,
-                "downloaded": 0,
-                "no_data": True,
-                "saw_not_downloaded": [],
-                "global_status": [],
-            }
-            continue
-
-        status = scraper_status[scraper]
-        saw_files = _scraper_saw_files(status)
-        downloaded_files = _scraper_downloaded_files(status)
-        scrapers_metrics[scraper] = {
-            "task_id": _single_task_id(_task_ids_from_scraper(status)),
-            "saw": len(saw_files),
-            "downloaded": len(downloaded_files),
-            "no_data": len(downloaded_files) == 0,
-            "saw_not_downloaded": _scraper_saw_not_downloaded(status),
-            "global_status": _started_global_status_from_raw(scraper_raw.get(scraper)),
-        }
 
     started_at = min(started_times) if started_times else now()
     return {
@@ -343,7 +353,6 @@ def _compute_scraper_quality(
             }
         ],
     }
-
 
 
 class ScraperQuality:
