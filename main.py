@@ -112,6 +112,9 @@ if __name__ == "__main__":
     Logger.info(f"Limit: {limit}")
     Logger.info(f"When: {when}")
     Logger.info(f"Re-download unparsed: {re_download_unparsed}")
+    # Scrape only files matching this regex (CI perf comparison, #186).
+    file_name_regex = os.environ.get("SCRAPE_FILE_NAME_REGEX") or None
+    Logger.info(f"Scrape file name regex: {file_name_regex}")
 
     second_to_wait_between_opreation = os.environ.get(
         "SECOND_TO_WAIT_BETWEEN_OPERATIONS", 60 * 30
@@ -149,6 +152,7 @@ if __name__ == "__main__":
         limit=limit,
         when_date=when,
         re_download_unparsed=re_download_unparsed,
+        file_name_regex=file_name_regex,
     )
 
     # self execute operations if OPERATION is set
