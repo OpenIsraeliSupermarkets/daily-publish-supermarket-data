@@ -31,6 +31,7 @@ from managers.indicators.status_files import (
     queued_for_parse,
 )
 from utils import Logger, now
+from utils.memory import log_step
 
 SCRAPER_QUALITY_FILENAME = "scraper_quality.json"
 PARSER_QUALITY_FILENAME = "parser_quality.json"
@@ -100,9 +101,7 @@ def generalize_filename_patterns(
             pattern = f"{kind}{chain}"
         else:
             columns = list(zip(*(row[2] for row in rows)))
-            tokens = [
-                column[0] if len(set(column)) == 1 else "*" for column in columns
-            ]
+            tokens = [column[0] if len(set(column)) == 1 else "*" for column in columns]
             pattern = f"{kind}{chain}-" + "-".join(tokens)
         patterns.append(
             {
@@ -190,9 +189,7 @@ def compute_improvement_priorities(
     for scraper, stats in scrape_stats.items():
         if stats["download_failed"] > 0:
             issue = "download_failures"
-            why = (
-                f"{stats['download_failed']} files failed download or extraction"
-            )
+            why = f"{stats['download_failed']} files failed download or extraction"
         elif (
             stats["iterations"] > 0
             and stats["no_data_iterations"] == stats["iterations"]
@@ -201,9 +198,7 @@ def compute_improvement_priorities(
             why = "no files downloaded"
         elif stats["latest_no_data"] and stats["latest_saw"] > 0:
             issue = "saw_but_not_downloaded"
-            why = (
-                f"saw {stats['latest_saw']} files but downloaded none"
-            )
+            why = f"saw {stats['latest_saw']} files but downloaded none"
         else:
             continue
         scraping.append(
@@ -380,7 +375,10 @@ def collect_scrape_sample_errors(
         for entry in metrics.get("saw_not_downloaded") or []:
             if not isinstance(entry, dict):
                 continue
-            if issue == "download_failures" and entry.get("reason") != "download_failed":
+            if (
+                issue == "download_failures"
+                and entry.get("reason") != "download_failed"
+            ):
                 continue
             if entry.get("reason") == "skipped_by_limit":
                 continue
@@ -450,11 +448,7 @@ def _started_events_from_metrics(metrics: Dict[str, Any]) -> List[Dict[str, Any]
         events = [raw]
     elif isinstance(metrics.get("parameters"), dict):
         events = [{"status": "started", **metrics["parameters"]}]
-    started = [
-        event
-        for event in events
-        if event.get("status") in (None, "started")
-    ]
+    started = [event for event in events if event.get("status") in (None, "started")]
     return started or events
 
 
@@ -638,9 +632,7 @@ def compute_pipeline_health(
     """
     thresholds = thresholds or _load_health_thresholds()
     scraper = scraper_section(scraper_quality)
-    parser = parser_section(
-        parser_quality, scraper["total_downloaded"]
-    )
+    parser = parser_section(parser_quality, scraper["total_downloaded"])
     if unparsed_downloads is None:
         unparsed_downloads = {"total_files": 0, "by_chain": []}
 
@@ -668,11 +660,15 @@ def compute_pipeline_health(
         DownloadPublishedLag.section: download_published_lag,
         # None when nothing was judged (no thresholds in the environment).
         "overall_healthy": (
-            all(judged) if (judged := [
-                section["healthy"]
-                for section in sections.values()
-                if section["healthy"] is not None
-            ]) else None
+            all(judged)
+            if (
+                judged := [
+                    section["healthy"]
+                    for section in sections.values()
+                    if section["healthy"] is not None
+                ]
+            )
+            else None
         ),
     }
 
@@ -782,53 +778,62 @@ def write_quality_indicators(
 
     os.makedirs(quality_folder, exist_ok=True)
 
-    scraper_quality = compute_scraper_quality(
-        scraping_status_folder, enabled_scrapers
-    )
-    parser_quality = compute_parser_quality(
-        scraping_status_folder,
-        converting_status_folder,
-        enabled_scrapers,
-        enabled_file_types,
-    )
-    unparsed_downloads = compute_unparsed_downloads(
-        scraping_status_folder,
-        converting_status_folder,
-        enabled_scrapers,
-        enabled_file_types,
-    )
+    # One line per step with time and memory, so an OOM kill points at the
+    # step that was running (#180).
+    with log_step("quality/scraper_quality"):
+        scraper_quality = compute_scraper_quality(
+            scraping_status_folder, enabled_scrapers
+        )
+    with log_step("quality/parser_quality"):
+        parser_quality = compute_parser_quality(
+            scraping_status_folder,
+            converting_status_folder,
+            enabled_scrapers,
+            enabled_file_types,
+        )
+    with log_step("quality/unparsed_downloads"):
+        unparsed_downloads = compute_unparsed_downloads(
+            scraping_status_folder,
+            converting_status_folder,
+            enabled_scrapers,
+            enabled_file_types,
+        )
 
     scraper_path = os.path.join(quality_folder, SCRAPER_QUALITY_FILENAME)
     parser_path = os.path.join(quality_folder, PARSER_QUALITY_FILENAME)
 
     end_to_end_coverage = None
     if outputs_folder is not None:
-        end_to_end_coverage = EndToEndCoverage.compute(
-            scraping_status_folder,
-            converting_status_folder,
-            outputs_folder,
-            enabled_scrapers,
-            enabled_file_types,
+        with log_step("quality/end_to_end_coverage"):
+            end_to_end_coverage = EndToEndCoverage.compute(
+                scraping_status_folder,
+                converting_status_folder,
+                outputs_folder,
+                enabled_scrapers,
+                enabled_file_types,
+            )
+    with log_step("quality/download_published_lag"):
+        download_published_lag = DownloadPublishedLag.compute(
+            scraping_status_folder, enabled_scrapers
         )
-    download_published_lag = DownloadPublishedLag.compute(
-        scraping_status_folder, enabled_scrapers
-    )
 
-    pipeline_health = compute_pipeline_health(
-        scraper_quality,
-        parser_quality,
-        unparsed_downloads=unparsed_downloads,
-        end_to_end_coverage=end_to_end_coverage,
-        download_published_lag=download_published_lag,
-    )
+    with log_step("quality/pipeline_health"):
+        pipeline_health = compute_pipeline_health(
+            scraper_quality,
+            parser_quality,
+            unparsed_downloads=unparsed_downloads,
+            end_to_end_coverage=end_to_end_coverage,
+            download_published_lag=download_published_lag,
+        )
     health_path = os.path.join(quality_folder, PIPELINE_HEALTH_FILENAME)
 
-    with open(scraper_path, "w", encoding="utf-8") as handle:
-        json.dump(scraper_quality, handle, indent=2, default=str)
-    with open(parser_path, "w", encoding="utf-8") as handle:
-        json.dump(parser_quality, handle, indent=2, default=str)
-    with open(health_path, "w", encoding="utf-8") as handle:
-        json.dump(pipeline_health, handle, indent=2, default=str)
+    with log_step("quality/write"):
+        with open(scraper_path, "w", encoding="utf-8") as handle:
+            json.dump(scraper_quality, handle, indent=2, default=str)
+        with open(parser_path, "w", encoding="utf-8") as handle:
+            json.dump(parser_quality, handle, indent=2, default=str)
+        with open(health_path, "w", encoding="utf-8") as handle:
+            json.dump(pipeline_health, handle, indent=2, default=str)
 
     Logger.info(
         "Quality indicators written: scrape_snapshot=%s parse_snapshot=%s "

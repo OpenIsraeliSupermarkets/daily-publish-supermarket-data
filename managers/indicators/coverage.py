@@ -8,6 +8,7 @@ to the CSV rows we publish, and put in the bucket of where it stopped.
 from __future__ import annotations
 
 import os
+import time
 from collections import Counter
 from typing import Any, Dict, Iterable, List, Optional, Set
 
@@ -24,6 +25,8 @@ from managers.indicators.status_files import (
     queued_for_parse,
 )
 from managers.indicators.views import ParserView, ScraperView
+from utils import Logger
+from utils.memory import memory_mb
 
 PUBLISHED = "published"
 EMPTY_AT_SOURCE = "empty_at_source"
@@ -59,15 +62,27 @@ def published_file_names(outputs_folder: str) -> Set[str]:
     """Normalized source file names that have rows in the output CSVs.
 
     Reads only the ``file_name`` column of every CSV under ``outputs_folder``.
+    Logs each CSV before reading it, so an OOM kill names the file (#180).
     """
     names: Set[str] = set()
     if not outputs_folder or not os.path.isdir(outputs_folder):
         return names
+    started = time.monotonic()
+    scanned = 0
     for root, _, files in os.walk(outputs_folder):
         for csv_name in files:
             if not csv_name.endswith(".csv"):
                 continue
             path = os.path.join(root, csv_name)
+            rss, peak = memory_mb()
+            Logger.info(
+                "Coverage scan: reading %s (%.0fMB) at %.1fs rss=%sMB peak=%sMB",
+                csv_name,
+                _size_mb(path),
+                time.monotonic() - started,
+                rss,
+                peak,
+            )
             try:
                 header = pd.read_csv(path, nrows=0)
             except (pd.errors.EmptyDataError, pd.errors.ParserError, OSError):
@@ -81,7 +96,24 @@ def published_file_names(outputs_folder: str) -> Set[str]:
                     normalize_filename(os.path.basename(value))
                     for value in chunk["file_name"].dropna().unique()
                 )
+            scanned += 1
+    rss, peak = memory_mb()
+    Logger.info(
+        "Coverage scan: %d CSVs, %d file names in %.1fs rss=%sMB peak=%sMB",
+        scanned,
+        len(names),
+        time.monotonic() - started,
+        rss,
+        peak,
+    )
     return names
+
+
+def _size_mb(path: str) -> float:
+    try:
+        return os.path.getsize(path) / 1e6
+    except OSError:
+        return 0.0
 
 
 class SeenFileClassifier:
