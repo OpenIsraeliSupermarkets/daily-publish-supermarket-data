@@ -7,11 +7,12 @@ to the CSV rows we publish, and put in the bucket of where it stopped.
 
 from __future__ import annotations
 
+import csv
 import os
+import sys
 from collections import Counter
 from typing import Any, Dict, Iterable, List, Optional, Set
 
-import pandas as pd
 
 from il_supermarket_scarper import FileTypesFilters
 
@@ -55,6 +56,61 @@ LOST = (
 SAMPLE_FILES = 20
 
 
+# Values pandas' read_csv turns into NaN by default; the scan skipped them
+# when it used pandas, so it still does.
+_NA_VALUES = frozenset(
+    {
+        "",
+        "#N/A",
+        "#N/A N/A",
+        "#NA",
+        "-1.#IND",
+        "-1.#QNAN",
+        "-NaN",
+        "-nan",
+        "1.#IND",
+        "1.#QNAN",
+        "<NA>",
+        "N/A",
+        "NA",
+        "NULL",
+        "NaN",
+        "None",
+        "n/a",
+        "nan",
+        "null",
+    }
+)
+
+
+def _csv_file_names(path: str) -> Optional[Set[str]]:
+    """Distinct raw ``file_name`` values of one CSV, or None when it has none.
+
+    Streams the file row by row with ``csv.reader``, so memory stays at about
+    one row however wide the rows are. pandas' tokenizer holds every field of
+    a 32k-64k row batch even with ``usecols``; with ~1 MB promo rows that was
+    the whole 8.7 GB file and the data-fetcher was OOM-killed (#182).
+    """
+    try:
+        handle = open(path, "r", encoding="utf-8", newline="")
+    except OSError:
+        return None
+    with handle:
+        reader = csv.reader(handle)
+        try:
+            header = next(reader)
+        except (StopIteration, csv.Error):
+            return None
+        if "file_name" not in header:
+            return None
+        index = header.index("file_name")
+        values: Set[str] = set()
+        for row in reader:
+            if len(row) > index and row[index] not in _NA_VALUES:
+                values.add(row[index])
+        return values
+
+
 def published_file_names(outputs_folder: str) -> Set[str]:
     """Normalized source file names that have rows in the output CSVs.
 
@@ -63,23 +119,15 @@ def published_file_names(outputs_folder: str) -> Set[str]:
     names: Set[str] = set()
     if not outputs_folder or not os.path.isdir(outputs_folder):
         return names
+    csv.field_size_limit(sys.maxsize)
     for root, _, files in os.walk(outputs_folder):
         for csv_name in files:
             if not csv_name.endswith(".csv"):
                 continue
-            path = os.path.join(root, csv_name)
-            try:
-                header = pd.read_csv(path, nrows=0)
-            except (pd.errors.EmptyDataError, pd.errors.ParserError, OSError):
-                continue
-            if "file_name" not in header.columns:
-                continue
-            for chunk in pd.read_csv(
-                path, usecols=["file_name"], dtype=str, chunksize=500_000
-            ):
+            values = _csv_file_names(os.path.join(root, csv_name))
+            if values:
                 names.update(
-                    normalize_filename(os.path.basename(value))
-                    for value in chunk["file_name"].dropna().unique()
+                    normalize_filename(os.path.basename(value)) for value in values
                 )
     return names
 
