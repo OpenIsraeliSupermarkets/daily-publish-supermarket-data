@@ -17,6 +17,8 @@ from il_supermarket_scarper import (
     StartedStatus,
 )
 
+from il_supermarket_scarper.utils.files.save_policy import SaveDecision
+
 from managers.indicators.status_files import (
     load_status_json as _load_status_json,
     normalize_filename,
@@ -103,6 +105,24 @@ def _scraper_files_queued_for_parse(
         for file_name, recorded in decisions.items()
         if any(_save_decision_queued_for_parse(decision) for decision in recorded)
     }
+
+
+def _scraper_verified_download_counts(status: ScraperStatusOutput) -> Dict[str, int]:
+    """Download rows in the window and how many of them repeated a stored file.
+
+    Every successful download adds a ``verified_downloads`` row. A row whose
+    ``save_decision`` is ``rewrote_same`` was downloaded again although the
+    same bytes (same sha256) were already stored, so it was not sent to the
+    parser: a wasted download (scrapers #233). Rows are counted, not files,
+    because each repeat adds a row.
+    """
+    total = 0
+    repeated = 0
+    for verified in status.verified_downloads:
+        total += 1
+        if str(verified.save_decision or "") == SaveDecision.REWROTE_SAME.value:
+            repeated += 1
+    return {"verified_downloads": total, "repeated_downloads": repeated}
 
 
 def _started_global_status_from_raw(
@@ -279,6 +299,8 @@ def _no_data_scraper_metrics() -> Dict[str, Any]:
         "task_id": None,
         "saw": 0,
         "downloaded": 0,
+        "verified_downloads": 0,
+        "repeated_downloads": 0,
         "no_data": True,
         "saw_not_downloaded": [],
         "global_status": [],
@@ -302,6 +324,7 @@ def _scraper_metrics(
         "task_id": _single_task_id(task_ids),
         "saw": len(saw_files),
         "downloaded": len(downloaded_files),
+        **_scraper_verified_download_counts(status),
         "no_data": len(downloaded_files) == 0,
         "saw_not_downloaded": _scraper_saw_not_downloaded(status),
         "global_status": _started_global_status_from_raw(raw),
