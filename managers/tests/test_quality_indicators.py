@@ -7,6 +7,7 @@ from datetime import datetime
 import pytest
 from il_supermarket_scarper import DumpFolderNames, FileTypesFilters
 
+from managers.indicators.scraping import scraper_section
 from managers.quality_indicators import (
     PARSER_QUALITY_FILENAME,
     PIPELINE_HEALTH_FILENAME,
@@ -1306,3 +1307,127 @@ def test_unparsed_downloads_skips_files_whose_download_failed(status_dirs):
     # download in the evening and the parser has no record of it.
     assert result["total_files"] == 1
     assert result["by_chain"][0]["files"] == ["PriceRetried"]
+
+
+# --- repeated downloads (issue #188) -------------------------------------
+
+
+def _scraper_iteration(**per_scraper):
+    """scraper_quality with one iteration: name -> (downloads, repeated)."""
+    return {
+        "iterations": [
+            {
+                "scrapers_with_no_data": 0,
+                "scrapers": {
+                    name: {
+                        "saw": downloads,
+                        "downloaded": downloads,
+                        "verified_downloads": downloads,
+                        "repeated_downloads": repeated,
+                        "saw_not_downloaded": [],
+                    }
+                    for name, (downloads, repeated) in per_scraper.items()
+                },
+            }
+        ]
+    }
+
+
+def test_compute_scraper_quality_counts_repeated_downloads(status_dirs):
+    """rewrote_same rows are repeats; every verified row is a download."""
+    started = datetime(2026, 11, 17, 10, 0, 0)
+    first = _scraper_status(
+        "task-1",
+        started,
+        saw_files=["Price123.xml", "Price456.xml"],
+        downloaded_files=["Price123.xml", "Price456.xml"],
+    )
+    again = _scraper_status(
+        "task-2",
+        started,
+        saw_files=["Price123.xml", "Price456.xml"],
+        downloaded_files=["Price123.xml", "Price456.xml"],
+        save_decisions={"Price123.xml": "rewrote_same", "Price456.xml": "rewrote_same"},
+    )
+    first["verified_downloads"].extend(again["verified_downloads"])
+    first["global_status"].extend(again["global_status"])
+    shufersal_file = DumpFolderNames["SHUFERSAL"].value.lower()
+    _write_json(os.path.join(status_dirs["scraping"], f"{shufersal_file}.json"), first)
+
+    result = compute_scraper_quality(status_dirs["scraping"], ["SHUFERSAL", "WOLT"])
+
+    scrapers = result["iterations"][0]["scrapers"]
+    assert scrapers["SHUFERSAL"]["verified_downloads"] == 4
+    assert scrapers["SHUFERSAL"]["repeated_downloads"] == 2
+    assert scrapers["SHUFERSAL"]["downloaded"] == 2
+    assert scrapers["WOLT"]["verified_downloads"] == 0
+    assert scrapers["WOLT"]["repeated_downloads"] == 0
+
+
+def test_repeated_downloads_normal_run_has_no_warning():
+    section = scraper_section(
+        _scraper_iteration(BAREKET=(10, 0)), repeated_download_threshold=0.2
+    )
+    assert section["total_repeated_downloads"] == 0
+    assert section["repeated_downloads_by_scraper"]["BAREKET"] == {
+        "repeated": 0,
+        "downloads": 10,
+        "share": 0.0,
+    }
+    assert section["repeated_downloads_warnings"] == []
+
+
+def test_repeated_downloads_all_repeat_run_warns_with_chain_and_count():
+    section = scraper_section(
+        _scraper_iteration(SHUFERSAL=(1500, 1500)), repeated_download_threshold=0.2
+    )
+    assert section["repeated_downloads_warnings"] == [
+        {"scraper": "SHUFERSAL", "repeated": 1500, "downloads": 1500, "share": 1.0}
+    ]
+
+
+def test_repeated_downloads_threshold_is_exclusive_and_sorted_worst_first():
+    section = scraper_section(
+        _scraper_iteration(
+            BAREKET=(10, 2),  # 0.2: at the threshold, no warning
+            WOLT=(10, 3),  # 0.3
+            SHUFERSAL=(10, 9),  # 0.9
+        ),
+        repeated_download_threshold=0.2,
+    )
+    assert [row["scraper"] for row in section["repeated_downloads_warnings"]] == [
+        "SHUFERSAL",
+        "WOLT",
+    ]
+
+
+def test_repeated_downloads_chain_without_downloads_is_zero_and_not_warned():
+    section = scraper_section(
+        _scraper_iteration(WOLT=(0, 0)), repeated_download_threshold=0.0
+    )
+    assert section["repeated_downloads_by_scraper"]["WOLT"]["share"] == 0.0
+    assert section["repeated_downloads_warnings"] == []
+
+
+def test_repeated_downloads_threshold_comes_from_env(monkeypatch):
+    monkeypatch.setenv("QUALITY_SCRAPER_MAX_REPEATED_DOWNLOAD_SHARE", "0.5")
+    section = scraper_section(_scraper_iteration(WOLT=(10, 3)))
+    assert section["repeated_downloads_threshold"] == 0.5
+    assert section["repeated_downloads_warnings"] == []
+    monkeypatch.delenv("QUALITY_SCRAPER_MAX_REPEATED_DOWNLOAD_SHARE")
+    section = scraper_section(_scraper_iteration(WOLT=(10, 3)))
+    assert section["repeated_downloads_threshold"] == 0.2
+    assert [row["scraper"] for row in section["repeated_downloads_warnings"]] == [
+        "WOLT"
+    ]
+
+
+def test_repeated_downloads_are_not_part_of_the_gate():
+    """Reported only: the gate rows and section health are unchanged."""
+    health = compute_pipeline_health(
+        _scraper_iteration(SHUFERSAL=(10, 10)),
+        {"iterations": []},
+        thresholds=GATE_THRESHOLDS,
+    )
+    assert health["scraper"]["repeated_downloads_warnings"]
+    assert health["scraper"]["healthy"] is True

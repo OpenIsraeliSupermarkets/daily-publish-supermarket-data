@@ -1,8 +1,10 @@
 """Indicators on what the scrapers downloaded."""
 
-from typing import Any, Dict
+import os
+from typing import Any, Dict, List, Optional
 
 from managers.indicators.base import Indicator
+from utils import Logger
 
 
 class AttemptedDownloadSuccessRate(Indicator):
@@ -51,7 +53,88 @@ class ScrapersWithNoData(Indicator):
         return sum(1 for downloaded in downloaded_by_scraper.values() if downloaded == 0)
 
 
-def scraper_section(scraper_quality: Dict[str, Any]) -> Dict[str, Any]:
+class RepeatedDownloads:
+    """Downloads of bytes already stored (``rewrote_same``), per chain.
+
+    Reported only, not part of the quality gate: a chain whose share is above
+    the threshold is listed under ``repeated_downloads_warnings``. Each file
+    is downloaded once more after a scraper upgrade that changes listing
+    identity, so a one-day spike can be expected then (scrapers #235).
+    """
+
+    env_var = "QUALITY_SCRAPER_MAX_REPEATED_DOWNLOAD_SHARE"
+    default_threshold = 0.2
+
+    @classmethod
+    def threshold(cls) -> float:
+        """The share above which a chain is warned about; env overrides."""
+        value = os.environ.get(cls.env_var)
+        return float(value) if value not in (None, "") else cls.default_threshold
+
+    @staticmethod
+    def by_scraper(
+        verified_by_scraper: Dict[str, int], repeated_by_scraper: Dict[str, int]
+    ) -> Dict[str, Dict[str, Any]]:
+        """Per chain: repeated count, all download rows and the repeated share."""
+        result = {}
+        for scraper in sorted(verified_by_scraper):
+            total = verified_by_scraper[scraper]
+            repeated = repeated_by_scraper.get(scraper, 0)
+            result[scraper] = {
+                "repeated": repeated,
+                "downloads": total,
+                "share": round(repeated / total, 4) if total > 0 else 0.0,
+            }
+        return result
+
+    @staticmethod
+    def warnings(
+        by_scraper: Dict[str, Dict[str, Any]], threshold: float
+    ) -> List[Dict[str, Any]]:
+        """Chains whose repeated share is above ``threshold``, worst first."""
+        warned = [
+            {"scraper": scraper, **counts}
+            for scraper, counts in by_scraper.items()
+            if counts["downloads"] > 0 and counts["share"] > threshold
+        ]
+        return sorted(warned, key=lambda row: (-row["share"], row["scraper"]))
+
+    @classmethod
+    def section(
+        cls, scraper_quality: Dict[str, Any], threshold: Optional[float] = None
+    ) -> Dict[str, Any]:
+        """The repeated-download keys of the scraper section; logs each warning."""
+        if threshold is None:
+            threshold = cls.threshold()
+        verified: Dict[str, int] = {}
+        repeated: Dict[str, int] = {}
+        for iteration in scraper_quality.get("iterations", []):
+            for scraper, metrics in iteration.get("scrapers", {}).items():
+                verified[scraper] = verified.get(scraper, 0) + metrics.get(
+                    "verified_downloads", 0
+                )
+                repeated[scraper] = repeated.get(scraper, 0) + metrics.get(
+                    "repeated_downloads", 0
+                )
+        by_scraper = cls.by_scraper(verified, repeated)
+        warnings = cls.warnings(by_scraper, threshold)
+        for row in warnings:
+            Logger.warning(
+                f"{row['scraper']}: {row['repeated']} of {row['downloads']} "
+                f"downloads ({row['share']:.0%}) repeated a file already stored"
+            )
+        return {
+            "total_repeated_downloads": sum(repeated.values()),
+            "repeated_downloads_by_scraper": by_scraper,
+            "repeated_downloads_threshold": threshold,
+            "repeated_downloads_warnings": warnings,
+        }
+
+
+def scraper_section(
+    scraper_quality: Dict[str, Any],
+    repeated_download_threshold: Optional[float] = None,
+) -> Dict[str, Any]:
     """The scraper section of pipeline_health.json."""
     total_saw = 0
     total_downloaded = 0
@@ -97,4 +180,5 @@ def scraper_section(scraper_quality: Dict[str, Any]) -> Dict[str, Any]:
         "attempted_download_success_rate": AttemptedDownloadSuccessRate.compute(
             total_downloaded, download_failed
         ),
+        **RepeatedDownloads.section(scraper_quality, repeated_download_threshold),
     }
