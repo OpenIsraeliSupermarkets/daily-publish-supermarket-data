@@ -12,10 +12,27 @@ from typing import Dict, Any, Optional, List
 from data_models.raw_schema import list_all_dynamic_tables, status_table_names
 
 from aiokafka import AIOKafkaProducer, AIOKafkaConsumer
-from aiokafka.errors import KafkaError
+from aiokafka.errors import (
+    KafkaError,
+    MessageSizeTooLargeError,
+    RecordListTooLargeError,
+    RecordTooLargeError,
+)
 from kafka import KafkaAdminClient
 from .api_base import ShortTermDatabaseUploader
 from .row_stream import KafkaRowStream
+
+
+# Errors about the records themselves, not the producer: a new producer
+# would fail the same way, so they are raised as before, without a retry.
+RECORD_ERRORS = (MessageSizeTooLargeError, RecordTooLargeError, RecordListTooLargeError)
+
+
+def is_record_error(error: BaseException) -> bool:
+    """Whether the push failed because of its records (see RECORD_ERRORS)."""
+    return isinstance(error, RECORD_ERRORS) or isinstance(
+        error.__cause__, RECORD_ERRORS
+    )
 
 
 class KafkaDbUploader(ShortTermDatabaseUploader):
@@ -34,6 +51,7 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
         compression_type: Optional[str] = None,
         enable_idempotence: bool = True,
         max_pending_rows: int = 100000,
+        max_consecutive_failures: Optional[int] = None,
     ):
         """Initialize Kafka connection.
 
@@ -53,6 +71,9 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
                 duplicates.
             max_pending_rows (int): Rows waiting for an ack in the streaming
                 push before it blocks.
+            max_consecutive_failures (int, optional): Pushes in a row that may
+                fail, even after recreating the producer, before the process
+                exits (#190). Default: KAFKA_MAX_CONSECUTIVE_FAILURES, or 3.
         """
         self.bootstrap_servers = kafka_bootstrap_servers or os.getenv(
             "KAFKA_BOOTSTRAP_SERVERS", "localhost:9092"
@@ -77,6 +98,10 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
         self.compression_type = compression_type
         self.enable_idempotence = enable_idempotence
         self.max_pending_rows = max_pending_rows
+        self.max_consecutive_failures = max_consecutive_failures or int(
+            os.getenv("KAFKA_MAX_CONSECUTIVE_FAILURES", "3")
+        )
+        self._consecutive_failed_pushes = 0
         self.producer: Optional[AIOKafkaProducer] = None
         self.admin_client: Optional[KafkaAdminClient] = None
         self._connection_tested = False
@@ -160,6 +185,48 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
                 Logger.error(f"Error during Kafka disconnect: {e}")
         self._connection_tested = False
 
+    # ------------------------------------------------------------------
+    # Producer recovery (#190)
+    #
+    # After a broker restart the idempotent producer can be left with
+    # sequence numbers the broker no longer knows (OutOfOrderSequenceNumber),
+    # and then no send is ever acked again. The only way out is a new
+    # producer: it gets a new producer id and starts its sequences at zero.
+    # ------------------------------------------------------------------
+
+    def _reset_producer(self):
+        """Stop the current producer and start a new one."""
+        Logger.warning("Recreating the Kafka producer")
+        self._loop.run_until_complete(self._disconnect_from_kafka())
+        self._ensure_connection()
+
+    def _record_push_result(self, error: Optional[BaseException]):
+        """Count pushes that failed in a row, even after a new producer.
+
+        Past the limit the process exits: the DAG logs and skips a failed
+        operation (#122), so raising would let the fetcher keep running
+        while every topic stays empty. Exiting makes Docker restart the
+        container, and the push cache resumes where it stopped.
+        """
+        # Step 1: a success clears the count.
+        if error is None:
+            self._consecutive_failed_pushes = 0
+            return
+
+        # Step 2: a failure adds to it; under the limit, the caller re-raises.
+        self._consecutive_failed_pushes += 1
+        if self._consecutive_failed_pushes < self.max_consecutive_failures:
+            return
+
+        # Step 3: at the limit, say so loudly and stop the process.
+        Logger.critical(
+            "Kafka push failed %d times in a row, also with a new producer "
+            "(last error: %s). Exiting so the container restarts.",
+            self._consecutive_failed_pushes,
+            error,
+        )
+        raise SystemExit(1)
+
     def _get_topic_name(self, table_target_name: str) -> str:
         """
         Generate Kafka topic name based on table name.
@@ -192,10 +259,37 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
             Logger.error("Failed to establish Kafka connection")
             return
 
-        # Run the async operation in the event loop
-        self._loop.run_until_complete(
-            self._async_insert_to_destinations(table_target_name, items)
-        )
+        # Step 1: push on the current producer.
+        try:
+            self._loop.run_until_complete(
+                self._async_insert_to_destinations(table_target_name, items)
+            )
+            self._record_push_result(None)
+            return
+        except KafkaError as error:
+            # A record the broker refuses fails on any producer: raise it.
+            if is_record_error(error):
+                raise
+            Logger.error(
+                "Push of %d items to %s failed (%s); retrying on a new producer",
+                len(items),
+                table_target_name,
+                error,
+            )
+
+        # Step 2: the producer may be broken (#190): push again on a new one.
+        # Rows that were acked the first time are sent again; consumers
+        # already tolerate re-sent rows (#108).
+        self._reset_producer()
+        try:
+            self._loop.run_until_complete(
+                self._async_insert_to_destinations(table_target_name, items)
+            )
+        except KafkaError as error:
+            # Step 3: it failed again: count it (exits past the limit), re-raise.
+            self._record_push_result(error)
+            raise
+        self._record_push_result(None)
 
     async def _async_insert_to_destinations(self, table_target_name, items):
         """Async implementation of insert to destinations."""
@@ -216,6 +310,7 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
             # send one by one costs a broker round trip per row (#108).
             successful_records = 0
             failed_records = 0
+            first_error = None
             flushs = []
             pending = []
             for item in items:
@@ -230,6 +325,7 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
                 except KafkaError as inner_e:
                     Logger.error("Failed to send record: %s", str(inner_e))
                     failed_records += 1
+                    first_error = first_error or inner_e
                 # only per-file rows get a flush marker; status rows have no file
                 file_name = item.get("file_name")
                 if file_name is not None and file_name not in flushs:
@@ -239,6 +335,7 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
                 if isinstance(result, KafkaError):
                     Logger.error("Failed to send record: %s", str(result))
                     failed_records += 1
+                    first_error = first_error or result
                 elif isinstance(result, BaseException):
                     raise result
                 else:
@@ -247,9 +344,11 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
             # A lost row must not be followed by a file_complete that claims
             # it, so fail the push; progress stays at the last boundary (#114).
             if failed_records:
+                # The first error is the cause, so the caller can tell a
+                # broken producer from a bad record (#190).
                 raise KafkaError(
                     f"{failed_records}/{len(items)} records were not acked by Kafka"
-                )
+                ) from first_error
 
             # flush messages go out only after the file's records are acked
             for result in await asyncio.gather(
@@ -295,7 +394,14 @@ class KafkaDbUploader(ShortTermDatabaseUploader):
                 await stream.close()
             return stream
 
-        return self._loop.run_until_complete(_run())
+        stream = self._loop.run_until_complete(_run())
+
+        # A file whose rows were not acked is left for the CSV push to resend
+        # (#114). Give that resend a new producer, in case this one is
+        # broken (#190).
+        if stream.failed_files:
+            self._reset_producer()
+        return stream
 
     def _create_destinations(self, partition_id, table_name):
         """Create a new topic (Kafka doesn't require explicit topic creation).
