@@ -229,6 +229,7 @@ Testing:
 - `RE_DOWNLOAD_UNPARSED` - Before scraping, ask the scraper to re-download files it downloaded that the parser never parsed (default: false). A file that keeps failing to parse is re-downloaded on every run. Set in production with the repository variable of the same name.
 - `WAIT_TIME_SECONDS` - Seconds between cycles (default: 1800)
 - `HEALTHCHECK_MAX_AGE_SECONDS` - Health check timeout (default: 300)
+- `FETCHER_STALL_EXIT_MINUTES` - Exit the process (so Docker restarts it) after this many minutes without progress, as the health check measures it (default: 120; `0` turns it off). See `docs/decisions/192-stall-watchdog.md`
 - `KAFKA_MAX_BATCH_SIZE` - Producer batch per partition in bytes (default: 1048576, capped at `KAFKA_MAX_REQUEST_SIZE`)
 - `KAFKA_LINGER_MS` - Producer linger (default: 0)
 - `KAFKA_COMPRESSION_TYPE` - `none` (default) or `gzip`; lz4/zstd also need the library on the consumer side

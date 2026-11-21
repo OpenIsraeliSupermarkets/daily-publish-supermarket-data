@@ -35,11 +35,7 @@ def main():
     max_age_seconds = int(os.environ.get("HEALTHCHECK_MAX_AGE_SECONDS", 3600))
 
     # Status files the operations update as they go
-    status_paths = [
-        os.path.join(app_data_path, "scraping_status"),
-        os.path.join(app_data_path, "converting_status"),
-        os.path.join(app_data_path, ".push_cache"),
-    ]
+    status_paths = HeartbeatManager.progress_status_paths(app_data_path)
 
     # Check health
     is_healthy, message = HeartbeatManager.check_health(

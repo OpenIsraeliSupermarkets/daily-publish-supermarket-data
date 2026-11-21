@@ -179,6 +179,29 @@ class HeartbeatManager:
         return latest
 
     @staticmethod
+    def progress_status_paths(app_data_path: str) -> list:
+        """The status files the operations update as they go: scraping and
+        converting status, and the push cache."""
+        return [
+            os.path.join(app_data_path, "scraping_status"),
+            os.path.join(app_data_path, "converting_status"),
+            os.path.join(app_data_path, ".push_cache"),
+        ]
+
+    @staticmethod
+    def last_progress(heartbeat: Dict, status_paths: Iterable[str]) -> datetime:
+        """When the process last made progress: the heartbeat's `last_update`,
+        or a status file's `_metadata.last_modified` if that is newer.
+
+        Raises if the heartbeat has no parsable `last_update`.
+        """
+        last = HeartbeatManager._as_aware(heartbeat["last_update"])
+        status_update = HeartbeatManager.last_status_update(status_paths)
+        if status_update is not None and status_update > last:
+            last = status_update
+        return last
+
+    @staticmethod
     def check_health(
         heartbeat_path: str,
         max_age_seconds: int = 300,
@@ -211,12 +234,9 @@ class HeartbeatManager:
 
         # Check how long since the process last made progress
         try:
-            last_progress = HeartbeatManager._as_aware(data["last_update"])
+            last_progress = HeartbeatManager.last_progress(data, status_paths or [])
         except Exception as e:
             return False, f"Error parsing last_update timestamp: {e}"
-        status_update = HeartbeatManager.last_status_update(status_paths or [])
-        if status_update is not None and status_update > last_progress:
-            last_progress = status_update
         idle_seconds = (datetime.now().astimezone() - last_progress).total_seconds()
         if idle_seconds > max_age_seconds:
             return (
