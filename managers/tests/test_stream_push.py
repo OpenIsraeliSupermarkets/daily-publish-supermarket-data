@@ -5,6 +5,8 @@ import asyncio
 import os
 import queue
 
+from unittest.mock import patch
+
 import numpy as np
 import pandas as pd
 
@@ -34,6 +36,12 @@ class DelayedAckProducer:
     def __init__(self, fail_rows=()):
         self.log = []
         self.fail_rows = set(fail_rows)
+
+    async def start(self):
+        pass
+
+    async def stop(self):
+        pass
 
     async def send(self, topic, key, value):
         loop = asyncio.get_running_loop()
@@ -167,7 +175,12 @@ def test_failed_ack_leaves_no_file_complete_and_no_progress(tmp_path):
     producer = DelayedAckProducer(fail_rows={1})
     queues = {("TEST", "PRICE_FULL_FILE"): Rows(_file("a.xml", 3))}
 
-    stream, streamed = _stream(tmp_path, _uploader(producer), queues)
+    # The failed file makes the uploader start a new producer (#190).
+    with patch(
+        "remotes.short_term.kafka_db.AIOKafkaProducer",
+        return_value=DelayedAckProducer(),
+    ), patch("remotes.short_term.kafka_db.KafkaAdminClient"):
+        stream, streamed = _stream(tmp_path, _uploader(producer), queues)
 
     assert stream.failed_files == ["a.xml"]
     assert streamed == []
