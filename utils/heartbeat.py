@@ -1,14 +1,40 @@
 """
 Heartbeat utility for tracking operation execution status.
 Writes and reads a JSON file with operation statuses for health monitoring.
+
+The health monitor thread (#192) runs the health check inside the process
+every minute, writes the result to `health_status.json` for `healthcheck.py`,
+and exits the process when nothing has made progress for too long, so Docker
+restarts a hung fetcher instead of only marking it unhealthy.
 """
 
 import glob
 import json
 import os
+import threading
+import time
 from datetime import datetime
-from typing import Dict, Iterable, Optional
-from utils import Logger
+from typing import Callable, Dict, Iterable, Optional
+from utils.logging_config import Logger
+
+HEALTH_STATUS_FILE = "health_status.json"
+
+
+def stall_exit_minutes_from_env(default: int = 120) -> int:
+    """FETCHER_STALL_EXIT_MINUTES: minutes without progress before the process
+    exits. 0 keeps the health monitor writing the status, but never exits."""
+    raw = os.environ.get("FETCHER_STALL_EXIT_MINUTES", "").strip()
+    if raw == "":
+        return default
+    try:
+        minutes = int(raw)
+    except ValueError as exc:
+        raise ValueError(
+            f"FETCHER_STALL_EXIT_MINUTES must be an integer, but got {raw!r}"
+        ) from exc
+    if minutes < 0:
+        raise ValueError(f"FETCHER_STALL_EXIT_MINUTES must be >= 0, but got {minutes}")
+    return minutes
 
 
 class HeartbeatManager:
@@ -141,6 +167,18 @@ class HeartbeatManager:
         data["last_update"] = datetime.now().isoformat()
         self._write_heartbeat(data)
 
+    def start_health_monitor(self) -> Optional["HealthMonitor"]:
+        """Start the health monitor thread for this heartbeat (#192). Settings
+        come from HEALTHCHECK_MAX_AGE_SECONDS and FETCHER_STALL_EXIT_MINUTES."""
+        app_data_path = os.path.dirname(self.heartbeat_path)
+        monitor = HealthMonitor(
+            app_data_path,
+            max_age_seconds=int(os.environ.get("HEALTHCHECK_MAX_AGE_SECONDS", 3600)),
+            stall_exit_minutes=stall_exit_minutes_from_env(),
+        )
+        monitor.start()
+        return monitor
+
     @staticmethod
     def _as_aware(timestamp: str) -> datetime:
         """Parse an ISO timestamp; one without a timezone is in local time."""
@@ -179,6 +217,29 @@ class HeartbeatManager:
         return latest
 
     @staticmethod
+    def progress_status_paths(app_data_path: str) -> list:
+        """The status files the operations update as they go: scraping and
+        converting status, and the push cache."""
+        return [
+            os.path.join(app_data_path, "scraping_status"),
+            os.path.join(app_data_path, "converting_status"),
+            os.path.join(app_data_path, ".push_cache"),
+        ]
+
+    @staticmethod
+    def last_progress(heartbeat: Dict, status_paths: Iterable[str]) -> datetime:
+        """When the process last made progress: the heartbeat's `last_update`,
+        or a status file's `_metadata.last_modified` if that is newer.
+
+        Raises if the heartbeat has no parsable `last_update`.
+        """
+        last = HeartbeatManager._as_aware(heartbeat["last_update"])
+        status_update = HeartbeatManager.last_status_update(status_paths)
+        if status_update is not None and status_update > last:
+            last = status_update
+        return last
+
+    @staticmethod
     def check_health(
         heartbeat_path: str,
         max_age_seconds: int = 300,
@@ -211,12 +272,9 @@ class HeartbeatManager:
 
         # Check how long since the process last made progress
         try:
-            last_progress = HeartbeatManager._as_aware(data["last_update"])
+            last_progress = HeartbeatManager.last_progress(data, status_paths or [])
         except Exception as e:
             return False, f"Error parsing last_update timestamp: {e}"
-        status_update = HeartbeatManager.last_status_update(status_paths or [])
-        if status_update is not None and status_update > last_progress:
-            last_progress = status_update
         idle_seconds = (datetime.now().astimezone() - last_progress).total_seconds()
         if idle_seconds > max_age_seconds:
             return (
@@ -255,3 +313,131 @@ class HeartbeatManager:
                     pass
 
         return True, "Healthy"
+
+
+class HealthMonitor:  # pylint: disable=too-many-instance-attributes
+    """Every `check_every_seconds`, runs the health check, writes the result to
+    `health_status.json`, and exits the process after `stall_exit_minutes`
+    without progress.
+
+    Progress is what the health check counts: the heartbeat's `last_update`, or
+    a scraping / converting status file or the push cache being written. A
+    failed operation is written as unhealthy but never exits: the DAG already
+    logs and skips it (#122).
+    """
+
+    def __init__(
+        self,
+        app_data_path: str,
+        max_age_seconds: int,
+        stall_exit_minutes: int,
+        check_every_seconds: float = 60,
+        exit_process: Callable[[int], None] = os._exit,
+    ):
+        self.heartbeat_path = os.path.join(app_data_path, "heartbeat.json")
+        self.health_status_path = os.path.join(app_data_path, HEALTH_STATUS_FILE)
+        self.status_paths = HeartbeatManager.progress_status_paths(app_data_path)
+        self.max_age_seconds = max_age_seconds
+        self.stall_seconds = stall_exit_minutes * 60
+        self.check_every_seconds = check_every_seconds
+        # os._exit, not sys.exit: SystemExit raised in this thread would end
+        # only the thread, and a hung process may hold locks a clean exit waits on.
+        self.exit_process = exit_process
+        self.started_at = datetime.now().astimezone()
+
+    def idle_seconds(self) -> float:
+        """Seconds since the last progress. When the heartbeat can't be read,
+        the monitor's own start counts as the last progress."""
+        try:
+            with open(self.heartbeat_path, "r", encoding="utf-8") as f:
+                heartbeat = json.load(f)
+            last_progress = HeartbeatManager.last_progress(heartbeat, self.status_paths)
+        except Exception:  # pylint: disable=broad-exception-caught
+            last_progress = self.started_at
+        # Progress from before this process started (an earlier container's
+        # files) counts as the start.
+        last_progress = max(last_progress, self.started_at)
+        return (datetime.now().astimezone() - last_progress).total_seconds()
+
+    def check_once(self) -> bool:
+        """Write the health status; exit the process if it has stalled.
+        Returns True when it called exit."""
+        # Step 1: the same check healthcheck.py used to run itself.
+        healthy, message = HeartbeatManager.check_health(
+            self.heartbeat_path, self.max_age_seconds, self.status_paths
+        )
+        idle = self.idle_seconds()
+
+        # Step 2: write it down for healthcheck.py.
+        self._write_status(healthy, message, idle)
+
+        # Step 3: stalled for too long. Say so loudly (CRITICAL also goes to
+        # Discord), then exit so Docker restarts the container.
+        if self.stall_seconds and idle >= self.stall_seconds:
+            Logger.critical(
+                "No progress for %.0f minutes (%s). "
+                "Exiting so the container restarts (#192).",
+                idle / 60,
+                message,
+            )
+            self.exit_process(1)
+            return True  # pylint: disable=unreachable
+        return False
+
+    def _write_status(self, healthy: bool, message: str, idle: float):
+        """Write the result atomically, so healthcheck.py never reads half a file."""
+        status = {
+            "healthy": healthy,
+            "message": message,
+            "idle_seconds": round(idle),
+            "checked_at": datetime.now().astimezone().isoformat(),
+        }
+        tmp_path = self.health_status_path + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(status, f, ensure_ascii=False)
+        os.replace(tmp_path, self.health_status_path)
+
+    def _run(self):
+        """The monitor loop: check now, then every interval. A failed check is
+        logged and retried next time."""
+        while True:
+            try:
+                if self.check_once():
+                    return
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                Logger.error("Health monitor check failed: %s", e)
+            time.sleep(self.check_every_seconds)
+
+    def start(self) -> threading.Thread:
+        """Start the monitor in a daemon thread, so it never keeps the process alive."""
+        thread = threading.Thread(target=self._run, name="health-monitor", daemon=True)
+        thread.start()
+        if self.stall_seconds:
+            Logger.info(
+                "Health monitor on: exit after %d minutes without progress",
+                self.stall_seconds // 60,
+            )
+        else:
+            Logger.info("Health monitor on, never exits (FETCHER_STALL_EXIT_MINUTES=0)")
+        return thread
+
+    @staticmethod
+    def read_status(app_data_path: str, max_age_seconds: float) -> tuple[bool, str]:
+        """For healthcheck.py: the monitor's last result. Unhealthy when the file
+        is missing, unreadable, or older than `max_age_seconds` (the monitor
+        stopped writing it)."""
+        path = os.path.join(app_data_path, HEALTH_STATUS_FILE)
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                status = json.load(f)
+            checked_at = HeartbeatManager._as_aware(  # pylint: disable=protected-access
+                status["checked_at"]
+            )
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            return False, f"No readable health status at {path}: {e}"
+
+        # A stale file means the monitor thread (or the process) is gone.
+        age = (datetime.now().astimezone() - checked_at).total_seconds()
+        if age > max_age_seconds:
+            return False, f"Health status not updated for {age:.0f}s"
+        return bool(status.get("healthy")), str(status.get("message", ""))

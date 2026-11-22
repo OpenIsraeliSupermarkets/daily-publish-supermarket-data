@@ -84,17 +84,19 @@ See the [API Docker Example](#api-example) below for usage.
 
 The health check script validates that the data processing service is running correctly. It's used by Docker's `HEALTHCHECK` directive to monitor container health.
 
-**What it checks:**
+The checks run inside the fetcher: its health monitor thread (`HealthMonitor` in `utils/heartbeat.py`) checks every minute and writes the result to `$APP_DATA_PATH/health_status.json`. `healthcheck.py` only reads that file, and is unhealthy when the file is missing or older than 5 minutes. When nothing has made progress for `FETCHER_STALL_EXIT_MINUTES`, the monitor exits the process so Docker restarts the container (#192).
+
+**What the monitor checks:**
 1. **Heartbeat file exists and is recent** - Ensures the process is actively running
-2. **No operations have failed** - Validates that scraping/processing operations are successful
-3. **Timestamp is within acceptable range** - Detects if the process has stalled
+2. **No operations have failed** - Validates that scraping/processing operations are successful (a failure is reported as unhealthy, but never restarts the process)
+3. **Progress is recent** - The heartbeat, or a scraping / converting status file or the push cache, was written within `HEALTHCHECK_MAX_AGE_SECONDS`
 
 **Exit codes:**
 - `0` - Service is healthy
-- `1` - Service is unhealthy (triggers container restart if configured)
+- `1` - Service is unhealthy (Docker does not restart an unhealthy container; the monitor's stall exit does)
 
 **Configuration:**
-- `APP_DATA_PATH` - Directory containing the heartbeat file (default: `app_data`)
+- `APP_DATA_PATH` - Directory containing the heartbeat and health status files (default: `app_data`)
 - `HEALTHCHECK_MAX_AGE_SECONDS` - Maximum age for heartbeat before considering unhealthy (default: `300` seconds = 5 minutes)
 
 The health check integrates with the `HeartbeatManager` utility which the data processor updates during operations.
@@ -229,6 +231,7 @@ Testing:
 - `RE_DOWNLOAD_UNPARSED` - Before scraping, ask the scraper to re-download files it downloaded that the parser never parsed (default: false). A file that keeps failing to parse is re-downloaded on every run. Set in production with the repository variable of the same name.
 - `WAIT_TIME_SECONDS` - Seconds between cycles (default: 1800)
 - `HEALTHCHECK_MAX_AGE_SECONDS` - Health check timeout (default: 300)
+- `FETCHER_STALL_EXIT_MINUTES` - Exit the process (so Docker restarts it) after this many minutes without progress, as the health monitor measures it (default: 120; `0` keeps the health status but never exits). See `docs/decisions/192-stall-watchdog.md`
 - `KAFKA_MAX_BATCH_SIZE` - Producer batch per partition in bytes (default: 1048576, capped at `KAFKA_MAX_REQUEST_SIZE`)
 - `KAFKA_LINGER_MS` - Producer linger (default: 0)
 - `KAFKA_COMPRESSION_TYPE` - `none` (default) or `gzip`; lz4/zstd also need the library on the consumer side
