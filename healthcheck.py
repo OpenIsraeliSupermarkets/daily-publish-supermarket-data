@@ -2,9 +2,10 @@
 """
 Health check script for the data processor service.
 
-This script validates the heartbeat status file to determine if the
-data processing operations are running successfully. It's designed to be
-used with Docker's HEALTHCHECK directive.
+The fetcher's health monitor thread (utils/heartbeat.py, #192) runs the
+health check every minute and writes the result to `health_status.json`.
+This script only reads that file. It's designed to be used with Docker's
+HEALTHCHECK directive.
 
 Exit codes:
     0: Service is healthy
@@ -13,35 +14,26 @@ Exit codes:
 
 import sys
 import os
-from utils.heartbeat import HeartbeatManager
+
+from utils.heartbeat import HealthMonitor
+
+# The monitor writes every 60 s; older than this means it stopped.
+HEALTH_STATUS_MAX_AGE_SECONDS = 300
 
 
 def main():
     """
-    Main health check function.
-
-    Reads the heartbeat file and validates:
-    1. File exists and is recent
-    2. No operations have failed
-    3. Process is making progress: the heartbeat, or the `_metadata.last_modified`
-       of a scraping / converting status file or the push cache, is recent
+    Report the health monitor's last result: unhealthy when it says so, or
+    when its file is missing or has not been written for 5 minutes.
     """
-    # Get heartbeat path from environment or use default
     app_data_path = os.environ.get("APP_DATA_PATH", "app_data")
-    heartbeat_path = os.path.join(app_data_path, "heartbeat.json")
 
-    # Maximum time without progress (1 hour by default, longer than the 30 minute
-    # wait between DAG runs)
-    max_age_seconds = int(os.environ.get("HEALTHCHECK_MAX_AGE_SECONDS", 3600))
-
-    # Status files the operations update as they go
-    status_paths = HeartbeatManager.progress_status_paths(app_data_path)
-
-    # Check health
-    is_healthy, message = HeartbeatManager.check_health(
-        heartbeat_path, max_age_seconds, status_paths
+    # Step 1: read the monitor's last result.
+    is_healthy, message = HealthMonitor.read_status(
+        app_data_path, HEALTH_STATUS_MAX_AGE_SECONDS
     )
 
+    # Step 2: report it to Docker.
     if is_healthy:
         print(f"✓ {message}")
         sys.exit(0)

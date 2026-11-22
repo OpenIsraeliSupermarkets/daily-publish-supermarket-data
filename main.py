@@ -10,7 +10,6 @@ import sys
 import datetime
 from utils import now
 from utils import Logger, exit_cleanly_on_sigterm, use_forkserver
-from utils.stall_watchdog import start_stall_watchdog
 import datetime
 import pytz
 
@@ -156,9 +155,10 @@ if __name__ == "__main__":
         file_name_regex=file_name_regex,
     )
 
-    # Exit when nothing has made progress for FETCHER_STALL_EXIT_MINUTES, so
-    # Docker restarts a hung fetcher (#192)
-    start_stall_watchdog(os.environ["APP_DATA_PATH"])
+    # Check health every minute into health_status.json, and exit when nothing
+    # has made progress for FETCHER_STALL_EXIT_MINUTES, so Docker restarts a
+    # hung fetcher (#192)
+    publisher.heartbeat.start_health_monitor()
 
     # self execute operations if OPERATION is set
     operations = os.environ.get("OPERATION", "")
