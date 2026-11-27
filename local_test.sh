@@ -207,13 +207,27 @@ docker compose rm -f
 docker rm -f raw-data-mongodb raw-data-api data-fetcher >/dev/null 2>&1 || true
 
 echo "Step 4: Cleaning app data directory"
-# Clean the app data folder
-if [ -d "$APP_DATA_PATH/app_data" ]; then
-    rm -rf "$APP_DATA_PATH/app_data"  # Remove hidden files/folders except . and ..
-    echo "Cleaned contents of $APP_DATA_PATH/app_data including hidden files"
+# Compose binds the app_data volume to $APP_DATA_PATH itself, so the container's
+# dumps, outputs, status and push cache live directly in it. Empty it, so a run
+# that stopped early (failed, cancelled, timed out) can't leak into this one (#203).
+
+# Step 4.1: refuse to delete when the path is unset or on a production runner,
+# which uses the same _work/.../app_data path for prod data
+if [ -z "$APP_DATA_PATH" ] || [ "$APP_DATA_PATH" == "/" ]; then
+    echo -e "\033[31mAPP_DATA_PATH is empty or '/'; refusing to clean it. Exiting.\033[0m"
+    exit 1
+fi
+if [ "$RUNNER_NAME" == "home-server" ]; then
+    echo -e "\033[31mRunning on the production runner ($RUNNER_NAME); refusing to clean $APP_DATA_PATH. Exiting.\033[0m"
+    exit 1
 fi
 
-mkdir -p "$APP_DATA_PATH/app_data"
+# Step 4.2: delete everything inside it, hidden files too. The container writes
+# as root, so delete from a container; the folder itself stays for the bind mount.
+mkdir -p "$APP_DATA_PATH"
+docker run --rm -v "$APP_DATA_PATH":/app_data alpine:3.20 \
+    sh -c 'find /app_data -mindepth 1 -delete' || exit 1
+echo "Cleaned contents of $APP_DATA_PATH including hidden files"
 
 echo "Step 5: Cleaning MongoDB data directory"
 # Clean the mongo data folder
