@@ -211,14 +211,10 @@ echo "Step 4: Cleaning app data directory"
 # dumps, outputs, status and push cache live directly in it. Empty it, so a run
 # that stopped early (failed, cancelled, timed out) can't leak into this one (#203).
 
-# Step 4.1: refuse to delete when the path is unset or on a production runner,
-# which uses the same _work/.../app_data path for prod data
+# Step 4.1: refuse to delete when the path is unset or '/'. In CI the path is the
+# test's own system_test_app_data folder, set in system_test_pr.yml.
 if [ -z "$APP_DATA_PATH" ] || [ "$APP_DATA_PATH" == "/" ]; then
     echo -e "\033[31mAPP_DATA_PATH is empty or '/'; refusing to clean it. Exiting.\033[0m"
-    exit 1
-fi
-if [ "$RUNNER_NAME" == "home-server" ]; then
-    echo -e "\033[31mRunning on the production runner ($RUNNER_NAME); refusing to clean $APP_DATA_PATH. Exiting.\033[0m"
     exit 1
 fi
 

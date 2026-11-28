@@ -11,9 +11,12 @@ leftover task's incomplete status failed `ScraperStatusOutput` validation.
 included, and keeps the folder for the bind mount. It deletes from an
 `alpine` container, because the data-fetcher writes as root.
 
-**Guards.** Step 4 refuses to run, and fails the test, when `APP_DATA_PATH` is
-empty or `/`, or when the runner is `home-server`. Prod uses the same
-`_work/.../app_data` path there.
+**Guards.** The system test uses its own folders,
+`<runner workspace>/system_test_app_data` and `system_test_mongo_data`, set in
+`system_test_pr.yml`. Prod uses `app_data` and `mongo_data` under the same
+workspace, so the test can't empty prod's data whichever runner it lands on.
+`runs-on: [self-hosted, ci]` remains the main protection. Step 4 also refuses
+an empty `APP_DATA_PATH` or `/`, for local runs with the variable unset.
 
 **Why this is enough on a timeout.** Any run, however it ends, is cleaned at
 the start of the next one, so a stopped run needs no clean step of its own.

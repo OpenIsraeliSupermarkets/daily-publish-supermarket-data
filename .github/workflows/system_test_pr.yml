@@ -36,8 +36,10 @@ jobs:
           echo "ENABLED_SCRAPERS=${{ secrets.ENABLED_SCRAPERS }}" >> $GITHUB_ENV
           echo "ENABLED_FILE_TYPES=${{ secrets.ENABLED_FILE_TYPES }}" >> $GITHUB_ENV
           echo "LIMIT=${{ secrets.LIMIT }}" >> $GITHUB_ENV
-          echo "APP_DATA_PATH=${{ runner.workspace }}/app_data" >> $GITHUB_ENV
-          echo "MONGO_DATA_PATH=${{ runner.workspace }}/mongo_data" >> $GITHUB_ENV
+          # Own folders, never prod's app_data/mongo_data, which use the same
+          # runner.workspace on a prod runner; local_test.sh empties them (#203)
+          echo "APP_DATA_PATH=${{ runner.workspace }}/system_test_app_data" >> $GITHUB_ENV
+          echo "MONGO_DATA_PATH=${{ runner.workspace }}/system_test_mongo_data" >> $GITHUB_ENV
           echo "MONGO_URL=${{ secrets.MONGO_URL }}" >> $GITHUB_ENV
           echo "MONGO_PORT=${{ secrets.MONGO_PORT }}" >> $GITHUB_ENV
           echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> $GITHUB_ENV
