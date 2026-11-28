@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Union, Optional
+from typing import Dict, Union, Optional
 
 
 class ScrapedFile(BaseModel):
@@ -138,14 +138,39 @@ class PaginatedFileContent(BaseModel):
         )
 
 
+class OperationHealth(BaseModel):
+    """One fetcher operation as the heartbeat records it: `running`,
+    `success` or `failed`, when it started and ended, and its error."""
+
+    status: str
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    error: Optional[str] = None
+
+
+class FetcherHealth(BaseModel):
+    """The fetcher's health, read from the files it writes in app_data
+    (`HealthMonitor.read_report`, #204). The same verdict healthcheck.py
+    gives Docker, plus what each operation did."""
+
+    healthy: bool
+    message: str
+    checked_at: Optional[str] = None
+    current_operation: Optional[str] = None
+    operations: Dict[str, OperationHealth] = {}
+
+
 class ServiceHealth(BaseModel):
     """Model for service health status.
 
-    Contains information about the current health and status of the supermarket data service.
+    `status` is the API's own liveness. `fetcher` is the data fetcher's last
+    health report; in prod the fetcher runs as a batch job, so between runs it
+    reads as not updated while the API itself is healthy.
     """
 
     status: str
     timestamp: str
+    fetcher: Optional[FetcherHealth] = None
 
 
 class LongTermDatabaseHealth(BaseModel):
