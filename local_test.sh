@@ -326,6 +326,11 @@ else
     check_container_health "raw-data-api" || exit 1
     check_container_health "data-fetcher" || exit 1
 
+    # The loop's publishing (Kaggle upload) sometimes takes longer than the wait
+    # above, so give it another minute before checking what it published (#204)
+    echo "Step 8.2.1: Waiting another 60 seconds for the loop's publishing to finish"
+    sleep 60
+
     echo "Step 8.3: Checking the quality indicators the loop just published"
     # The loop publishes and then cleans the local quality folder within the
     # wait above, so check the copy it uploaded to the test dataset.
