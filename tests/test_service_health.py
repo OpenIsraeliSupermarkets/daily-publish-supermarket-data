@@ -67,19 +67,35 @@ def test_service_health_without_fetcher_files_keeps_the_api_healthy(
     assert health["fetcher"]["checked_at"] is None
 
 
-def test_service_health_reports_a_failed_operation(tmp_path, monkeypatch):
+def test_service_health_shows_a_failure_type_but_no_details(tmp_path, monkeypatch):
+    # The heartbeat keeps the full error; the public endpoint shows only its type.
     _fetcher_files(
         tmp_path,
         {"publishing": "failed"},
         healthy=False,
-        message="Operations failed: publishing. Errors: 429",
+        message="Operations failed: publishing. Errors: mongodb://user:secret@host",
     )
+    heartbeat_path = os.path.join(tmp_path, "heartbeat.json")
+    with open(heartbeat_path, encoding="utf-8") as f:
+        heartbeat = json.load(f)
+    heartbeat["operations"]["publishing"].update(
+        error="mongodb://user:secret@host refused", error_type="ConnectionError"
+    )
+    _write(heartbeat_path, heartbeat)
 
     health = _service_health(tmp_path, monkeypatch)
 
     assert health["status"] == "healthy"
     assert not health["fetcher"]["healthy"]
-    assert "429" in health["fetcher"]["message"]
+    publishing = health["fetcher"]["operations"]["publishing"]
+    assert publishing == {
+        "status": "failed",
+        "started_at": publishing["started_at"],
+        "completed_at": publishing["completed_at"],
+        "error_type": "ConnectionError",
+    }
+    assert "message" not in health["fetcher"]
+    assert "secret" not in json.dumps(health)
 
 
 def test_service_health_survives_a_malformed_heartbeat(tmp_path, monkeypatch):

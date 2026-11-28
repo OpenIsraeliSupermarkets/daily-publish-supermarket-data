@@ -32,3 +32,11 @@ one of the short-term setups).
 
 **Not changed:** `healthcheck.py`'s behaviour, the stall exit, and
 `pipeline_health.json` (data quality per run, read by the quality gate).
+
+**What `/service_health` shows (Sefi, 2026-11-28).** The endpoint is public,
+so for a failed operation it shows only the exception type (`error_type`,
+which the DAG now records next to `error`), never the error text, and the
+`fetcher` section has no free-text `message`. Both can hold credentials, paths
+or other internal details. The full error stays in `heartbeat.json`, in
+`healthcheck.py`'s output and in the fetcher's logs. The response models list
+only the safe fields, so pydantic drops the rest.

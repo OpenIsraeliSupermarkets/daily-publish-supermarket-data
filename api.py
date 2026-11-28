@@ -141,10 +141,8 @@ async def service_health_check() -> ServiceHealth:
     # error of this endpoint, since Docker's check of the API calls it.
     try:
         fetcher = FetcherHealth(**report)
-    except ValueError as e:
-        fetcher = FetcherHealth(
-            healthy=False, message=f"Unreadable fetcher health: {e}"
-        )
+    except ValueError:
+        fetcher = FetcherHealth(healthy=False)
 
     # Step 3: `status` stays the API's own liveness; the fetcher is a batch
     # job in prod and isn't running between scrapes.

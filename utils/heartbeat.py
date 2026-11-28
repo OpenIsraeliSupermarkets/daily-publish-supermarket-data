@@ -119,13 +119,18 @@ class HeartbeatManager:
             "started_at": datetime.now().isoformat(),
             "completed_at": None,
             "error": None,
+            "error_type": None,
         }
 
         self._write_heartbeat(data)
         Logger.info(f"Heartbeat: Started operation '{operation}'")
 
     def complete_operation(
-        self, operation: str, success: bool = True, error: Optional[str] = None
+        self,
+        operation: str,
+        success: bool = True,
+        error: Optional[str] = None,
+        error_type: Optional[str] = None,
     ):
         """
         Mark an operation as completed.
@@ -134,6 +139,8 @@ class HeartbeatManager:
             operation: Name of the operation being completed
             success: Whether the operation succeeded
             error: Error message if operation failed
+            error_type: The exception's class name, the only part of a failure
+                the public /service_health shows (#204)
         """
         data = self._read_heartbeat()
         data["last_update"] = datetime.now().isoformat()
@@ -147,6 +154,7 @@ class HeartbeatManager:
             data["operations"][operation]["completed_at"] = datetime.now().isoformat()
             if error:
                 data["operations"][operation]["error"] = str(error)
+            data["operations"][operation]["error_type"] = error_type
         else:
             # Operation wasn't started properly, create entry
             data["operations"][operation] = {
@@ -154,6 +162,7 @@ class HeartbeatManager:
                 "started_at": datetime.now().isoformat(),
                 "completed_at": datetime.now().isoformat(),
                 "error": str(error) if error else None,
+                "error_type": error_type,
             }
 
         self._write_heartbeat(data)

@@ -138,14 +138,22 @@ class PaginatedFileContent(BaseModel):
         )
 
 
+# /service_health is public, so these two models list only what is safe to
+# show (Sefi, 2026-11-28): a failure's exception type, never its message, and
+# no free-text health message, which can hold paths, errors or credentials.
+# Fields not listed here (the heartbeat's `error`, the report's `message`) are
+# dropped by pydantic.
+
+
 class OperationHealth(BaseModel):
     """One fetcher operation as the heartbeat records it: `running`,
-    `success` or `failed`, when it started and ended, and its error."""
+    `success` or `failed`, when it started and ended, and the exception type
+    when it failed."""
 
     status: str
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
-    error: Optional[str] = None
+    error_type: Optional[str] = None
 
 
 class FetcherHealth(BaseModel):
@@ -154,7 +162,6 @@ class FetcherHealth(BaseModel):
     gives Docker, plus what each operation did."""
 
     healthy: bool
-    message: str
     checked_at: Optional[str] = None
     current_operation: Optional[str] = None
     operations: Dict[str, OperationHealth] = {}

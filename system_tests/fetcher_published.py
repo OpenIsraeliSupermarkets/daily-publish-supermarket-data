@@ -27,8 +27,8 @@ def published_state(health: dict) -> int:
     if not fetcher.get("checked_at"):
         return WAITING
 
-    # Step 2: unhealthy covers a failed operation (its error is in `message`)
-    # and a fetcher that stopped making progress.
+    # Step 2: unhealthy covers a failed operation (its `error_type` is in
+    # `operations`) and a fetcher that stopped making progress.
     if not fetcher.get("healthy"):
         return FAILED
 
@@ -53,8 +53,7 @@ def main() -> int:
     fetcher = health.get("fetcher") or {}
     print(
         f"fetcher: healthy={fetcher.get('healthy')} "
-        f"current_operation={fetcher.get('current_operation')} "
-        f"message={fetcher.get('message')!r}"
+        f"current_operation={fetcher.get('current_operation')}"
     )
     state = published_state(health)
     if state == FAILED:

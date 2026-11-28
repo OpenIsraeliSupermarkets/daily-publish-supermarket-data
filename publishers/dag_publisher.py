@@ -86,7 +86,10 @@ class SupermarketDataPublisherInterface(BaseSupermarketDataPublisher):
             except Exception as e:
                 # Mark operation as failed
                 self.heartbeat.complete_operation(
-                    operation, success=False, error=str(e)
+                    operation,
+                    success=False,
+                    error=str(e),
+                    error_type=type(e).__name__,
                 )
                 Logger.error(f"Operation {operation} failed: {e}")
                 failed.append(operation)
