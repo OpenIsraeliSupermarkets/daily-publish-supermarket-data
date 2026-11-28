@@ -15,10 +15,7 @@ Exit codes:
 import sys
 import os
 
-from utils.heartbeat import HealthMonitor
-
-# The monitor writes every 60 s; older than this means it stopped.
-HEALTH_STATUS_MAX_AGE_SECONDS = 300
+from utils.heartbeat import HEALTH_STATUS_MAX_AGE_SECONDS, HealthMonitor
 
 
 def main():

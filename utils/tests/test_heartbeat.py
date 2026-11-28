@@ -154,3 +154,18 @@ def test_reset_drops_a_previous_process_operations(tmp_path):
 
     healthy, message = HeartbeatManager.check_health(heartbeat_path, 3600)
     assert healthy, message
+
+
+def test_a_failed_operation_records_its_error_and_its_type(tmp_path):
+    # The type is what the public /service_health shows (#204).
+    manager = HeartbeatManager(str(tmp_path / "heartbeat.json"))
+    manager.start_operation("publishing")
+    manager.complete_operation(
+        "publishing", success=False, error="refused", error_type="ConnectionError"
+    )
+
+    with open(tmp_path / "heartbeat.json", encoding="utf-8") as f:
+        publishing = json.load(f)["operations"]["publishing"]
+    assert publishing["status"] == "failed"
+    assert publishing["error"] == "refused"
+    assert publishing["error_type"] == "ConnectionError"

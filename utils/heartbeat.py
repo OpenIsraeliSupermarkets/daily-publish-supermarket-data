@@ -18,6 +18,9 @@ from typing import Callable, Dict, Iterable, Optional
 from utils.logging_config import Logger
 
 HEALTH_STATUS_FILE = "health_status.json"
+# The monitor writes every 60 s; a status file older than this means it
+# stopped. Shared by healthcheck.py and the API's /service_health (#204).
+HEALTH_STATUS_MAX_AGE_SECONDS = 300
 
 
 def stall_exit_minutes_from_env(default: int = 120) -> int:
@@ -116,13 +119,18 @@ class HeartbeatManager:
             "started_at": datetime.now().isoformat(),
             "completed_at": None,
             "error": None,
+            "error_type": None,
         }
 
         self._write_heartbeat(data)
         Logger.info(f"Heartbeat: Started operation '{operation}'")
 
     def complete_operation(
-        self, operation: str, success: bool = True, error: Optional[str] = None
+        self,
+        operation: str,
+        success: bool = True,
+        error: Optional[str] = None,
+        error_type: Optional[str] = None,
     ):
         """
         Mark an operation as completed.
@@ -131,6 +139,8 @@ class HeartbeatManager:
             operation: Name of the operation being completed
             success: Whether the operation succeeded
             error: Error message if operation failed
+            error_type: The exception's class name, the only part of a failure
+                the public /service_health shows (#204)
         """
         data = self._read_heartbeat()
         data["last_update"] = datetime.now().isoformat()
@@ -144,6 +154,7 @@ class HeartbeatManager:
             data["operations"][operation]["completed_at"] = datetime.now().isoformat()
             if error:
                 data["operations"][operation]["error"] = str(error)
+            data["operations"][operation]["error_type"] = error_type
         else:
             # Operation wasn't started properly, create entry
             data["operations"][operation] = {
@@ -151,6 +162,7 @@ class HeartbeatManager:
                 "started_at": datetime.now().isoformat(),
                 "completed_at": datetime.now().isoformat(),
                 "error": str(error) if error else None,
+                "error_type": error_type,
             }
 
         self._write_heartbeat(data)
@@ -422,10 +434,25 @@ class HealthMonitor:  # pylint: disable=too-many-instance-attributes
         return thread
 
     @staticmethod
-    def read_status(app_data_path: str, max_age_seconds: float) -> tuple[bool, str]:
-        """For healthcheck.py: the monitor's last result. Unhealthy when the file
-        is missing, unreadable, or older than `max_age_seconds` (the monitor
-        stopped writing it)."""
+    def read_report(app_data_path: str, max_age_seconds: float) -> Dict:
+        """The fetcher's health for readers outside the process (#204):
+        `healthcheck.py` through `read_status`, and the API's /service_health.
+
+        Returns the monitor's last verdict (`healthy`, `message`, `checked_at`)
+        and what each operation did (`current_operation`, `operations`, from
+        `heartbeat.json`). Unhealthy when the status file is missing,
+        unreadable, or older than `max_age_seconds` (the monitor stopped
+        writing it); `checked_at` is None when it can't be read.
+        """
+        report = {
+            "healthy": False,
+            "message": "",
+            "checked_at": None,
+            "current_operation": None,
+            "operations": {},
+        }
+
+        # Step 1: the monitor's last verdict, from health_status.json.
         path = os.path.join(app_data_path, HEALTH_STATUS_FILE)
         try:
             with open(path, "r", encoding="utf-8") as f:
@@ -434,10 +461,33 @@ class HealthMonitor:  # pylint: disable=too-many-instance-attributes
                 status["checked_at"]
             )
         except Exception as e:  # pylint: disable=broad-exception-caught
-            return False, f"No readable health status at {path}: {e}"
+            report["message"] = f"No readable health status at {path}: {e}"
+            checked_at = None
 
-        # A stale file means the monitor thread (or the process) is gone.
-        age = (datetime.now().astimezone() - checked_at).total_seconds()
-        if age > max_age_seconds:
-            return False, f"Health status not updated for {age:.0f}s"
-        return bool(status.get("healthy")), str(status.get("message", ""))
+        # Step 2: a stale file means the monitor thread (or the process) is gone.
+        if checked_at is not None:
+            report["checked_at"] = checked_at.isoformat()
+            age = (datetime.now().astimezone() - checked_at).total_seconds()
+            if age > max_age_seconds:
+                report["message"] = f"Health status not updated for {age:.0f}s"
+            else:
+                report["healthy"] = bool(status.get("healthy"))
+                report["message"] = str(status.get("message", ""))
+
+        # Step 3: what each operation did, from the heartbeat the DAG writes.
+        heartbeat_path = os.path.join(app_data_path, "heartbeat.json")
+        if os.path.exists(heartbeat_path):
+            manager = HeartbeatManager(heartbeat_path)
+            heartbeat = manager._read_heartbeat()  # pylint: disable=protected-access
+            if not isinstance(heartbeat, dict):
+                heartbeat = {}
+            report["current_operation"] = heartbeat.get("current_operation")
+            report["operations"] = heartbeat.get("operations", {})
+        return report
+
+    @staticmethod
+    def read_status(app_data_path: str, max_age_seconds: float) -> tuple[bool, str]:
+        """For healthcheck.py: the monitor's last verdict, as `read_report`
+        gives it."""
+        report = HealthMonitor.read_report(app_data_path, max_age_seconds)
+        return report["healthy"], report["message"]

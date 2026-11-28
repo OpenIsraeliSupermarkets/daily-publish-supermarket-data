@@ -17,12 +17,14 @@ from data_models.response import (
     FileContent,
     PaginatedFileContent,
     ServiceHealth,
+    FetcherHealth,
     LongTermDatabaseHealth,
     ShortTermDatabaseHealth,
 )
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from datetime import datetime
 from access.middleware import AuthMiddleware, TelemetryMiddleware
+from utils.heartbeat import HEALTH_STATUS_MAX_AGE_SECONDS, HealthMonitor
 
 
 security = HTTPBearer()
@@ -130,8 +132,24 @@ async def file_content(
 
 @app.get("/service_health", tags=["Health"])
 async def service_health_check() -> ServiceHealth:
+    # Step 1: the fetcher's last health report, from the files it writes in
+    # the shared app_data volume (#204), the same verdict healthcheck.py reads.
+    app_data_path = os.environ.get("APP_DATA_PATH", "app_data")
+    report = HealthMonitor.read_report(app_data_path, HEALTH_STATUS_MAX_AGE_SECONDS)
+
+    # Step 2: a malformed file reads as an unhealthy fetcher, never as an
+    # error of this endpoint, since Docker's check of the API calls it.
+    try:
+        fetcher = FetcherHealth(**report)
+    except ValueError:
+        fetcher = FetcherHealth(healthy=False)
+
+    # Step 3: `status` stays the API's own liveness; the fetcher is a batch
+    # job in prod and isn't running between scrapes.
     return ServiceHealth(
-        status="healthy", timestamp=datetime.now().astimezone().isoformat()
+        status="healthy",
+        timestamp=datetime.now().astimezone().isoformat(),
+        fetcher=fetcher,
     )
 
 

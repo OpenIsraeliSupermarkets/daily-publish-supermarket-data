@@ -167,3 +167,72 @@ def test_a_bad_stall_minutes_value_is_refused(monkeypatch, value):
     monkeypatch.setenv("FETCHER_STALL_EXIT_MINUTES", value)
     with pytest.raises(ValueError):
         stall_exit_minutes_from_env()
+
+
+# The report served by the API's /service_health (#204)
+
+
+def _monitor_status(app_data, healthy=True, message="Healthy", age_seconds=0):
+    """health_status.json as the monitor writes it, age_seconds ago."""
+    checked_at = datetime.now().astimezone() - timedelta(seconds=age_seconds)
+    _write(
+        os.path.join(app_data, "health_status.json"),
+        {"healthy": healthy, "message": message, "checked_at": checked_at.isoformat()},
+    )
+
+
+def test_report_has_the_verdict_and_the_operations(tmp_path):
+    _heartbeat(tmp_path, datetime.now(), operation="publishing", status="success")
+    _monitor_status(tmp_path)
+
+    report = HealthMonitor.read_report(str(tmp_path), max_age_seconds=300)
+
+    assert report["healthy"]
+    assert report["message"] == "Healthy"
+    assert report["checked_at"]
+    assert report["current_operation"] == "publishing"
+    assert report["operations"]["publishing"]["status"] == "success"
+
+
+def test_report_without_files_is_unhealthy_and_unchecked(tmp_path):
+    report = HealthMonitor.read_report(str(tmp_path), max_age_seconds=300)
+
+    assert not report["healthy"]
+    assert "No readable health status" in report["message"]
+    assert report["checked_at"] is None
+    assert report["operations"] == {}
+
+
+def test_report_of_a_failed_operation_carries_its_error(tmp_path):
+    # The monitor turns a failed operation into unhealthy with its error.
+    _heartbeat(tmp_path, datetime.now(), operation="publishing", status="failed")
+    _monitor_status(
+        tmp_path, healthy=False, message="Operations failed: publishing. Errors: 429"
+    )
+
+    report = HealthMonitor.read_report(str(tmp_path), max_age_seconds=300)
+
+    assert not report["healthy"]
+    assert "429" in report["message"]
+    assert report["operations"]["publishing"]["status"] == "failed"
+
+
+def test_report_of_a_stale_status_is_unhealthy_but_keeps_the_operations(tmp_path):
+    # Prod between scrapes: the fetcher exited, its last operations stay readable.
+    _heartbeat(tmp_path, datetime.now(), operation="scraping", status="success")
+    _monitor_status(tmp_path, age_seconds=900)
+
+    report = HealthMonitor.read_report(str(tmp_path), max_age_seconds=300)
+
+    assert not report["healthy"]
+    assert "not updated" in report["message"]
+    assert report["operations"]["scraping"]["status"] == "success"
+
+
+def test_read_status_gives_the_report_verdict(tmp_path):
+    _monitor_status(tmp_path, healthy=False, message="No progress for 4000s")
+
+    report = HealthMonitor.read_report(str(tmp_path), max_age_seconds=300)
+    healthy, message = HealthMonitor.read_status(str(tmp_path), max_age_seconds=300)
+
+    assert (healthy, message) == (report["healthy"], report["message"])

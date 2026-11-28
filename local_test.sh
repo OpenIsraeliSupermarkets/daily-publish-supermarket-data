@@ -59,30 +59,53 @@ fi
 source "$(dirname "$0")/test_env.sh"
 
 
-# Function to check container health
-check_container_health() {
-    local container_name=$1
-    local retries=20
-    local wait_seconds=5
-    local i=0
+# The one polling loop of this script (#204). Run a check every 5 s until it
+# returns 0 (done) or 2 (failed for good), or until timeout_seconds pass.
+# A timeout of 0 means no limit. Usage: wait_until <timeout_seconds> <what> <check...>
+wait_until() {
+    local timeout_seconds=$1
+    local what=$2
+    shift 2
+    local waited=0
 
-    while [ $i -lt $retries ]; do
-        health_status=$(docker inspect --format='{{.State.Health.Status}}' "$container_name" 2>/dev/null)
-        if [ "$health_status" == "healthy" ]; then
-            echo "$container_name is healthy."
+    while true; do
+        # Step 1: one look. The check runs in this shell, so it can set variables.
+        "$@"
+        local result=$?
+        if [ $result -eq 0 ]; then
             return 0
-        elif [ "$health_status" == "unhealthy" ]; then
-            echo -e "\033[31m$container_name is unhealthy. Exiting.\033[0m"
+        elif [ $result -eq 2 ]; then
             return 1
-        else
-            echo "Waiting for $container_name to become healthy... ($((i+1))/$retries)"
-            sleep $wait_seconds
         fi
-        i=$((i+1))
-    done
 
-    echo -e "\033[31mTimeout waiting for $container_name to become healthy. Exiting.\033[0m"
+        # Step 2: give up after the timeout, otherwise look again in 5 s.
+        if [ "$timeout_seconds" -gt 0 ] && [ $waited -ge "$timeout_seconds" ]; then
+            echo -e "\033[31mTimeout after ${timeout_seconds}s waiting for $what. Exiting.\033[0m"
+            return 1
+        fi
+        echo "Waiting for $what... (${waited}s)"
+        sleep 5
+        waited=$((waited + 5))
+    done
+}
+
+# One look at a container's Docker health: 0 healthy, 2 unhealthy, 1 not yet.
+container_is_healthy() {
+    local container_name=$1
+    health_status=$(docker inspect --format='{{.State.Health.Status}}' "$container_name" 2>/dev/null)
+    if [ "$health_status" == "healthy" ]; then
+        echo "$container_name is healthy."
+        return 0
+    elif [ "$health_status" == "unhealthy" ]; then
+        echo -e "\033[31m$container_name is unhealthy. Exiting.\033[0m"
+        return 2
+    fi
     return 1
+}
+
+# Wait up to 100 s for a container to report healthy.
+check_container_health() {
+    wait_until 100 "$1 to become healthy" container_is_healthy "$1"
 }
 
 # `docker compose up` exits 0 even when the container it ran exited non-zero,
@@ -148,6 +171,28 @@ sample_container_usage() {
     echo "{\"peak_mem_mb\": $((peak / 1048576)), \"cpu_s\": $((cpu_usec / 1000000)), \"wall_s\": $(( $(date +%s) - start ))}" > "$out"
 }
 
+# One look at a running data processor, for run_data_processor_watching_health:
+# 0 once it exited, 2 when it turned unhealthy or has no health check, 1 while
+# it runs. Sets seen_healthy=true once it reports healthy.
+fetcher_exited_while_healthy() {
+    local container_name=$1
+    if [ "$(docker inspect -f '{{.State.Running}}' "$container_name" 2>/dev/null)" != "true" ]; then
+        return 0
+    fi
+    health_status=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_name")
+    if [ "$health_status" == "unhealthy" ]; then
+        echo -e "\033[31m$container_name turned unhealthy while running:\033[0m"
+        docker inspect -f '{{range .State.Health.Log}}{{.End}} exit={{.ExitCode}} {{.Output}}{{end}}' "$container_name"
+        return 2
+    elif [ "$health_status" == "none" ]; then
+        echo -e "\033[31m$container_name has no health check. Exiting.\033[0m"
+        return 2
+    elif [ "$health_status" == "healthy" ]; then
+        seen_healthy=true
+    fi
+    return 1
+}
+
 # Run the data processor for one OPERATION and watch Docker's health status of
 # the container while it runs: it must never turn unhealthy, and with
 # require_healthy=true it must report healthy at least once (#129).
@@ -168,22 +213,11 @@ run_data_processor_watching_health() {
         sampler_pid=$!
     fi
 
-    while [ "$(docker inspect -f '{{.State.Running}}' "$container_name" 2>/dev/null)" == "true" ]; do
-        health_status=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_name")
-        if [ "$health_status" == "unhealthy" ]; then
-            kill $logs_pid 2>/dev/null
-            echo -e "\033[31m$container_name turned unhealthy while running:\033[0m"
-            docker inspect -f '{{range .State.Health.Log}}{{.End}} exit={{.ExitCode}} {{.Output}}{{end}}' "$container_name"
-            return 1
-        elif [ "$health_status" == "healthy" ]; then
-            seen_healthy=true
-        elif [ "$health_status" == "none" ]; then
-            kill $logs_pid 2>/dev/null
-            echo -e "\033[31m$container_name has no health check. Exiting.\033[0m"
-            return 1
-        fi
-        sleep 5
-    done
+    # Watch until the container exits, with no time limit (the job has one).
+    if ! wait_until 0 "$container_name to finish" fetcher_exited_while_healthy "$container_name"; then
+        kill $logs_pid 2>/dev/null
+        return 1
+    fi
     kill $logs_pid 2>/dev/null
     [ -n "$sampler_pid" ] && wait "$sampler_pid"
 
@@ -314,21 +348,19 @@ else
     
     docker compose up data_processor -d
     
-    echo "Step 8.2: Waiting 2 minutes before proceeding with a progress bar..."
-    wait_seconds=120
-    for ((i=1; i<=wait_seconds; i++)); do
-        bar=$(printf '#%.0s' $(seq 1 $((i*90/wait_seconds))))
-        printf "\rWaiting: [%-90s] %d/%d seconds" "$bar" "$i" "$wait_seconds"
-        sleep 1
-    done
-    echo -e "\nDone waiting."
+    echo "Step 8.2: Waiting until the API reports the loop published and cleaned up (#204)"
+    # system_tests/fetcher_published.py asks /service_health once, from inside
+    # the API container: done when publishing and clean_all_source_data both
+    # succeeded, failed when the fetcher is unhealthy. At most 3 minutes.
+    wait_until 180 "the loop's publishing and clean_all_source_data" \
+        docker exec raw-data-api python system_tests/fetcher_published.py || exit 1
 
     check_container_health "raw-data-api" || exit 1
     check_container_health "data-fetcher" || exit 1
 
     echo "Step 8.3: Checking the quality indicators the loop just published"
-    # The loop publishes and then cleans the local quality folder within the
-    # wait above, so check the copy it uploaded to the test dataset.
+    # The loop cleaned the local quality folder after publishing, so check
+    # the copy it uploaded to the test dataset.
     run_quality_gate \
         -e KAGGLE_API_TOKEN=${KAGGLE_API_TOKEN} \
         -e KAGGLE_DATASET_REMOTE_NAME=${KAGGLE_DATASET_REMOTE_NAME} || exit 1

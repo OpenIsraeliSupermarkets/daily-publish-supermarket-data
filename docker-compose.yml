@@ -40,6 +40,9 @@ services:
       - ENABLED_FILE_TYPES=${ENABLED_FILE_TYPES}
       - LOG_LEVEL=${LOG_LEVEL:-WARNING}
       - API_TOKEN=${API_TOKEN}
+    # Read-only, for the fetcher's health files in /service_health (#204)
+    volumes:
+      - app_data:/usr/src/app/app_data:ro
     networks:
       - mongo-network
     restart: unless-stopped
